@@ -38,9 +38,9 @@ platform's own `docker-compose.local.yml` stack.
 
 | Component | Image | Default port | Purpose |
 | --- | --- | ---: | --- |
-| Integration Hub Backend | `ghcr.io/zequent/zqnt-integration-hub-backend:latest` | `8080` | Go API: connector/mapping/vault CRUD, the running bridge engine, and (optional) the Zequent platform bridge |
+| Integration Hub Backend | `ghcr.io/zequent/zqnt-integration-hub-backend:1.1.0` | `8080` | Go API: connector/mapping/vault CRUD, the running bridge engine, and (optional) the Zequent platform bridge |
 
-The console dashboard's own image (`ghcr.io/zequent/zqnt-admin-console-dashboard`) is what serves
+The console dashboard's own image (`ghcr.io/zequent/zqnt-platform-console`) is what serves
 Integration Hub's UI now — no separate frontend image is part of a console-embedded deployment.
 
 `ghcr.io/zequent/zqnt-integration-hub-frontend` still exists as its own published image (built from

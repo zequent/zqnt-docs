@@ -52,14 +52,16 @@ Zequent platform services are run from published container images. Use versioned
 
 | Component | Image | Default port | Customer-facing purpose |
 | --- | --- | ---: | --- |
-| Connector Service | `ghcr.io/zequent/connector-service:latest` | `8010` | System of record: assets, organizations, applications/skills, schedulers, technical config, telemetry persistence |
-| Remote Control Service | `ghcr.io/zequent/remote-control-service:latest` | `8002` | Direct asset commands such as takeoff, go-to, return-to-home, dock, camera, and manual-control commands |
-| Live Data Service | `ghcr.io/zequent/live-data-service:latest` | `8003` | Live telemetry, detections, and skill-execution progress streams |
-| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:latest` | `8004` | Executes Applications/Skills and manages schedulers |
-| Admin Console API | `ghcr.io/zequent/admin-console-service:latest` | `8005` | HTTP/WebSocket API for the Admin Console |
-| Admin Console UI | `ghcr.io/zequent/zqnt-admin-console-dashboard:latest` | `3001` | Browser UI: asset monitoring, live streams, manual control, and the Applications/Skills graph editor |
+| Connector Service | `ghcr.io/zequent/connector-service:1.3.1` | `8010` | System of record: assets, organizations, applications/skills, schedulers, technical config, telemetry persistence |
+| Remote Control Service | `ghcr.io/zequent/remote-control-service:1.3.1` | `8002` | Direct asset commands such as takeoff, go-to, return-to-home, dock, camera, and manual-control commands |
+| Live Data Service | `ghcr.io/zequent/live-data-service:1.3.1` | `8003` | Live telemetry, detections, and skill-execution progress streams |
+| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:1.3.1` | `8004` | Executes Applications/Skills and manages schedulers |
+| Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.1` | `8005` | HTTP/WebSocket API for the Admin Console |
+| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.0.5` | `3001` | Browser UI: asset monitoring, live streams, manual control, and the Applications/Skills graph editor |
 
-Platform services also require **Postgres (TimescaleDB)** and **Redis** — see [docker-compose.customer.yml](docker-compose.customer.yml).
+The Admin Console UI's image is `zqnt-platform-console`, not `zqnt-admin-console-dashboard` — that name is not a real published package, and pulling it fails. Its version line (`vX.Y.Z`) is independent of the core services' `1.3.x` line.
+
+Platform services also require **Postgres (TimescaleDB)** and **Redis** — see [docker-compose.customer.yml](docker-compose.customer.yml). A runnable copy of the same file also lives at `core/docker-compose.customer.yml`, alongside `docker-compose.local.yml`/`docker-compose.env.yml`, for working directly in the monorepo — keep both copies in sync if you edit one.
 
 ### Integration Hub
 
@@ -75,23 +77,31 @@ Use these adapter images when you want a ready-made integration. Use the Edge SD
 
 | Adapter | Image | Status | Notes |
 | --- | --- | --- | --- |
-| DJI | `ghcr.io/zequent/dji-adapter:latest` | Available | DJI dock/drone integration. [Deployment guide](edge-sdk/edge-sdk-dji-adapter-deployment.md) |
-| MAVLink | `ghcr.io/zequent/zqnt-adapter-mavlink:latest` | Available | PX4/ArduPilot vehicles via MAVSDK. [Deployment guide](edge-sdk/edge-sdk-mavlink-adapter-deployment.md) |
-| Sapient | No published image yet | Source only | Bridges TCP SAPIENT edge nodes to gRPC. [Deployment guide](edge-sdk/edge-sdk-sapient-adapter-deployment.md) |
-| RNS | No published image yet | Source only | Early-stage — implements asset registration and vendor custom commands only. [Deployment guide](edge-sdk/edge-sdk-rns-adapter-deployment.md) |
+| DJI | `ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0` | Available | DJI dock/drone integration. [Deployment guide](edge-sdk/edge-sdk-dji-adapter-deployment.md) |
+| MAVLink | `ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0` | Available | PX4/ArduPilot vehicles via MAVSDK. [Deployment guide](edge-sdk/edge-sdk-mavlink-adapter-deployment.md) |
+| Sapient | `ghcr.io/zequent/zqnt-adapter-sapient:1.3.0` | Available | Bridges TCP SAPIENT edge nodes to gRPC. [Deployment guide](edge-sdk/edge-sdk-sapient-adapter-deployment.md) |
+| RNS | No versioned release yet (`latest` only) | Source only | Early-stage — implements asset registration and vendor custom commands only. [Deployment guide](edge-sdk/edge-sdk-rns-adapter-deployment.md) |
 | Betaflight | No published image yet | Source only | Serial/USB flight-controller integration; no container packaging yet. [Deployment guide](edge-sdk/edge-sdk-betaflight-adapter-deployment.md) |
 | AI Adapter | No published image yet | Early access | RTMP/RTSP video → YOLO detection → georeferenced results, with optional gimbal re-aim. Uses the standard Edge SDK adapter pattern. [Deployment guide](edge-sdk/edge-sdk-ai-adapter-deployment.md) |
 
-"Source only" / "Early access" adapters are real, working code you can run today with `uv run` — they just don't have a published container image yet. Build your own image from the adapter's own `Dockerfile` where one exists, or contact Zequent about early access to a build.
+The DJI image is `zqnt-edge-adapter-dji`, not `dji-adapter` — that older package name still exists but is stale/abandoned (only a floating `latest`, no versioned releases). "Source only" / "Early access" adapters are real, working code you can run today with `uv run` — they just don't have a versioned container image yet. Build your own image from the adapter's own `Dockerfile` where one exists, or contact Zequent about early access to a build.
+
+### Load-test / fleet simulator
+
+`ghcr.io/zequent/zqnt-simulator:1.3.3` — a Go tool that simulates a fleet of edge adapters against
+the live stack, for load-testing the Live Data gRPC telemetry ingest path and exercising
+remote-control/admin-console fleet flows without real hardware. Optional, enabled via the
+`simulator` Compose profile — not part of a normal customer deployment. See the repo's own
+`simulator/README.md` for the full env var reference.
 
 ## Deployment Configuration
 
-Container deployments use one deployment-local `.env` file referenced by [docker-compose.customer.yml](docker-compose.customer.yml).
+Container deployments use one deployment-local `.env` file referenced by [docker-compose.customer.yml](docker-compose.customer.yml). Start from [.env.customer](.env.customer) — copy it to `.env` next to the compose file and fill in every `<PLACEHOLDER>` (database/Redis passwords, your Ed25519 signing key, your license key, public dashboard URLs) before starting the stack. It contains no Zequent-internal credentials — every value is either a safe structural default or a placeholder only you can fill in.
 
 ```yaml
 services:
   connector-service:
-    image: ghcr.io/zequent/connector-service:latest
+    image: ghcr.io/zequent/connector-service:1.3.1
     env_file:
       - .env
 ```

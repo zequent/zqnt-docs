@@ -85,7 +85,7 @@ Use the same deployment-local `.env` file as the platform stack.
 ```yaml
 services:
   edge-dji:
-    image: ghcr.io/zequent/dji-adapter:latest
+    image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
     env_file:
       - .env
     ports:
@@ -115,7 +115,7 @@ spec:
     spec:
       containers:
         - name: edge-adapter-dji
-          image: ghcr.io/zequent/dji-adapter:latest
+          image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
           ports:
             - containerPort: 9001
           env:

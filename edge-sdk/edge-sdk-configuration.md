@@ -235,7 +235,7 @@ Use the deployment-local `.env` file for adapter configuration:
 ```yaml
 services:
   edge-adapter:
-    image: ghcr.io/zequent/edge-dji:latest
+    image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
     env_file:
       - .env
     ports:
@@ -256,7 +256,7 @@ spec:
     spec:
       containers:
       - name: edge-dji
-        image: ghcr.io/zequent/edge-dji:latest
+        image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
         ports:
         - containerPort: 9001
         env:

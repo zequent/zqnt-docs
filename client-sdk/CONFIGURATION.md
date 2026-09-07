@@ -6,12 +6,12 @@ Zequent platform services are run from published container images. Customer appl
 
 ## Container Configuration
 
-The public customer Compose template is [docker-compose.customer.yml](../docker-compose.customer.yml). It references one deployment-local `.env` file.
+The public customer Compose template is [docker-compose.customer.yml](../docker-compose.customer.yml). It references one deployment-local `.env` file — start from [.env.customer](../.env.customer) (`cp .env.customer .env`, then fill in every `<PLACEHOLDER>`; a runnable copy of both files also lives at the same paths under `core/` for working directly in the monorepo).
 
 ```yaml
 services:
   connector-service:
-    image: ghcr.io/zequent/connector-service:latest
+    image: ghcr.io/zequent/connector-service:1.3.1
     env_file:
       - .env
 ```
@@ -36,25 +36,26 @@ docker compose -f docker-compose.customer.yml --profile edge-dji up -d
 
 | Component | Image | Default port |
 | --- | --- | ---: |
-| Connector Service | `ghcr.io/zequent/connector-service:latest` | `8010` |
-| Remote Control Service | `ghcr.io/zequent/remote-control-service:latest` | `8002` |
-| Live Data Service | `ghcr.io/zequent/live-data-service:latest` | `8003` |
-| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:latest` | `8004` |
-| Admin Console API | `ghcr.io/zequent/admin-console-service:latest` | `8005` |
-| Admin Console UI | `ghcr.io/zequent/zqnt-admin-console-dashboard:latest` | `3001` |
+| Connector Service | `ghcr.io/zequent/connector-service:1.3.1` | `8010` |
+| Remote Control Service | `ghcr.io/zequent/remote-control-service:1.3.1` | `8002` |
+| Live Data Service | `ghcr.io/zequent/live-data-service:1.3.1` | `8003` |
+| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:1.3.1` | `8004` |
+| Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.1` | `8005` |
+| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.0.5` | `3001` |
 
-Use versioned image tags for production deployments.
+Use versioned image tags for production deployments (as above — not `:latest`). The Admin Console UI's
+version line is independent of the core services' `1.3.x` line.
 
 ## Adapter Images
 
 | Adapter | Image | Status |
 | --- | --- | --- |
-| DJI | `ghcr.io/zequent/edge-dji:latest` | Available |
-| Betaflight | `ghcr.io/zequent/edge-betaflight:latest` | Available |
-| MAVLink | `ghcr.io/zequent/edge-mavlink:latest` | Available |
-| RNS | `ghcr.io/zequent/edge-rns:latest` | Available |
-| Sapient | `ghcr.io/zequent/edge-sapient:latest` | Available |
-| AI Adapter | `ghcr.io/zequent/ai-adapter:latest` | Under development |
+| DJI | `ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0` | Available |
+| MAVLink | `ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0` | Available |
+| Sapient | `ghcr.io/zequent/zqnt-adapter-sapient:1.3.0` | Available |
+| RNS | `ghcr.io/zequent/zqnt-adapter-rns` — no versioned release yet, `latest` only | Source only |
+| Betaflight | No published image yet | Source only |
+| AI Adapter | No published image yet | Early access |
 
 ## Required `.env` Variables (Platform Deployment)
 
@@ -125,8 +126,8 @@ The Admin Console has two images:
 
 | Component | Image | Default local URL |
 | --- | --- | --- |
-| Admin Console API | `ghcr.io/zequent/admin-console-service:latest` | `http://localhost:8005` |
-| Admin Console UI | `ghcr.io/zequent/zqnt-admin-console-dashboard:latest` | `http://localhost:3001` |
+| Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.1` | `http://localhost:8005` |
+| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.0.5` | `http://localhost:3001` |
 
 The Admin Console UI needs public API and WebSocket URLs that are reachable from the user's browser.
 

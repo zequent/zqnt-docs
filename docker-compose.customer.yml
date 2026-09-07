@@ -1,6 +1,8 @@
+name: zqnt-platform-customer
+
 x-zequent-env: &zequent-env
   env_file:
-    - .env
+    - .env.customer
 
 services:
   # --- Infrastructure --------------------------------------------------
@@ -31,7 +33,7 @@ services:
 
   connector-service:
     <<: *zequent-env
-    image: ghcr.io/zequent/connector-service:latest
+    image: ghcr.io/zequent/connector-service:1.3.1
     pull_policy: always
     depends_on:
       - postgres
@@ -42,7 +44,7 @@ services:
 
   live-data-service:
     <<: *zequent-env
-    image: ghcr.io/zequent/live-data-service:latest
+    image: ghcr.io/zequent/live-data-service:1.3.1
     pull_policy: always
     depends_on:
       - connector-service
@@ -52,7 +54,7 @@ services:
 
   remote-control-service:
     <<: *zequent-env
-    image: ghcr.io/zequent/remote-control-service:latest
+    image: ghcr.io/zequent/remote-control-service:1.3.1
     pull_policy: always
     depends_on:
       - connector-service
@@ -63,7 +65,7 @@ services:
 
   mission-autonomy-service:
     <<: *zequent-env
-    image: ghcr.io/zequent/mission-autonomy-service:latest
+    image: ghcr.io/zequent/mission-autonomy-service:1.3.1
     pull_policy: always
     depends_on:
       - connector-service
@@ -74,7 +76,7 @@ services:
 
   admin-console-service:
     <<: *zequent-env
-    image: ghcr.io/zequent/admin-console-service:latest
+    image: ghcr.io/zequent/admin-console-service:1.3.1
     pull_policy: always
     depends_on:
       - connector-service
@@ -84,16 +86,26 @@ services:
     ports:
       - "8005:8005"
     restart: unless-stopped
-    # Set ADMIN_CONSOLE_CORS_ORIGINS in your .env to this deployment's real public dashboard
+    # Set ADMIN_CONSOLE_CORS_ORIGINS in your .env.customer to this deployment's real public dashboard
     # URL(s) (comma-separated) — the built-in default only covers localhost, which a real
     # customer domain never matches.
     # License activation (the console's "Activate" screen, where the customer enters the license
     # key we send them) is reachable by default. Set LICENSING_ACTIVATION_API_ENABLED=false in
-    # your .env only if you want to lock it down after the initial activation.
+    # your .env.customer only if you want to lock it down after the initial activation.
 
   admin-console-ui:
     <<: *zequent-env
-    image: ghcr.io/zequent/zqnt-admin-console-dashboard:latest
+    # Package is zqnt-platform-console (not zqnt-admin-console-dashboard, which is
+    # not a real published package — pulling it fails). It has its own version
+    # line, separate from the core services' 1.3.x line.
+    # Set in your .env.customer: BACKEND_ORIGIN=http://admin-console-service:8005 and
+    # LICENSE_API_ORIGIN=https://api.zequent.com. Both are read at runtime by this
+    # image's own server.js and silently default to localhost:8005/localhost:4000 if
+    # unset — inside this container that means itself, not admin-console-service, so
+    # the dashboard loads but has no working backend connection. Also set the
+    # NEXT_PUBLIC_BACKEND_*_HOST vars to your real public dashboard URL — see
+    # core/docs/client-sdk/CONFIGURATION.md.
+    image: ghcr.io/zequent/zqnt-platform-console:v1.3.0
     pull_policy: always
     depends_on:
       - admin-console-service
@@ -102,15 +114,17 @@ services:
     restart: unless-stopped
 
   # --- Optional edge adapters (enable with --profile) --------------------
-  # Only DJI and MAVLink have a published container image today — see
-  # README.md's adapter table. Sapient, RNS, Betaflight, and the AI adapter
-  # are real, working code but currently source-only (`uv run`); build your
-  # own image from the adapter's own Dockerfile where one exists, or see
-  # each adapter's deployment guide under edge-sdk/.
+  # DJI, MAVLink, and Sapient have a published container image today — see
+  # README.md's adapter table. RNS, Betaflight, and the AI adapter are real,
+  # working code but currently source-only (`uv run`); build your own image
+  # from the adapter's own Dockerfile where one exists, or see each
+  # adapter's deployment guide under edge-sdk/.
 
   edge-dji:
     <<: *zequent-env
-    image: ghcr.io/zequent/dji-adapter:latest
+    # Package is zqnt-edge-adapter-dji (not dji-adapter, which is a stale,
+    # abandoned package with no versioned releases).
+    image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
     pull_policy: always
     profiles: ["edge-dji"]
     ports:
@@ -119,12 +133,52 @@ services:
 
   edge-mavlink:
     <<: *zequent-env
-    image: ghcr.io/zequent/zqnt-adapter-mavlink:latest
+    image: ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0
     pull_policy: always
     profiles: ["edge-mavlink"]
     ports:
       - "9003:50051"
     restart: unless-stopped
+
+  edge-sapient:
+    <<: *zequent-env
+    image: ghcr.io/zequent/zqnt-adapter-sapient:1.3.0
+    pull_policy: always
+    profiles: ["edge-sapient"]
+    ports:
+      - "9002:14000"   # SAPIENT_PORT — TCP port edge nodes connect to
+      - "9004:50051"   # GRPC_PORT — platform command interface
+    restart: unless-stopped
+
+  # --- Optional load-test / fleet simulator (enable with --profile) ------
+  # Simulates a fleet of edge adapters against the live stack, for load-testing the Live Data
+  # gRPC telemetry ingest path and exercising remote-control/admin-console fleet flows without
+  # real hardware. Not part of a normal customer deployment — opt in only when you need it. See
+  # simulator/README.md for the full env var reference.
+
+  simulator:
+    <<: *zequent-env
+    image: ghcr.io/zequent/zqnt-simulator:1.3.3
+    pull_policy: always
+    profiles: ["simulator"]
+    depends_on:
+      - redis
+      - connector-service
+      - live-data-service
+      - mission-autonomy-service
+      - remote-control-service
+    ports:
+      - "9190:9190"   # EdgeAdapterService — what remote-control dials (unauthenticated)
+      - "9191:9191"   # SimulatorControlService — admin-console's fleet add/remove/list (authenticated)
+    restart: unless-stopped
+    # Set in your .env.customer: CONNECTOR_ADDR=connector-service:8010, LIVE_DATA_ADDR=live-data-service:8003,
+    # MISSION_AUTONOMY_ADDR=mission-autonomy-service:8004, REDIS_ADDR=redis:6379, and
+    # ADVERTISE_ADDR=simulator:9190 (must resolve from inside remote-control-service's own
+    # container, not just from here — its "localhost" fallback would resolve to the wrong
+    # container). DEVICE_SN defaults to SIM-DRONE-001. Set ZQNT_AUTH_ENABLED=true with
+    # AUTH_PUBLIC_KEY/AUTH_EXPECTED_ISSUER matching this deployment's real signing key so
+    # admin-console's fleet controls reach it securely — ZQNT_AUTH_ENABLED=false (no auth on
+    # SimulatorControlService) is a local-dev-only shortcut, not for a customer deployment.
 
 volumes:
   zequent_data:

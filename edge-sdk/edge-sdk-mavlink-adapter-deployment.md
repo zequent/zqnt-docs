@@ -62,7 +62,7 @@ The vehicle's MAVLink connection string (e.g. `udp://:14540`, `serial:///dev/tty
 ```yaml
 services:
   edge-mavlink:
-    image: ghcr.io/zequent/zqnt-adapter-mavlink:latest
+    image: ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0
     env_file:
       - .env
     ports:
@@ -104,7 +104,7 @@ spec:
     spec:
       containers:
         - name: edge-mavlink
-          image: ghcr.io/zequent/zqnt-adapter-mavlink:latest
+          image: ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0
           ports:
             - containerPort: 50051
           env:
