@@ -41,7 +41,7 @@ docker compose -f docker-compose.customer.yml --profile edge-dji up -d
 | Live Data Service | `ghcr.io/zequent/live-data-service:1.3.1` | `8003` |
 | Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:1.3.1` | `8004` |
 | Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.1` | `8005` |
-| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.0.5` | `3001` |
+| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.3.3` | `3001` |
 
 Use versioned image tags for production deployments (as above — not `:latest`). The Admin Console UI's
 version line is independent of the core services' `1.3.x` line.
@@ -127,7 +127,7 @@ The Admin Console has two images:
 | Component | Image | Default local URL |
 | --- | --- | --- |
 | Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.1` | `http://localhost:8005` |
-| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.0.5` | `http://localhost:3001` |
+| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.3.3` | `http://localhost:3001` |
 
 The Admin Console UI needs public API and WebSocket URLs that are reachable from the user's browser.
 

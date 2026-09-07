@@ -105,7 +105,7 @@ services:
     # the dashboard loads but has no working backend connection. Also set the
     # NEXT_PUBLIC_BACKEND_*_HOST vars to your real public dashboard URL — see
     # core/docs/client-sdk/CONFIGURATION.md.
-    image: ghcr.io/zequent/zqnt-platform-console:v1.3.0
+    image: ghcr.io/zequent/zqnt-platform-console:v1.3.3
     pull_policy: always
     depends_on:
       - admin-console-service

@@ -57,7 +57,7 @@ Zequent platform services are run from published container images. Use versioned
 | Live Data Service | `ghcr.io/zequent/live-data-service:1.3.1` | `8003` | Live telemetry, detections, and skill-execution progress streams |
 | Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:1.3.1` | `8004` | Executes Applications/Skills and manages schedulers |
 | Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.1` | `8005` | HTTP/WebSocket API for the Admin Console |
-| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.0.5` | `3001` | Browser UI: asset monitoring, live streams, manual control, and the Applications/Skills graph editor |
+| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.3.3` | `3001` | Browser UI: asset monitoring, live streams, manual control, and the Applications/Skills graph editor |
 
 The Admin Console UI's image is `zqnt-platform-console`, not `zqnt-admin-console-dashboard` — that name is not a real published package, and pulling it fails. Its version line (`vX.Y.Z`) is independent of the core services' `1.3.x` line.
 
