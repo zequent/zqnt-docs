@@ -73,7 +73,16 @@ await live.produce_telemetry(sub)
 
 `produce_telemetry` accepts either `AssetTelemetry` or `SubAssetTelemetry` — the SDK routes it correctly based on the type you pass.
 
-See [Models Reference](edge-sdk-python-models.md#telemetry) for the complete field list.
+### Which one should you publish?
+
+The choice is about **which entity the reading describes**, not what kind of device it is:
+
+- Publish **`AssetTelemetry`** when the reading describes the registered top-level **Asset** itself. An Asset can be a drone, a dock, a ground vehicle, a sensor gateway, a camera or a station. If your adapter registers a drone as a standalone Asset with no parent, its telemetry is `AssetTelemetry` — that is correct, and the platform records it with `source_type = ASSET` and no sub-asset.
+- Publish **`SubAssetTelemetry`** when the reading describes an optional child **SubAsset** belonging to an Asset — for example the drone that lives in a dock, where the dock is the Asset.
+
+`AssetTelemetry` is a superset covering every kind of Asset, so a standalone drone simply leaves the dock-only fields (`cover_state`, `air_conditioner`, `inside_temp`, `working_voltage`) as `None`. That is complete telemetry, not partial.
+
+See [Assets & Sub-Assets](../concepts/assets-and-sub-assets.md) for fully-populated examples of both configurations, and [Models Reference](edge-sdk-python-models.md#telemetry) for the complete field list.
 
 ---
 

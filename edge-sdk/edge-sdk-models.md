@@ -345,6 +345,8 @@ TelemetryRequestData data = TelemetryRequestData.builder()
 
 Unified asset and sub-asset telemetry. Exactly one of `asset` / `subAsset` must be set — which one determines `getSourceType()` (`ASSET`, `SUB_ASSET`, or `UNSPECIFIED` if neither/both are set). Position and movement fields that both an asset and a sub-asset can report (`latitude`, `longitude`, `absoluteAltitude`, `relativeAltitude`, `windSpeed`, `heading`) live directly on `TelemetryData`, not duplicated per source type.
 
+`asset` and `subAsset` describe the **source/context** of the reading — which entity it is about — not a device category. An **Asset** is the registered top-level entity (a drone, dock, ground vehicle, sensor gateway, camera or station); a **SubAsset** is an optional child entity belonging to an Asset. Set `.asset(...)` when the reading describes the Asset itself, including when that Asset *is* the drone, and `.subAsset(...)` when it describes a child SubAsset. A drone registered directly as an Asset therefore correctly reports `sourceType = ASSET` with `subAsset` left `null`. See [Assets & Sub-Assets](../concepts/assets-and-sub-assets.md) for worked examples of both configurations.
+
 **Package:** `com.zqnt.utils.edge.sdk.domains`
 
 | Field | Type | Description |
@@ -358,8 +360,8 @@ Unified asset and sub-asset telemetry. Exactly one of `asset` / `subAsset` must 
 | `relativeAltitude` | `Float` | Altitude above ground (m) |
 | `windSpeed` | `Float` | Wind speed (m/s) |
 | `heading` | `Float` | Heading (degrees) |
-| `asset` | `AssetDetails` | Set when this is asset-level telemetry (e.g. a dock) |
-| `subAsset` | `SubAssetDetails` | Set when this is sub-asset-level telemetry (e.g. a drone) |
+| `asset` | `AssetDetails` | Set when the reading describes the registered top-level Asset itself (a standalone drone, a dock, a vehicle, a sensor gateway, ...) |
+| `subAsset` | `SubAssetDetails` | Set when the reading describes a child SubAsset belonging to an Asset (e.g. a drone docked in a station) |
 
 `validate()` throws `IllegalArgumentException` if `id`/`timestamp`/`sn` are missing, or if `asset`/`subAsset` aren't set to exactly one.
 
@@ -367,7 +369,7 @@ Unified asset and sub-asset telemetry. Exactly one of `asset` / `subAsset` must 
 TelemetryData telemetry = TelemetryData.builder()
     .id(UUID.randomUUID().toString())
     .timestamp(LocalDateTime.now())
-    .sn("DOCK-1")
+    .sn("DOCK-1")          // or a standalone drone's own SN, e.g. "SIM-DRONE-001"
     .latitude(47.3769)
     .longitude(8.5417)
     .absoluteAltitude(450.0f)
@@ -379,7 +381,9 @@ TelemetryData telemetry = TelemetryData.builder()
 
 ### AssetDetails
 
-Telemetry specific to the primary asset (dock, station, or ground device). Nested under `TelemetryData.asset`.
+Telemetry describing the registered top-level Asset itself. Nested under `TelemetryData.asset`.
+
+This is a **superset** covering every kind of Asset, so not every field applies to every device. A dock populates the enclosure and climate fields (`coverState`, `airConditioner`, `insideTemp`, `workingVoltage`); a standalone drone registered as an Asset leaves those `null` and populates only what it physically has. Leaving inapplicable fields `null` is correct behaviour, not incomplete telemetry.
 
 | Field | Type | Description |
 |-------|------|-------------|

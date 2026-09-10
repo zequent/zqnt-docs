@@ -96,6 +96,61 @@ StreamTelemetryResponse(
 )
 ```
 
-Every frame carries exactly one of `asset_telemetry` (the dock) or `sub_asset_telemetry` (the drone) — never both. Note `mode` is a plain `str` here (the raw proto enum name), unlike Java where it's a typed `SubAssetMode` enum.
+Every frame carries exactly one of `asset_telemetry` or `sub_asset_telemetry` — never both. Note
+`mode` is a plain `str` here (the raw proto enum name), unlike Java where it's a typed
+`SubAssetMode` enum.
+
+**`asset_telemetry` does not mean "the dock", and `sub_asset_telemetry` does not mean "the drone".**
+They identify *which entity the reading is about*:
+
+| Populated field | The reading describes |
+| --- | --- |
+| `asset_telemetry` | the registered top-level Asset itself — which may be a drone, dock, vehicle, sensor gateway or camera |
+| `sub_asset_telemetry` | a child SubAsset belonging to that Asset |
+
+The frame above is a **hierarchical** Dock → Drone configuration: the Asset is a dock, and the drone
+is its SubAsset. A drone operated independently is registered as an Asset in its own right, and its
+telemetry arrives in `asset_telemetry` instead:
+
+```
+StreamTelemetryResponse(
+    tid='8f14e45f-ceea-467a-9575-9f2a1b0c3d4e',
+    sn='SIM-DRONE-001',
+    timestamp=datetime.datetime(2026, 8, 26, 18, 41, 57, 385000),
+    has_errors=False,
+    asset_id='c1d7f3a2-95b4-4c1e-8f6d-2a7b9e0c4513',
+    asset_telemetry=AssetTelemetry(
+        id='SIM-DRONE-001',
+        sn='SIM-DRONE-001',
+        latitude=52.52000045776367,
+        longitude=13.404999732971191,
+        absolute_altitude=34.0,
+        relative_altitude=34.0,
+        wind_speed=3.305775,
+        heading=0.0,
+        mode='ASSET_MODE_IDLE',
+        sub_asset_percentage=100.0,
+        has_active_manual_control_session=False,
+        position_valid=True,
+        position_state=AssetPositionState(gps_number=14, rtk_number=0, quality=5),
+        network_information=AssetNetworkInfo(type='NETWORK_TYPE_4_G', rate=12.4, quality='NETWORK_STATE_QUALITY_GOOD'),
+        manual_control_state='MANUAL_CONTROL_STATE_DISCONNECTED',
+        environment_temp=21.5,
+        humidity=48.0,
+        rainfall='RAINFALL_NO',
+        cover_state=None,        # dock enclosure hardware — a standalone drone has none
+        air_conditioner=None,
+        inside_temp=None,
+    ),
+    sub_asset_telemetry=None,
+    error=None,
+)
+```
+
+`sub_asset_telemetry=None` here is correct and complete, not missing data. `AssetTelemetry` is a
+superset covering every kind of Asset; each device populates the fields that physically apply to
+it. See [Assets & Sub-Assets](../concepts/assets-and-sub-assets.md) for the full model.
+
+Note `SubAssetBatteryInfo.percentage` and `return_to_home_power` are `str`, not numbers.
 
 See [CONNECTOR_PYTHON.md](CONNECTOR_PYTHON.md) for looking up asset state on demand instead of streaming it, and [QUICKSTART_PYTHON.md](QUICKSTART_PYTHON.md) for how `client.remote_control` / `client.live_data` get wired up in the first place.

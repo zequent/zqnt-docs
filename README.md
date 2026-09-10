@@ -15,6 +15,7 @@ This public documentation is for external developers and integration teams. It f
 | Goal | Documentation |
 | --- | --- |
 | Understand what you can build on Zequent | [Applications & Skills](concepts/applications-and-skills.md) |
+| Understand Assets vs SubAssets, and how telemetry identifies its source | [Assets & Sub-Assets](concepts/assets-and-sub-assets.md) |
 | Use Zequent from a Java application | [Java Client SDK Quickstart](client-sdk/QUICKSTART.md) |
 | Use Zequent from a Python application | [Python Client SDK Quickstart](client-sdk/QUICKSTART_PYTHON.md) |
 | Use Zequent from a Go application | [Go Client SDK Quickstart](client-sdk/QUICKSTART_GO.md) |

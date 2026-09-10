@@ -96,6 +96,31 @@ data:{
 }
 ```
 
-Every frame carries exactly one of `asset` (the dock) or `sub_asset` (the drone) via `Telemetry.Source` — never both.
+Every frame carries exactly one of `asset` or `sub_asset` via `Telemetry.Source` — never both.
+
+**`asset` does not mean "the dock", and `sub_asset` does not mean "the drone".** They identify
+*which entity the reading is about*:
+
+| Populated | The reading describes |
+| --- | --- |
+| `asset` | the registered top-level Asset itself — a drone, dock, vehicle, sensor gateway or camera |
+| `sub_asset` | a child SubAsset belonging to that Asset |
+
+The frame above is a **hierarchical** Dock → Drone configuration. A drone operated independently is
+registered as an Asset in its own right, and its readings arrive in `asset` instead — with
+`sub_asset` unset:
+
+```
+tid:"8f14e45f-ceea-467a-9575-9f2a1b0c3d4e"  timestamp:{seconds:1756233717}  has_errors:false  sn:"SIM-DRONE-001"  asset_id:"c1d7f3a2-95b4-4c1e-8f6d-2a7b9e0c4513"
+data:{
+    id:"SIM-DRONE-001"  sn:"SIM-DRONE-001"  latitude:52.52000045776367  longitude:13.404999732971191  absolute_altitude:34  relative_altitude:34  wind_speed:3.305775  heading:0
+    asset:{mode:ASSET_MODE_IDLE  sub_asset_percentage:100  has_active_manual_control_session:false  position_valid:true  position_state:{gps_number:14  rtk_number:0  quality:5}  network_information:{type:NETWORK_TYPE_4_G  rate:12.4  quality:NETWORK_STATE_QUALITY_GOOD}  manual_control_state:MANUAL_CONTROL_STATE_DISCONNECTED  environment_temp:21.5  humidity:48  rainfall:RAINFALL_NO}
+}
+```
+
+`GetSubAsset()` returning `nil` here is correct and complete, not missing data — dock-only fields
+such as `cover_state` and `air_conditioner` are simply unset for a device that has no enclosure.
+Switch on which of `GetAsset()` / `GetSubAsset()` is non-nil rather than assuming a device
+category. See [Assets & Sub-Assets](../concepts/assets-and-sub-assets.md) for the full model.
 
 See [CONNECTOR_GO.md](CONNECTOR_GO.md) for looking up asset state on demand instead of streaming it, and [QUICKSTART_GO.md](QUICKSTART_GO.md) for how `remotecontrol.New()` / `livedata.New()` get wired up in the first place.

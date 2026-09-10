@@ -53,7 +53,9 @@ Per-device stream --> Live Data Service (platform)
 
 ### Build the telemetry payload
 
-`TelemetryData` is a single class with two nested detail types, `AssetDetails` and `SubAssetDetails` -- set exactly one of `.asset(...)` / `.subAsset(...)` depending on whether this is dock/station-level or drone/vehicle-level telemetry. Shared position fields (`latitude`, `longitude`, `absoluteAltitude`, `relativeAltitude`, `windSpeed`, `heading`) live directly on `TelemetryData`, not duplicated per source.
+`TelemetryData` is a single class with two nested detail types, `AssetDetails` and `SubAssetDetails` -- set exactly one of `.asset(...)` / `.subAsset(...)` depending on whether the reading describes the registered top-level **Asset** itself or one of its child **SubAssets**. Shared position fields (`latitude`, `longitude`, `absoluteAltitude`, `relativeAltitude`, `windSpeed`, `heading`) live directly on `TelemetryData`, not duplicated per source.
+
+This is a source/context distinction, not a device-category one. An Asset can be a drone, a dock, a ground vehicle, a sensor gateway or a camera. If your adapter registers a drone as a standalone Asset with no parent, its telemetry uses `.asset(...)` and `getSourceType()` correctly returns `ASSET`. If the drone belongs to a dock, the dock is the Asset and the drone's readings use `.subAsset(...)`. Both configurations are supported -- see [Assets & Sub-Assets](../concepts/assets-and-sub-assets.md).
 
 ```java
 import com.zqnt.utils.edge.sdk.domains.TelemetryData;
