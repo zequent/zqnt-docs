@@ -33,7 +33,7 @@ services:
 
   connector-service:
     <<: *zequent-env
-    image: ghcr.io/zequent/connector-service:1.3.1
+    image: ghcr.io/zequent/connector-service:1.3.2
     pull_policy: always
     depends_on:
       - postgres
@@ -44,7 +44,7 @@ services:
 
   live-data-service:
     <<: *zequent-env
-    image: ghcr.io/zequent/live-data-service:1.3.1
+    image: ghcr.io/zequent/live-data-service:1.3.2
     pull_policy: always
     depends_on:
       - connector-service
@@ -54,7 +54,7 @@ services:
 
   remote-control-service:
     <<: *zequent-env
-    image: ghcr.io/zequent/remote-control-service:1.3.1
+    image: ghcr.io/zequent/remote-control-service:1.3.2
     pull_policy: always
     depends_on:
       - connector-service
@@ -65,7 +65,7 @@ services:
 
   mission-autonomy-service:
     <<: *zequent-env
-    image: ghcr.io/zequent/mission-autonomy-service:1.3.1
+    image: ghcr.io/zequent/mission-autonomy-service:1.3.2
     pull_policy: always
     depends_on:
       - connector-service
@@ -76,7 +76,7 @@ services:
 
   admin-console-service:
     <<: *zequent-env
-    image: ghcr.io/zequent/admin-console-service:1.3.1
+    image: ghcr.io/zequent/admin-console-service:1.3.2
     pull_policy: always
     depends_on:
       - connector-service

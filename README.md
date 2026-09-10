@@ -52,11 +52,11 @@ Zequent platform services are run from published container images. Use versioned
 
 | Component | Image | Default port | Customer-facing purpose |
 | --- | --- | ---: | --- |
-| Connector Service | `ghcr.io/zequent/connector-service:1.3.1` | `8010` | System of record: assets, organizations, missions and tasks, schedulers, technical config, telemetry persistence |
-| Remote Control Service | `ghcr.io/zequent/remote-control-service:1.3.1` | `8002` | Direct asset commands such as takeoff, go-to, return-to-home, dock, camera, and manual-control commands |
-| Live Data Service | `ghcr.io/zequent/live-data-service:1.3.1` | `8003` | Live telemetry, detections, and task-progress notification streams |
-| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:1.3.1` | `8004` | Executes mission tasks and manages schedulers |
-| Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.1` | `8005` | HTTP/WebSocket API for the Admin Console |
+| Connector Service | `ghcr.io/zequent/connector-service:1.3.2` | `8010` | System of record: assets, organizations, missions and tasks, schedulers, technical config, telemetry persistence |
+| Remote Control Service | `ghcr.io/zequent/remote-control-service:1.3.2` | `8002` | Direct asset commands such as takeoff, go-to, return-to-home, dock, camera, and manual-control commands |
+| Live Data Service | `ghcr.io/zequent/live-data-service:1.3.2` | `8003` | Live telemetry, detections, and task-progress notification streams |
+| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:1.3.2` | `8004` | Executes mission tasks and manages schedulers |
+| Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.2` | `8005` | HTTP/WebSocket API for the Admin Console |
 | Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.3.3` | `3001` | Browser UI: asset monitoring, live streams, manual control, and mission planning |
 
 The Admin Console UI's image is `zqnt-platform-console`, not `zqnt-admin-console-dashboard` — that name is not a real published package, and pulling it fails. Its version line (`vX.Y.Z`) is independent of the core services' `1.3.x` line.
@@ -93,7 +93,7 @@ Container deployments use one deployment-local `.env` file referenced by [docker
 ```yaml
 services:
   connector-service:
-    image: ghcr.io/zequent/connector-service:1.3.1
+    image: ghcr.io/zequent/connector-service:1.3.2
     env_file:
       - .env
 ```
