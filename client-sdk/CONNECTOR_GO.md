@@ -1,7 +1,7 @@
 # Zequent Client SDK (Go) — Connector
 
 `connector.New(conn)` gives your Go application direct access to the platform's system of record:
-asset lookup, the Skill Registry, scheduler management, technical configuration, and operational
+asset lookup, mission and task management, scheduler management, technical configuration, and operational
 policies. See [CONNECTOR.md](CONNECTOR.md) / [CONNECTOR_PYTHON.md](CONNECTOR_PYTHON.md) for the
 Java/Python equivalents — same backend service, same underlying data.
 
@@ -33,33 +33,14 @@ asset, err := c.GetAssetBySn(ctx, "YOUR_DEVICE_SN")
 This package only exposes read access to assets so far — registration/update is normally done by an
 edge adapter, not a customer app (see the edge SDK docs).
 
-## Skill Contracts
+## Capabilities
 
-Every connected asset self-reports which commands it actually supports through its edge adapter —
-that's a **Skill Contract**. Customer applications typically only need to *read* this registry (e.g.
-to build a UI that only shows buttons for commands an asset actually supports); an edge adapter is
-what *writes* to it.
-
-| Method | Purpose |
-| --- | --- |
-| `ObserveSkillContract(ctx, contract)` | Register/update a command contract (normally called by an edge adapter) |
-| `ListSkillContracts(ctx, status, commandID)` | List known command contracts, optionally filtered by status and/or command ID |
-| `SetSkillContractStatus(ctx, id, status)` | Change a contract's status (e.g. deprecate it) |
-| `SetSkillContractPermissions(ctx, id, requiredPermissions)` | Set which roles/permissions are required to invoke a command |
-
-```go
-contracts, err := c.ListSkillContracts(ctx, nil, "flight.takeoff")
-for _, contract := range contracts {
-    fmt.Println(contract.GetCommandId(), contract.GetSchemaVersion())
-}
-```
-
-Pass `nil` for `status` to list every status; pass `""` for `commandID` to list every command.
+Ask what an asset supports before offering it as an option — the returned snapshot lists each
+command id with its target type and input schema. What an asset reports comes from its edge adapter.
 
 ## Schedulers
 
-Schedulers define when and how often a Skill or command runs (see
-[Applications & Skills](../concepts/applications-and-skills.md)).
+Schedulers define when and how often a task or command runs.
 
 | Method | Purpose |
 | --- | --- |

@@ -5,7 +5,7 @@ Zequent is a platform for connecting, monitoring, and controlling remote assets 
 This public documentation is for external developers and integration teams. It focuses on:
 
 - using the Client SDKs from customer applications
-- building and running **Applications** (capability packages) and **Skills** — the platform's graph-based automation model
+- creating missions and waypoint tasks and running them on connected assets
 - building custom edge adapters with the Edge SDKs
 - running Zequent platform services from published container images
 - deploying supported edge adapter images
@@ -14,9 +14,9 @@ This public documentation is for external developers and integration teams. It f
 
 | Goal | Documentation |
 | --- | --- |
-| Understand what you can build on Zequent | [Applications & Skills](concepts/applications-and-skills.md) |
 | Understand Assets vs SubAssets, and how telemetry identifies its source | [Assets & Sub-Assets](concepts/assets-and-sub-assets.md) |
 | Use Zequent from a Java application | [Java Client SDK Quickstart](client-sdk/QUICKSTART.md) |
+| Fly a waypoint mission from your own application | [Waypoint Missions](client-sdk/WAYPOINT_MISSIONS.md) |
 | Use Zequent from a Python application | [Python Client SDK Quickstart](client-sdk/QUICKSTART_PYTHON.md) |
 | Use Zequent from a Go application | [Go Client SDK Quickstart](client-sdk/QUICKSTART_GO.md) |
 | Configure a customer application / deployment | [Client SDK Configuration](client-sdk/CONFIGURATION.md) |
@@ -26,13 +26,12 @@ This public documentation is for external developers and integration teams. It f
 | Build a custom Go edge adapter | [Go Edge SDK Quickstart](edge-sdk/edge-sdk-go-quickstart.md) — older API surface, see the doc's status note |
 | Configure an edge adapter | [Edge SDK Configuration](edge-sdk/edge-sdk-configuration.md) |
 | Deploy a ready-made adapter | [DJI](edge-sdk/edge-sdk-dji-adapter-deployment.md) · [MAVLink](edge-sdk/edge-sdk-mavlink-adapter-deployment.md) · [Sapient](edge-sdk/edge-sdk-sapient-adapter-deployment.md) · [RNS](edge-sdk/edge-sdk-rns-adapter-deployment.md) · [Betaflight](edge-sdk/edge-sdk-betaflight-adapter-deployment.md) · [AI Adapter](edge-sdk/edge-sdk-ai-adapter-deployment.md) |
-| Stand up your first organization, users, or connect SSO | [Organizations, Users & Single Sign-On](admin/organizations-and-sso.md) |
-| Bridge external systems (MQTT, Kafka, OPC-UA, ...) into Skills and back out again | [Integration Hub](integrations/integration-hub.md) |
+
 
 ## What You Can Build
 
 - **Direct control** — takeoff, go-to, return-to-home, dock open/close, camera and gimbal control, and live joystick-style manual control, called directly from your application via the Client SDK.
-- **Applications & Skills** — multi-step, graph-based automations ("Skills") authored visually in the Admin Console and bundled into versioned **Applications**. Trigger a Skill against an asset from your own code, track its progress, and pause/resume/cancel it — without hand-coding a state machine per workflow. See [Applications & Skills](concepts/applications-and-skills.md).
+- **Missions & Tasks** — define a mission, attach waypoint tasks to it, and start, pause, resume or stop them from your own code. See [Waypoint Missions](client-sdk/WAYPOINT_MISSIONS.md).
 - **Live telemetry & detections** — subscribe to real-time position, battery, and sensor telemetry, and AI detection results, streamed from every connected asset.
 - **Live video** — start/stop live video streams from a connected asset's camera and view them in the Admin Console or your own player.
 - **Custom hardware integrations** — build a new edge adapter with the Edge SDK for any device that isn't already supported, using the same command/telemetry contract every built-in adapter uses.
@@ -53,24 +52,16 @@ Zequent platform services are run from published container images. Use versioned
 
 | Component | Image | Default port | Customer-facing purpose |
 | --- | --- | ---: | --- |
-| Connector Service | `ghcr.io/zequent/connector-service:1.3.1` | `8010` | System of record: assets, organizations, applications/skills, schedulers, technical config, telemetry persistence |
+| Connector Service | `ghcr.io/zequent/connector-service:1.3.1` | `8010` | System of record: assets, organizations, missions and tasks, schedulers, technical config, telemetry persistence |
 | Remote Control Service | `ghcr.io/zequent/remote-control-service:1.3.1` | `8002` | Direct asset commands such as takeoff, go-to, return-to-home, dock, camera, and manual-control commands |
-| Live Data Service | `ghcr.io/zequent/live-data-service:1.3.1` | `8003` | Live telemetry, detections, and skill-execution progress streams |
-| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:1.3.1` | `8004` | Executes Applications/Skills and manages schedulers |
+| Live Data Service | `ghcr.io/zequent/live-data-service:1.3.1` | `8003` | Live telemetry, detections, and task-progress notification streams |
+| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:1.3.1` | `8004` | Executes mission tasks and manages schedulers |
 | Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.1` | `8005` | HTTP/WebSocket API for the Admin Console |
-| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.3.3` | `3001` | Browser UI: asset monitoring, live streams, manual control, and the Applications/Skills graph editor |
+| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.3.3` | `3001` | Browser UI: asset monitoring, live streams, manual control, and mission planning |
 
 The Admin Console UI's image is `zqnt-platform-console`, not `zqnt-admin-console-dashboard` — that name is not a real published package, and pulling it fails. Its version line (`vX.Y.Z`) is independent of the core services' `1.3.x` line.
 
 Platform services also require **Postgres (TimescaleDB)** and **Redis** — see [docker-compose.customer.yml](docker-compose.customer.yml). A runnable copy of the same file also lives at `core/docker-compose.customer.yml`, alongside `docker-compose.local.yml`/`docker-compose.env.yml`, for working directly in the monorepo — keep both copies in sync if you edit one.
-
-### Integration Hub
-
-A separate, optional service for bridging external systems (MQTT, Kafka, OPC-UA, WebSocket,
-HTTP/OpenAPI) into the platform and back out again — including as Skill-invocable capabilities and
-Skill-execution triggers. Backend has its own container image and its own Postgres database; its UI
-is natively embedded in the Admin Console dashboard (not a separate image, in a console-embedded
-deployment). See the [Integration Hub deployment guide](integrations/integration-hub.md).
 
 ## Edge Adapter Images
 
@@ -144,10 +135,8 @@ The Admin Console is split into an API image and a UI image.
 | Admin Console UI | `http://localhost:3001` |
 | Admin Console API | `http://localhost:8005` |
 
-The Admin Console provides browser workflows for asset monitoring, telemetry, the Applications/Skills graph editor, remote control, live streams, adapter management, licensing, and service health.
+The Admin Console provides browser workflows for asset monitoring, telemetry, mission planning, remote control, live streams, adapter management, licensing, and service health.
 
-For bootstrapping your first organization and users, or connecting an organization to its own SSO
-identity provider, see [Organizations, Users & Single Sign-On](admin/organizations-and-sso.md).
 
 ## SDK Requirements
 

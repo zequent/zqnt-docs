@@ -85,12 +85,18 @@ Progress flows back to the platform via `LiveDataService.produce_notification`, 
 | Receiving `prepare_task`/`start_task`/`stop_task` calls | `EdgeAdapter` — see [Edge Adapter](edge-sdk-python-adapter.md) |
 | Vendor-specific commands | `EdgeAdapter.send_custom_command` (above) |
 | Reporting progress/telemetry while a task runs | `LiveDataService` — see [Live Data](edge-sdk-python-live-data.md) |
-| Declaring which commands your adapter supports | `ConnectorClient`'s Skill Contract registry — see [Connector](edge-sdk-python-connector.md#skill-contracts) |
-| Authoring, deploying, and triggering multi-step Applications/Skills | The **Client SDK**, used by customer applications — see [Applications & Skills](../concepts/applications-and-skills.md) |
+| Declaring which commands your adapter supports | `get_capabilities` on `EdgeAdapter` — see [Connector](edge-sdk-python-connector.md#capabilities) |
+| Creating missions and tasks, and triggering them | The **Client SDK**, used by customer applications |
 
 ---
 
 ## Best practices
+
+> These apply if your adapter implements the task methods — that is, it can resolve a task ID
+> through the Connector, as the SAPIENT adapter does. If it instead accepts
+> `mission.waypoint.execute` through `send_custom_command` (the MAVLink approach), the waypoints
+> and configuration arrive inline and none of this applies. See
+> [Edge Adapter](edge-sdk-python-adapter.md#tasks).
 
 - **Validate in `prepare_task`**; return an error there if you can't handle the task. Don't accept and then fail in `start_task`.
 - **Make `start_task` non-blocking.** Schedule the work and return success immediately. Use `LiveDataService` to report state.

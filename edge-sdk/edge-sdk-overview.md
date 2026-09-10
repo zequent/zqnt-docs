@@ -28,7 +28,7 @@ The primary interface that every edge adapter must implement. It declares comman
 
 ### ConnectorService
 
-Provides access to the platform's Connector Service over gRPC: register and manage your asset(s), look up schedulers and organizations, and report which commands your adapter supports through the Skill Contract registry.
+Provides access to the platform's Connector Service over gRPC: register and manage your asset(s), and look up missions, tasks, schedulers and organizations.
 
 ### LiveDataService
 
@@ -36,7 +36,7 @@ Manages persistent gRPC telemetry streams. It lets you push asset and sub-asset 
 
 ### MissionAutonomyService
 
-Communicates with the Mission Autonomy Service over gRPC to look up scheduler definitions. Task execution itself is driven by the platform calling *into* your adapter (see `EdgeAdapterService`), not by the adapter polling this service — and multi-step, graph-based automations (Applications/Skills) are authored and triggered through the **Client SDK**, not the Edge SDK. See [Applications & Skills](../concepts/applications-and-skills.md).
+Communicates with the Mission Autonomy Service over gRPC to look up scheduler definitions. Task execution itself is driven by the platform calling *into* your adapter (see `EdgeAdapterService`), not by the adapter polling this service. Missions and tasks are authored and triggered through the **Client SDK**, not the Edge SDK.
 
 ## Available Documentation
 

@@ -10,7 +10,7 @@ This SDK predates the platform's current Skill/Capability/Application model. Its
 (`EdgeAdapter`), and its `connector`/`missionautonomy` client packages, are still on the **old**
 Mission/Task/Scheduler contract (`CreateMission`, `CreateTask`, `StartTask`, `GetCapabilities`'s
 2-value `available bool` schema) — not the Skill Registry / Application-and-Skill graph model the
-[Applications & Skills](../concepts/applications-and-skills.md) concept doc and the Java/Python Edge
+Java/Python Edge
 SDK docs describe. It's real, tagged (`v1.0.0`/`v1.0.1`), published (`go get
 github.com/Zequent/zqnt-edge-sdk-go@latest` works), and CI'd — just architecturally older than its
 Java/Python counterparts.

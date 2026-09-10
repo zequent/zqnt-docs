@@ -41,7 +41,7 @@ org = await client.connector.get_organization()
 
 ## Schedulers
 
-Schedulers define when and how often a Skill or command runs (see [Applications & Skills](../concepts/applications-and-skills.md)).
+Schedulers define when and how often a task or command runs.
 
 ```python
 from client_sdk.models import SchedulerDTO
@@ -61,15 +61,18 @@ policies = await client.connector.get_active_policies_by_type("GEOFENCE")
 all_policies = await client.connector.get_all_active_policies()
 ```
 
-## Skill Contracts
+## Capabilities
 
-Every connected asset self-reports which commands it actually supports through its edge adapter — that's a **Skill Contract**. Customer applications typically only need to *read* this registry; an edge adapter is what *writes* to it (see [Edge SDK (Python) — Connector](../edge-sdk/edge-sdk-python-connector.md#skill-contracts)).
+Ask what an asset supports before offering it as an option:
 
 ```python
-contracts = await client.connector.list_skill_contracts(status="ACTIVE")
-for c in contracts:
-    print(c.command_id)
+snapshot = await client.remote_control.get_capabilities(sn)
+for capability in snapshot.capabilities:
+    print(capability.command_id, capability.state)
 ```
+
+What an asset reports comes from its edge adapter — see
+[Edge SDK (Python) — Connector](../edge-sdk/edge-sdk-python-connector.md#capabilities).
 
 ## Error handling
 

@@ -273,7 +273,7 @@ What you don't have to write yourself:
 - Retry/circuit-breaker logic.
 - Environment-switch handling in code.
 
-For running multi-step automations instead of one-off commands, see [Applications & Skills](../concepts/applications-and-skills.md).
+For flying a waypoint mission instead of one-off commands, see [Waypoint Missions](WAYPOINT_MISSIONS.md).
 
 ## Support
 

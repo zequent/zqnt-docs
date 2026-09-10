@@ -267,6 +267,24 @@ client.remoteControl().sendCustomCommand(...)
 ```
 See [Remote Control](REMOTE_CONTROL.md) for the full method reference.
 
+### Flying a waypoint mission
+
+**There are two execution paths on 1.3.x, and which one applies depends on your adapter.** DJI uses
+the task-based path; MAVLink and the simulator use a single command. They are not interchangeable:
+
+```java
+// Task-based (DJI)
+client.missionAutonomy().createTask(taskDTO)      // taskType = TASK_TYPE_WAYPOINT
+client.missionAutonomy().startTask(taskId)
+
+// Command-based (MAVLink, simulator)
+client.remoteControl().sendCustomCommand(request) // commandType = "mission.waypoint.execute"
+```
+
+Both are configured with the same `WaypointTaskConfig`. Read
+**[Waypoint Missions](WAYPOINT_MISSIONS.md)** before writing either — it has the per-adapter table,
+the full parameter contract and progress tracking.
+
 ### Mission Autonomy — missions, tasks & scheduling
 ```java
 client.missionAutonomy().createMission(missionDTO)
@@ -278,7 +296,12 @@ client.missionAutonomy().stopTask(taskId)
 client.missionAutonomy().uploadMissionNfzZones(missionId, zones, replaceExisting)
 client.missionAutonomy().createScheduler(schedulerDTO)
 ```
-See [Applications & Skills](../concepts/applications-and-skills.md) for the full picture — running the graph-based automations you build in the Admin Console.
+
+The task lifecycle methods forward a bare task ID to the adapter, which then fetches the Task
+itself. They work only where the adapter implements them — DJI and SAPIENT do; MAVLink, the
+simulator, Betaflight and RNS do not, and return `startTask is not implemented for this asset`.
+See [Waypoint Missions](WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use).
+
 
 ### Live Data
 ```java

@@ -155,8 +155,8 @@ async def return_home(sn: str, client: ZequentClient = Depends(get_client)):
 
 
 # ----------------------------------------------------------------------
-# Mission Autonomy — Applications & Skills
-# See: ../concepts/applications-and-skills.md
+# Mission Autonomy — missions & tasks
+# See: WAYPOINT_MISSIONS.md
 # ----------------------------------------------------------------------
 
 @app.post("/drones/{sn}/skills/execute")

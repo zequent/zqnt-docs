@@ -84,23 +84,6 @@ Every platform service verifies a license lease before performing protected oper
 
 Activation is a one-time step performed from the Admin Console once it's running — see [Licensing](../README.md#licensing).
 
-### Authentication & SSO
-
-Local email+password authentication works with no configuration beyond the variables below. Every
-platform user belongs to one organization by default; connecting an organization to its own OIDC
-identity provider (SSO) instead is an opt-in step performed after the deployment is running — see
-[Organizations, Users & Single Sign-On](../admin/organizations-and-sso.md) for the full walkthrough
-(bootstrapping the first user, creating organizations, configuring SSO, and testing it locally).
-
-| Variable | Applies to | Notes |
-| --- | --- | --- |
-| `AUTH_PRIVATE_KEY` | Admin Console only | Ed25519 private key (PKCS8, base64) that signs every bearer token this deployment issues. Generate your own for production — never reuse a development default |
-| `AUTH_PUBLIC_KEY` | All services | The matching Ed25519 public key, used to verify bearer tokens. Same value on every service |
-| `AUTH_ISSUER` | Admin Console only | Issuer claim this deployment stamps on tokens it mints |
-| `AUTH_EXPECTED_ISSUER` | All services | Issuer claim every service requires on a token it verifies — normally the same value as `AUTH_ISSUER` |
-| `AUTH_SYSTEM_ADMIN_EMAIL` | Connector Service | Email for the one `system_admin` user seeded automatically on first boot against an empty database |
-| `OIDC_REDIRECT_URI` | Admin Console only | Only needed if any organization uses SSO — your Admin Console UI's own callback URL, registered as the allowed redirect URI on every configured identity provider |
-
 ## Client SDK Service Endpoints
 
 Customer applications need the platform service hostnames and ports.

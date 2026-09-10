@@ -70,6 +70,10 @@ client.connector().getOrganization(request)
 
 `MissionResponse`/`TaskResponse`/`WaypointsResponse` use `isSuccess()` + `getError()` rather than the `getHasErrors()` pattern above — check `success` before reading the response payload.
 
+> These methods create and read mission **records**. Creating one does not fly anything by itself.
+> How a flight is actually triggered depends on the adapter — see
+> [Waypoint Missions](WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use).
+
 ```java
 import com.zqnt.utils.missionautonomy.domains.MissionDTO;
 import com.zqnt.utils.mission.proto.MissionType;
@@ -135,6 +139,10 @@ client.connector().uploadMissionNfzZones(request)
 | `deleteTask(DeleteTaskRequest)` | Delete a task |
 | `getWaypointsByTaskId(GetWaypointsByTaskIdRequest)` | Get the resolved waypoint list for a task |
 
+> As with missions, these manage task **records**. Creating a task does not start it. `startTask`
+> reaches the device only where the adapter implements the task methods (DJI, SAPIENT) — see
+> [Waypoint Missions](WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use).
+
 ```java
 var request = GetTaskByFlightIdRequest.builder()
     .flightId("FLIGHT-20260901-0001")
@@ -148,7 +156,7 @@ client.connector().getTaskByFlightId(request)
 
 ## Schedulers
 
-Schedulers define when and how often a Skill or command runs (see [Applications & Skills](../concepts/applications-and-skills.md)).
+Schedulers define when and how often a task or command runs.
 
 | Method | Purpose |
 | --- | --- |
@@ -182,18 +190,19 @@ Read-only lookups useful when your application needs to mirror platform-side con
 | `getActivePoliciesByType(GetPoliciesRequest)` | Fetch active operational policies of a given type |
 | `getAllActivePolicies(GetAllActivePoliciesRequest)` | Fetch every active operational policy |
 
-## Skill Contracts
+## Capabilities
 
-Every connected asset self-reports which commands it actually supports through its edge adapter — that's a **Skill Contract**. Customer applications typically only need to *read* this registry (e.g. to build a UI that only shows buttons for commands an asset actually supports); an edge adapter is what *writes* to it. See [Edge SDK — Connector](../edge-sdk/edge-sdk-connector.md#skill-contracts) for the adapter side.
-
-| Method | Purpose |
-| --- | --- |
-| `listSkillContracts(SkillContractStatus, commandId)` | List known command contracts, optionally filtered |
+A customer application can ask what an asset supports before offering it as an option:
 
 ```java
-client.connector().listSkillContracts(SkillContractStatus.SKILL_CONTRACT_STATUS_ACTIVE, null)
-    .thenAccept(contracts -> contracts.forEach(c -> System.out.println(c.getCommandId())));
+client.remoteControl().getCapabilities(sn)
+    .thenAccept(snapshot -> snapshot.getCapabilities()
+            .forEach(c -> System.out.println(c.getCommandId() + " -> " + c.getState())));
 ```
+
+Each entry carries the command id, a description, its target type, and an input schema. Use it to
+build a UI that only shows commands the asset actually implements. What an asset reports comes from
+its edge adapter — see [Edge SDK — Connector](../edge-sdk/edge-sdk-connector.md#capabilities).
 
 ## Error handling
 

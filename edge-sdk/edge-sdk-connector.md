@@ -1,6 +1,6 @@
 # Edge SDK -- Connector Service
 
-The `ConnectorService` interface gives an edge adapter access to the platform's asset registry and Skill Contract registry over gRPC. It covers what an adapter itself needs — registering and updating its own asset(s), looking up schedulers and organization info, and reporting which commands it supports — not general mission/task management (that belongs to the **Client SDK**, used by customer applications; see [Applications & Skills](../concepts/applications-and-skills.md)).
+The `ConnectorService` interface gives an edge adapter access to the platform's asset registry over gRPC. It covers what an adapter itself needs — registering and updating its own asset(s), looking up schedulers and organization info, and reporting which commands it supports — not general mission/task management (that belongs to the **Client SDK**, used by customer applications).
 
 ## Table of Contents
 
@@ -9,7 +9,6 @@ The `ConnectorService` interface gives an edge adapter access to the platform's 
 - [Asset Payloads](#asset-payloads)
 - [Schedulers](#schedulers)
 - [Organization](#organization)
-- [Skill Contracts](#skill-contracts)
 - [Error Handling](#error-handling)
 - [Configuration](#configuration)
 - [Usage Examples](#usage-examples)
@@ -25,7 +24,7 @@ From the edge adapter, you use `ConnectorService` to:
 - Update asset state as it changes.
 - Fetch a scheduler's definition and the organization it belongs to.
 - Store and retrieve asset payloads (arbitrary versioned metadata blobs, e.g. calibration data).
-- Report which commands your adapter currently supports, via the **Skill Contract** registry — this is what lets the Admin Console's graph editor validate a Skill against real device capability while it's being authored.
+- Report which commands your adapter currently supports, by implementing `getCapabilities` on `EdgeAdapterService` — this is what lets the Admin Console show only the controls an asset actually implements.
 
 The SDK provides a ready-to-use implementation (`ConnectorServiceImpl`) that handles gRPC communication and Proto-to-DTO mapping.
 
@@ -106,7 +105,7 @@ connectorService.upsertAssetPayload("YOUR_DEVICE_SN", null, payloadDTO)
 
 ## Schedulers
 
-Schedulers define when and how often a Skill or command runs — see [Applications & Skills](../concepts/applications-and-skills.md).
+Schedulers define when and how often a task or command runs.
 
 ```java
 connectorService.getSchedulerById("scheduler-uuid")
@@ -135,30 +134,28 @@ connectorService.getOrganizationById("org-uuid")
 
 ---
 
-## Skill Contracts
+## Capabilities
 
-A Skill Contract is your adapter's self-reported declaration of which commands it supports, with their parameter schema. Reporting this accurately is what lets the Admin Console warn an operator at Skill-authoring time — "this asset doesn't support ChangeLens" — instead of failing at execution time.
+An adapter reports which commands it supports by implementing `getCapabilities(String sn)` on
+`EdgeAdapterService`, returning a `CurrentCapabilities` of `Capability` entries. The platform calls
+this when it needs to know what an asset can do — for example so the Admin Console can hide
+controls an asset does not support, rather than failing at execution time.
 
 ```java
-import com.zqnt.utils.connector.proto.SkillContractProtoDTO;
-import com.zqnt.utils.connector.proto.SkillContractStatus;
+@Override
+public CompletableFuture<CurrentCapabilities> getCapabilities(String sn) {
+    Capability takeoff = new Capability("takeOff", "Take off to a target point",
+            true, null, Map.of("source", "adapter"));
+    takeoff.setTargetType(CapabilityTargetType.CAPABILITY_TARGET_TYPE_ASSET);
+    takeoff.setInputSchema(Map.of("type", "object"));
 
-connectorService.observeSkillContract(contract)
-    .thenAccept(observed -> log.info("Contract observed: {}", observed.getCommandId()));
-
-connectorService.listSkillContracts(SkillContractStatus.SKILL_CONTRACT_STATUS_ACTIVE, null)
-    .thenAccept(contracts -> log.info("Known contracts: {}", contracts.size()));
-
-connectorService.setSkillContractStatus("contract-id", SkillContractStatus.SKILL_CONTRACT_STATUS_ACTIVE)
-    .thenAccept(updated -> log.info("Status updated"));
-
-connectorService.setSkillContractPermissions("contract-id", List.of("camera.control"))
-    .thenAccept(updated -> log.info("Permissions updated"));
+    return CompletableFuture.completedFuture(
+            CurrentCapabilities.of(sn, AssetTypeEnum.ASSET_TYPE_AIRCRAFT, Set.of(takeoff)));
+}
 ```
 
-In practice, most adapters call `observeSkillContract` once per supported command at startup, deriving the list from whichever `EdgeAdapterService` methods they've overridden (see [Edge Adapter](edge-sdk-adapter.md#capability-reporting)).
-
----
+Return `CurrentCapabilities.empty(sn)` for an asset you do not recognise. See
+[Edge Adapter](edge-sdk-adapter.md) for the full `EdgeAdapterService` surface.
 
 ## Error Handling
 
@@ -265,9 +262,5 @@ public class AssetRegistration {
 | `updateScheduler(id, dto)` | `CompletableFuture<SchedulerDTO>` | Update an existing scheduler |
 | `deleteScheduler(id)` | `CompletableFuture<Boolean>` | Delete a scheduler |
 | `getOrganizationById(id)` | `CompletableFuture<OrganizationDTO>` | Get organization by ID |
-| `observeSkillContract(contract)` | `CompletableFuture<SkillContractProtoDTO>` | Report/update a supported command's contract |
-| `listSkillContracts(status, commandId)` | `CompletableFuture<List<SkillContractProtoDTO>>` | List known command contracts |
-| `setSkillContractStatus(id, status)` | `CompletableFuture<SkillContractProtoDTO>` | Change a contract's lifecycle status |
-| `setSkillContractPermissions(id, permissions)` | `CompletableFuture<SkillContractProtoDTO>` | Set required permissions for a contract |
 
-Mission, task, and application management are not part of the Edge SDK's `ConnectorService` — an edge adapter *receives* task lifecycle calls (`prepareTask`/`startTask`/`stopTask`) from the platform through `EdgeAdapterService` (see [Edge Adapter](edge-sdk-adapter.md)) rather than creating or managing them itself. A customer application authors and triggers Applications/Skills through the **Client SDK** instead — see [Applications & Skills](../concepts/applications-and-skills.md).
+Creating and managing missions and tasks is not part of the Edge SDK's `ConnectorService` — that belongs to the **Client SDK**, used by customer applications. An adapter *receives* task lifecycle calls (`prepareTask`/`startTask`/`stopTask`) from the platform through `EdgeAdapterService` (see [Edge Adapter](edge-sdk-adapter.md)), and can resolve the task it was handed with `getTaskById`.

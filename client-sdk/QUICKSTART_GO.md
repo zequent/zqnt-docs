@@ -129,7 +129,7 @@ ma.SignalSkillExecution(ctx, executionID, nodeID, eventType, data, approved)
 ma.ResolveExecutionConfig(ctx, execContext, keys)
 ```
 
-See [Applications & Skills](../concepts/applications-and-skills.md) for the graph-based automation
+See [Waypoint Missions](WAYPOINT_MISSIONS.md) for flying a waypoint mission
 model these calls run against — same underlying execution engine the Java/Python SDKs and the Admin
 Console dashboard all drive.
 

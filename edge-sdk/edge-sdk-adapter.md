@@ -247,12 +247,24 @@ public CompletableFuture<CommandResult> startLiveStream(LiveStreamStartRequest r
 
 | Method | Parameters | Description |
 |--------|-----------|-------------|
-| `prepareTask(String taskId, String tid)` | taskId, tid | Prepare a task for execution (e.g., generate wayline files, upload resources) |
-| `startTask(String taskId, String tid)` | taskId, tid | Start executing a previously prepared task |
+| `prepareTask(String taskId, String tid)` | taskId, tid | Prepare a task for execution. Receives only a task ID — see the note below |
+| `startTask(String taskId, String tid)` | taskId, tid | Start executing a previously prepared task. Receives only a task ID — see the note below |
 | `pauseTask(String taskId)` | taskId | Pause a running task |
 | `resumeTask(String taskId)` | taskId | Resume a paused task |
 | `stopTask(String taskId)` | taskId | Stop a running task |
 | `cancelExecution(String sn, String externalExecutionId)` | sn, externalExecutionId | Cancel an asynchronously-running command previously accepted via `sendCustomCommand` |
+
+> **The task methods receive only a task ID.** To act on one, resolve it with
+> `ConnectorService.getTaskById(taskId)` and read the `WaypointTaskConfig` off the returned
+> `TaskDTO` — that is what the DJI adapter does to build and upload its KMZ. SAPIENT implements
+> them too, because its own protocol owns the task that ID refers to.
+>
+> The alternative is to skip them entirely and accept `mission.waypoint.execute` through
+> `sendCustomCommand` (below), where the waypoints and configuration arrive inline and no lookup is
+> needed — that is what the MAVLink adapter and the simulator do. Both approaches are valid;
+> leaving the task methods unimplemented returns `NOT_IMPLEMENTED`, which callers handle. Whichever
+> you choose, document it, because the two are not interchangeable from a customer application's
+> point of view.
 
 ### Custom Commands
 
@@ -278,7 +290,7 @@ public CompletableFuture<CommandResult> sendCustomCommand(String sn, String comp
 
 #### Command ID naming convention
 
-Every built-in command above maps to a well-known, vendor-neutral `command_id` string used when authoring Skills (see [Applications & Skills](../concepts/applications-and-skills.md)). Custom commands should follow the same convention:
+Every built-in command above maps to a well-known, vendor-neutral `command_id` string. Custom commands should follow the same convention:
 
 - **Vendor-neutral** — never encode a vendor name (`dji.takeoff` is wrong); the same id should be implementable by any adapter.
 - **`domain.action`** for a single atomic command — a domain (`flight`, `navigation`, `dock`, `asset`, `camera`, `gimbal`, `stream`) and a snake_case action (`return_to_home`, `go_to`, `change_lens`).

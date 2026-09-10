@@ -219,7 +219,7 @@ docker compose -f docker-compose.customer.yml up -d
 
 ## Next steps
 
-- [Applications & Skills](../concepts/applications-and-skills.md) — running multi-step, graph-based automations instead of one-off commands
+- [Waypoint Missions](WAYPOINT_MISSIONS.md) — flying a waypoint mission
 - [Connector reference](CONNECTOR_PYTHON.md) — assets, organizations, schedulers, technical config
 - [Configuration reference](CONFIGURATION_PYTHON.md) — every env var the SDK reads
 - [Customer example](CUSTOMER_EXAMPLE_PYTHON.md) — full working FastAPI sample

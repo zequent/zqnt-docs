@@ -123,6 +123,15 @@ The base class organises methods into groups. You only override what your hardwa
 | `start_task(ctx, task: Task) -> EdgeResponse`           | Begin execution.                               |
 | `stop_task(ctx, task_id: str) -> EdgeResponse`          | Abort a running task.                          |
 
+> **These receive only a task ID.** To act on one you must resolve it through the Connector and read
+> the task's `WaypointTaskConfig` — the SAPIENT adapter implements them because its own protocol
+> owns the task that ID refers to.
+>
+> The alternative is to leave them unimplemented (the `EdgeAdapter` default returns
+> `NOT_IMPLEMENTED`) and accept `mission.waypoint.execute` through `send_custom_command` instead,
+> where the waypoints and configuration arrive inline. That is what the MAVLink adapter does. Both
+> are valid — pick one and document it, since a customer application has to know which to call.
+
 ---
 
 ## Reporting progress for long-running commands

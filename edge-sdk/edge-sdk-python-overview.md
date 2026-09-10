@@ -46,7 +46,7 @@ Manages a persistent gRPC connection to the Live Data service. Lets you push ass
 
 ### `ConnectorClient`
 
-Talks to the platform's Connector Service over gRPC for asset registration/lookup and the Skill Contract registry — reporting which commands your adapter currently supports. Mission/task management is not part of this client; the platform drives task execution by calling into your `EdgeAdapter` instead (see [Mission Autonomy](edge-sdk-python-mission-autonomy.md)).
+Talks to the platform's Connector Service over gRPC for asset registration and lookup. Mission/task management is not part of this client; the platform drives task execution by calling into your `EdgeAdapter` instead (see [Mission Autonomy](edge-sdk-python-mission-autonomy.md)).
 
 ### `EdgeAdapterConfig` / `EdgeAdapterRuntime`
 

@@ -114,8 +114,7 @@ Skill Registry alternative (`skillregistry.ObserveSkillContract`), currently on 
 | `StopTask(ctx, taskID string)` | Stop a running task |
 | `PrepareTask(ctx, taskID, tid string)` | Prepare a task before starting it |
 
-These correspond to the platform's old Mission/Task model, not the current
-[Applications & Skills](../concepts/applications-and-skills.md) graph-execution engine — see
+These correspond to the platform's Mission/Task model — see
 [Overview](edge-sdk-go-overview.md) for what that means for this SDK.
 
 ## `CommandResult`

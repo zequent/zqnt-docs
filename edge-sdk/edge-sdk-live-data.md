@@ -20,7 +20,7 @@ The `LiveDataService` interface manages persistent gRPC streams between the edge
 Edge adapters continuously push data to the Live Data Service, where it's broadcast to Client SDK consumers, shown live in the Admin Console, and stored for historical analysis:
 
 - **Telemetry** -- position, battery, environmental readings, camera state, and more.
-- **Detections** -- AI/vision detection results (e.g. from a `DetectTask`-style Skill).
+- **Detections** -- AI/vision detection results.
 - **Notifications** -- asset online/offline events, and progress/completion events for commands accepted asynchronously via `CommandResult.accepted(...)` (see [Edge Adapter](edge-sdk-adapter.md#task-execution)).
 
 The `LiveDataService` abstracts the complexity of managing gRPC streams: one persistent stream per device per data kind, with automatic reconnection on failure (exponential backoff, 1s to 30s, 20% jitter, up to 10 attempts).

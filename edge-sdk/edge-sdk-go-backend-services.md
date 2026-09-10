@@ -64,7 +64,7 @@ Application/Skill execution engine.
 | Schedulers | `GetScheduler`, `CreateScheduler`, `UpdateScheduler`, `DeleteScheduler` |
 
 Multi-step, graph-based automations (Applications/Skills) are authored and triggered through the
-**Client SDK** (see [Applications & Skills](../concepts/applications-and-skills.md)), the same as
+**Client SDK**, the same as
 for the Java/Python Edge SDKs — this package's old Mission/Task methods predate that model entirely
 and aren't a way to reach it.
 

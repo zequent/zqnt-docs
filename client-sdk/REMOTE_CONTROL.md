@@ -87,7 +87,7 @@ client.remoteControl().debugMode(request)
 
 ## Capabilities & custom commands
 
-Every connected asset can report a **live capability snapshot** — the set of commands it actually supports right now, including ones the platform has no built-in method for (e.g. a specific payload's vendor-defined commands). This is different from the static [Skill Contract](CONNECTOR.md#skill-contracts) registry: Skill Contracts describe commands generally available across the platform, while a capability snapshot is per-asset, live, and can go stale if the asset is unreachable.
+Every connected asset can report a **live capability snapshot** — the set of commands it actually supports right now, including ones the platform has no built-in method for (e.g. a specific payload's vendor-defined commands). A capability snapshot is per-asset, live, and can go stale if the asset is unreachable.
 
 ```java
 client.remoteControl().getCapabilities("YOUR_DEVICE_SN")

@@ -1,6 +1,6 @@
 # Edge SDK (Python) — Connector
 
-`ConnectorClient` gives an edge adapter access to the platform's asset registry and Skill Contract registry over gRPC — what an adapter itself needs (registering its own asset, watching asset state, reporting supported commands), not general mission/task management. Mission/task CRUD was retired from `ConnectorService` in favor of the Applications/Skills execution model — see [Applications & Skills](../concepts/applications-and-skills.md), used from the **Client SDK** by customer applications.
+`ConnectorClient` gives an edge adapter access to the platform's asset registry over gRPC — what an adapter itself needs (registering its own asset, watching asset state, reporting supported commands), not general mission/task management. It does expose `get_mission`, `get_task` and `get_task_by_flight_id` so an adapter can resolve a task the platform asked it to run; creating and managing missions and tasks belongs to the **Client SDK**, used by customer applications.
 
 For Java, see [edge-sdk-connector.md](edge-sdk-connector.md).
 
@@ -60,20 +60,15 @@ The stream runs until cancelled or the server closes it; wrap it in your own ret
 
 ---
 
-## Skill Contracts
+## Capabilities
 
-A Skill Contract is your adapter's self-reported declaration of which commands it supports, with their parameter schema. Reporting this accurately is what lets the Admin Console warn an operator at Skill-authoring time — "this asset doesn't support ChangeLens" — instead of failing at execution time.
+An adapter reports which commands it supports by implementing `get_capabilities(sn, asset_id)` on
+`EdgeAdapter`, returning a `Capabilities` object. The platform calls this when it needs to know what
+an asset can do — for example so the Admin Console can hide controls an asset does not support,
+rather than failing at execution time.
 
-```python
-await conn.observe_skill_contract(contract)          # upsert a supported command's contract
-contracts = await conn.list_skill_contracts(status="ACTIVE")
-await conn.set_skill_contract_status(contract_id, "ACTIVE")
-await conn.set_skill_contract_permissions(contract_id, ["camera.control"])
-```
-
-These methods work with the raw generated `SkillContractProtoDTO` type rather than a plain-Python dataclass — the contract shape (input/output schema, errors, events, requirements, source) is already fully typed by the protobuf definition.
-
----
+Return an empty set for an asset you do not recognise. See
+[Edge Adapter](edge-sdk-python-adapter.md) for the full `EdgeAdapter` surface.
 
 ## Error handling
 

@@ -22,7 +22,7 @@ Unlike every other adapter, this one doesn't drive the hardware it watches — i
 1. The adapter registers itself as a `SENSOR` asset.
 2. A detection session is started via a custom command (see below), pointed at a target asset's video stream.
 3. Each detected object's bounding box is converted to an approximate geographic position using the camera's field of view and the target's live telemetry (`StreamTelemetry`).
-4. Results are published via `DetectionPublisher` / `ProduceDetection`, visible the same way any other adapter's detections are (see [Applications & Skills](../concepts/applications-and-skills.md) for how a `DetectTaskConfig`-style Skill can consume these).
+4. Results are published via `DetectionPublisher` / `ProduceDetection`, visible the same way any other adapter's detections are.
 5. If enabled, the adapter calls `RemoteControlService.LookAt` to re-aim the target's gimbal at the tracked object.
 
 ## Detection control (custom command)
