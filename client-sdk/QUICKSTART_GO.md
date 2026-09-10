@@ -109,42 +109,32 @@ Shares its request/response shapes with `EdgeAdapterService` (`devicecontrol` pa
 types flow end to end from this client through to the edge adapter that actually talks to the
 hardware.
 
-### `missionautonomy` — Applications & Skills
+### `missionautonomy` — missions, tasks & schedulers
 
 ```go
 ma := missionautonomy.New(conn)   // dial mission-autonomy-service, default port 8004
 
-ma.UpsertApplication(ctx, app, expectedRevision)
-ma.GetApplication(ctx, applicationID, version)
-ma.ListApplications(ctx, scope, enabledOnly, pageSize, pageToken)
+ma.CreateMission(ctx, mission) / ma.UpdateMission(ctx, id, mission)
+ma.GetMission(ctx, missionID)   / ma.DeleteMission(ctx, missionID)
 
-// Run a single command directly (no Application involved):
-ma.ExecuteSimple(ctx, assetSn, commandID, parameters, idempotencyKey)
-// Run a named Skill out of an already-deployed Application:
-ma.ExecuteApplication(ctx, assetSn, applicationID, skillID, applicationVersion, parameters, idempotencyKey)
+ma.CreateTask(ctx, task) / ma.UpdateTask(ctx, id, task) / ma.DeleteTask(ctx, taskID)
+ma.GetTask(ctx, taskID)  / ma.GetTaskByFlightID(ctx, flightID)
 
-ma.GetSkillExecution(ctx, executionID)
-ma.PauseSkillExecution(ctx, executionID) / ma.ResumeSkillExecution(ctx, executionID) / ma.CancelSkillExecution(ctx, executionID)
-ma.SignalSkillExecution(ctx, executionID, nodeID, eventType, data, approved)
-ma.ResolveExecutionConfig(ctx, execContext, keys)
+ma.StartTask(ctx, taskID) / ma.StopTask(ctx, taskID)
+ma.PauseTask(ctx, taskID) / ma.ResumeTask(ctx, taskID)
+
+ma.ListSchedulers(ctx)
 ```
 
-See [Waypoint Missions](WAYPOINT_MISSIONS.md) for flying a waypoint mission
-model these calls run against — same underlying execution engine the Java/Python SDKs and the Admin
-Console dashboard all drive.
+See [Waypoint Missions](WAYPOINT_MISSIONS.md) for which of these actually flies an asset — the task
+lifecycle reaches the device only on adapters that implement it.
 
-### `connector` — assets, Skill Registry, schedulers, policies, config
+### `connector` — assets, schedulers, policies, config
 
 ```go
 c := connector.New(conn)   // dial connector-service, default port 8010
 
 c.GetAssetBySn(ctx, sn)
-
-// Skill Registry
-c.ObserveSkillContract(ctx, contract)
-c.ListSkillContracts(ctx, status, commandID)
-c.SetSkillContractStatus(ctx, id, status)
-c.SetSkillContractPermissions(ctx, id, requiredPermissions)
 
 // Schedulers
 c.GetScheduler(ctx, schedulerID) / c.ListSchedulers(ctx)

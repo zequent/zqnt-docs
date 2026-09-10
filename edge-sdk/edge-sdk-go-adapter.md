@@ -2,7 +2,7 @@
 
 The `adapter.EdgeAdapter` interface (`github.com/Zequent/zqnt-edge-sdk-go/adapter`) is the core
 contract of the Go Edge SDK — the direct hardware-command surface, one method per operation. This is
-the SDK's **older** API shape (predates the Skill Registry/Application-and-Skill model — see
+the SDK's narrower API shape (see
 [Overview](edge-sdk-go-overview.md)); commands are called directly by method name, not routed through
 a Skill Contract the way `EdgeAdapterService` is in the Java/Python SDKs.
 
@@ -103,11 +103,10 @@ for anything you don't override.
 |--------|--------------|
 | `GetCapabilities(ctx, sn)` | Report the device's current capability snapshot (`*domains.CurrentCapabilities`) |
 
-Note: this is the **older**, 2-value (`available bool`) capability schema — see
-[Backend Services](edge-sdk-go-backend-services.md#skill-registry-unmerged) for the newer, richer
-Skill Registry alternative (`skillregistry.ObserveSkillContract`), currently on an unmerged branch.
+Note: this reports the 2-value (`available bool`) capability schema, rather than the richer
+capability state the Java Edge SDK reports.
 
-### Task execution (old Mission/Task model)
+### Task execution
 | Method | Description |
 |--------|--------------|
 | `StartTask(ctx, taskID, tid string)` | Start executing a task |

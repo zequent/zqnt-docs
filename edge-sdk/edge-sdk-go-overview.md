@@ -6,22 +6,16 @@ same inversion-of-control shape as the Java/Python Edge SDKs' `EdgeAdapterServic
 
 ## Status: an older API surface than Java/Python — read this before you start
 
-This SDK predates the platform's current Skill/Capability/Application model. Its command interface
-(`EdgeAdapter`), and its `connector`/`missionautonomy` client packages, are still on the **old**
-Mission/Task/Scheduler contract (`CreateMission`, `CreateTask`, `StartTask`, `GetCapabilities`'s
-2-value `available bool` schema) — not the Skill Registry / Application-and-Skill graph model the
-Java/Python Edge
-SDK docs describe. It's real, tagged (`v1.0.0`/`v1.0.1`), published (`go get
-github.com/Zequent/zqnt-edge-sdk-go@latest` works), and CI'd — just architecturally older than its
-Java/Python counterparts.
+This SDK has a narrower surface than its Java and Python counterparts. Its `connector` client
+covers assets and organizations only — there is no task or mission lookup, so a Go adapter cannot
+resolve a bare task id and can only take the command-based execution path (see
+[Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md)). Its `missionautonomy` client exposes
+scheduler lookup only. `GetCapabilities` uses a 2-value `available bool` schema rather than the
+richer state enum the Java SDK reports.
 
-**One piece has caught up**: a `skillregistry` package (self-report command contracts into the
-platform's persisted Skill Registry, mirroring the Java/Python `ObserveSkillContract`/
-`ListSkillContracts` surface) exists on branch `feature/skill-registry-v2`, **not yet merged to
-main** — check whether it's landed before depending on it. It vendors its own up-to-date generated
-proto code alongside (not replacing) the older `proto/` submodule the rest of the SDK still uses —
-see [Backend Services](edge-sdk-go-backend-services.md#skill-registry-unmerged) for why, and what
-that means for `GetCapabilities`'s wire format in the meantime.
+It is real, tagged, published (`go get github.com/Zequent/zqnt-edge-sdk-go@latest` works) and CI'd
+— just smaller in scope. Build a Go adapter on it when the command surface is enough for your
+device; use the Java or Python Edge SDK when you need the task lifecycle.
 
 ## Tech Specs
 

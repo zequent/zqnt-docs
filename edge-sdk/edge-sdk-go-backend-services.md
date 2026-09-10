@@ -42,10 +42,12 @@ current-model Connector the Java/Python Edge SDKs and the Go **client** SDK's
 | Category | Methods |
 |----------|---------|
 | Assets | `GetAssetBySN`, `GetAssetByID`, `GetSubAssetBySN`, `UpdateAsset`, `RegisterAsset`, `DeRegisterAsset` |
-| Missions (old model) | `GetMissionByID`, `CreateMission`, `UpdateMission`, `DeleteMission` |
-| Tasks (old model) | `GetTaskByID`, `GetTaskByFlightID`, `CreateTask`, `UpdateTask`, `DeleteTask` |
-| Schedulers | `GetSchedulerByID`, `CreateScheduler`, `UpdateScheduler`, `DeleteScheduler` |
 | Organizations | `GetOrganizationByID` |
+
+Mission and task lookup are not part of the Go Edge SDK's connector client — unlike the Java and
+Python Edge SDKs, it has no `GetTask`. A Go adapter therefore cannot resolve a bare task id, which
+is why it can only take the command-based execution path (see
+[Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md)).
 
 ```go
 asset, err := client.Connector().GetAssetBySN(ctx, "YOUR-DEVICE-SN")
@@ -59,39 +61,9 @@ Application/Skill execution engine.
 
 | Category | Methods |
 |----------|---------|
-| Missions | `CreateMission`, `UpdateMission`, `GetMission`, `DeleteMission` |
-| Tasks | `GetTask`, `GetTaskByFlightID`, `CreateTask`, `UpdateTask`, `DeleteTask`, `StartTask`, `StopTask` |
-| Schedulers | `GetScheduler`, `CreateScheduler`, `UpdateScheduler`, `DeleteScheduler` |
+| Schedulers | `GetScheduler` |
 
-Multi-step, graph-based automations (Applications/Skills) are authored and triggered through the
-**Client SDK**, the same as
-for the Java/Python Edge SDKs — this package's old Mission/Task methods predate that model entirely
-and aren't a way to reach it.
+That is the whole surface: the Go Edge SDK's `missionautonomy` package exposes scheduler lookup
+only. Creating and managing missions and tasks belongs to the **Client SDK**, used by customer
+applications.
 
-## Skill Registry (unmerged)
-
-A `skillregistry` package exists on branch `feature/skill-registry-v2` (**not on `main` as of this
-writing** — check whether it's landed) that lets an adapter self-report its own command contracts
-directly into the platform's persisted Skill Registry, mirroring the Java/Python
-`ObserveSkillContract`/`ListSkillContracts` surface:
-
-```go
-import (
-    "github.com/Zequent/zqnt-edge-sdk-go/skillregistry"
-    connectorpb "github.com/Zequent/zqnt-edge-sdk-go/gen/connector/proto"
-)
-
-svc := skillregistry.NewServiceImpl(connectorpb.NewConnectorServiceClient(conn), logger)
-svc.ObserveSkillContract(ctx, &connectorpb.SkillContractProtoDTO{CommandId: "acme.custom_scan"})
-```
-
-**Why this coexists with the old proto tree rather than replacing it**: the SDK's `proto/` submodule
-(`zqnt-protos`) is pinned to a schema that predates the Skill/Capability/Application model — no
-`ObserveSkillContract`, no `ListSkillContracts`, and `GetCapabilities`'s wire format is still a plain
-`available bool` rather than the richer `CapabilityState` enum. Bumping that submodule is a real,
-coordinated breaking change to a dependency this repo doesn't own, so `skillregistry` instead vendors
-its own up-to-date generated code under `gen/connector/...` (different Go import path, no conflict)
-rather than forcing that bump just to add one new package. Practical consequence: until the submodule
-itself is bumped, `EdgeAdapter.GetCapabilities` (see [Edge Adapter](edge-sdk-go-adapter.md)) and
-`skillregistry.ObserveSkillContract` report device capabilities through **two different, temporarily
-coexisting schemas** — don't expect them to line up field-for-field yet.
