@@ -50,14 +50,12 @@ The universal return type for all `EdgeAdapterService` commands.
 | `tid` | `String` | Transaction ID for tracing |
 | `sn` | `String` | Device serial number |
 | `resultType` | `CommandResultType` | Result classification |
-| `externalExecutionId` | `String` | Vendor-assigned id for a command still running asynchronously (e.g. a DJI `flightId`). Set via `accepted(...)`; used to correlate async progress events and route cancellation back to the right execution. |
 
 **CommandResultType enum:**
 
 | Value | Description |
 |-------|-------------|
 | `SUCCESS` | Command executed successfully |
-| `ACCEPTED` | Command was accepted and is still running asynchronously — track it via `externalExecutionId` |
 | `ERROR` | Command failed |
 | `NOT_IMPLEMENTED` | Command is not supported by this adapter |
 
@@ -69,7 +67,7 @@ CommandResult.success("Message", sn)
 CommandResult.success("Message", tid, sn)
 
 // Accepted — still running asynchronously
-CommandResult.accepted("Message", externalExecutionId, sn)
+CommandResult.success("Message", vendorExecutionId, sn)   // vendor id rides on the transaction id
 
 // Error
 CommandResult.error("Error message", sn)
@@ -83,7 +81,6 @@ CommandResult.notImplemented("Not supported", sn)
 
 ```java
 boolean isNotImplemented()  // returns true if resultType == NOT_IMPLEMENTED
-boolean isAccepted()        // returns true if resultType == ACCEPTED
 ```
 
 ---

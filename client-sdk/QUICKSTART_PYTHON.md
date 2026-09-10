@@ -118,15 +118,14 @@ async def takeoff(sn: str, lat: float, lon: float, alt: float):
 
 ```python
 from client_sdk import ZequentClient
-from client_sdk.config import ZequentClientConfig
+from client_sdk.config.service_config import ServiceConfig
 
-config = ZequentClientConfig(
-    remote_control_host="rc.prod.example.com", remote_control_port=8002,
-    mission_autonomy_host="ma.prod.example.com", mission_autonomy_port=8004,
-    live_data_host="ld.prod.example.com", live_data_port=8003,
-)
-
-async with ZequentClient(config) as client:
+async with ZequentClient(
+    connector_config=ServiceConfig(service_name="connector", host="c.prod.example.com", port=8010),
+    remote_control_config=ServiceConfig(service_name="remote-control", host="rc.prod.example.com", port=8002),
+    mission_autonomy_config=ServiceConfig(service_name="mission-autonomy", host="ma.prod.example.com", port=8004),
+    live_data_config=ServiceConfig(service_name="live-data", host="ld.prod.example.com", port=8003),
+) as client:
     ...
 ```
 

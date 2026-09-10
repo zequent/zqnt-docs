@@ -252,7 +252,6 @@ public CompletableFuture<CommandResult> startLiveStream(LiveStreamStartRequest r
 | `pauseTask(String taskId)` | taskId | Pause a running task |
 | `resumeTask(String taskId)` | taskId | Resume a paused task |
 | `stopTask(String taskId)` | taskId | Stop a running task |
-| `cancelExecution(String sn, String externalExecutionId)` | sn, externalExecutionId | Cancel an asynchronously-running command previously accepted via `sendCustomCommand` |
 
 > **The task methods receive only a task ID.** To act on one, resolve it with
 > `ConnectorService.getTaskById(taskId)` and read the `WaypointTaskConfig` off the returned
@@ -270,7 +269,7 @@ public CompletableFuture<CommandResult> startLiveStream(LiveStreamStartRequest r
 
 | Method | Parameters | Description |
 |--------|-----------|-------------|
-| `sendCustomCommand(String sn, String componentId, String commandType, Map<String, Object> params)` | sn, componentId, commandType, params | Handle a command that doesn't map to a standard method above. Set `externalExecutionId` on the result if the command keeps running asynchronously, so `cancelExecution`/`stopTask` can reference it later. |
+| `sendCustomCommand(String sn, String componentId, String commandType, Map<String, Object> params)` | sn, componentId, commandType, params | Handle a command that doesn't map to a standard method above. |
 
 Example:
 
@@ -281,7 +280,7 @@ public CompletableFuture<CommandResult> sendCustomCommand(String sn, String comp
     if ("mission.waypoint.execute".equals(commandType)) {
         String executionId = deviceApi.startWaypointMission(params);
         return CompletableFuture.completedFuture(
-            CommandResult.accepted("Waypoint mission started", executionId, sn)
+            CommandResult.success("Waypoint mission started", executionId, sn)
         );
     }
     return CompletableFuture.completedFuture(CommandResult.notImplemented("Unknown command", sn));
@@ -364,8 +363,8 @@ CommandResult.error("Error description", sn);
 CommandResult.error("Error description", tid, sn);
 
 // Accepted, but still running asynchronously — pass externalExecutionId so a later
-// stopTask/cancelExecution call can reference this specific run
-CommandResult.accepted("Waypoint mission started", externalExecutionId, sn);
+// a later stopTask call can reference this specific run
+CommandResult.success("Waypoint mission started", vendorExecutionId, sn);
 
 // Not Implemented (used by default methods)
 CommandResult.notImplemented("Command not supported", sn);
@@ -374,7 +373,6 @@ CommandResult.notImplemented("Command not supported", sn);
 The `CommandResult.ResultType` enum has these values:
 - `SUCCESS` -- command executed successfully
 - `ERROR` -- command failed
-- `ACCEPTED` -- command was accepted and is still running asynchronously (use `isAccepted()` to check)
 - `NOT_IMPLEMENTED` -- command is not supported by this adapter
 
 ---

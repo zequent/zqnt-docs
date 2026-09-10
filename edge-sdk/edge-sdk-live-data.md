@@ -21,7 +21,7 @@ Edge adapters continuously push data to the Live Data Service, where it's broadc
 
 - **Telemetry** -- position, battery, environmental readings, camera state, and more.
 - **Detections** -- AI/vision detection results.
-- **Notifications** -- asset online/offline events, and progress/completion events for commands accepted asynchronously via `CommandResult.accepted(...)` (see [Edge Adapter](edge-sdk-adapter.md#task-execution)).
+- **Notifications** -- asset online/offline events, and task progress/completion events (see [Edge Adapter](edge-sdk-adapter.md#task-execution)).
 
 The `LiveDataService` abstracts the complexity of managing gRPC streams: one persistent stream per device per data kind, with automatic reconnection on failure (exponential backoff, 1s to 30s, 20% jitter, up to 10 attempts).
 
@@ -189,23 +189,24 @@ liveDataService.produceDetectionData(batch)
 
 ## Notifications
 
-Notifications cover two cases: reporting an asset's online/offline transitions, and reporting progress/completion of a command your adapter accepted asynchronously (see [`CommandResult.accepted(...)`](edge-sdk-adapter.md#commandresult)). Exactly one event field should be set per call.
+Notifications cover two cases: reporting an asset's online/offline transitions, and reporting progress or completion of a task your adapter is running. Exactly one event field should be set per call.
 
 ```java
 import com.zqnt.sdk.edge.adapter.domains.NotificationRequestData;
-import com.zqnt.sdk.edge.adapter.domains.NotificationRequestData.CommandExecutionEventData;
-import com.zqnt.utils.events.proto.CommandExecutionStatus;
+import com.zqnt.sdk.edge.adapter.domains.NotificationRequestData.TaskEventData;
+import com.zqnt.utils.mission.proto.TaskStatus;
+import com.zqnt.utils.mission.proto.TaskTypeProto;
 
-// Report progress for a command you previously accepted with an externalExecutionId
+// Report progress for a task your adapter is running
 NotificationRequestData progress = NotificationRequestData.builder()
     .sn("YOUR_DEVICE_SN")
     .timestamp(LocalDateTime.now())
-    .commandExecutionEvent(CommandExecutionEventData.builder()
-        .externalExecutionId(executionId)
-        .commandId("mission.waypoint.execute")
-        .status(CommandExecutionStatus.COMMAND_EXECUTION_STATUS_RUNNING)
+    .eventType(NotificationEventType.NOTIFICATION_EVENT_TASK)
+    .taskEvent(TaskEventData.builder()
+        .taskId(taskId)
+        .taskType(TaskTypeProto.TASK_TYPE_WAYPOINT)
+        .status(TaskStatus.TASK_RUNNING)
         .progress(0.42f)
-        .assetSn("YOUR_DEVICE_SN")
         .build())
     .build();
 
@@ -280,7 +281,7 @@ See the [Configuration Guide](edge-sdk-configuration.md) for the complete refere
 
 4. **Include a transaction ID.** Setting `tid` on every message enables end-to-end tracing across the system.
 
-5. **Correlate async commands with `externalExecutionId`.** If you returned `CommandResult.accepted(...)` for a command, use the same id in subsequent `CommandExecutionEventData` notifications so the platform can track and later cancel that specific run.
+5. **Keep the task id stable.** Use the same `taskId` across every `TaskEventData` notification for one run, so the platform can follow that run's progress through to completion.
 
 6. **Do not manually manage streams.** Let the SDK handle stream creation, reconnection, and teardown. If you need to reset a stream, call the relevant `close*Stream(deviceSn)` and the next `produce*` call will create a new one automatically.
 

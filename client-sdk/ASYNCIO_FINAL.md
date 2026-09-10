@@ -76,9 +76,9 @@ Cancelling the calling task cancels the underlying gRPC call. Use it for timeout
 ```python
 try:
     async with asyncio.timeout(2.0):
-        await client.mission_autonomy.get_skill_execution("slow-execution-id")
+        await client.mission_autonomy.get_task("slow-task-id")
 except TimeoutError:
-    log.warning("get_skill_execution timed out")
+    log.warning("get_task timed out")
 ```
 
 For streams, simply `break` out of the iterator or let the surrounding context manager exit:
@@ -100,8 +100,7 @@ For long-lived streams that you want to control explicitly (start/stop from diff
 ```python
 from client_sdk import StreamHandle
 
-handle: StreamHandle = await client.live_data.open_telemetry_stream(asset_sn="DOCK-1")
-asyncio.create_task(consume(handle))
+handle: StreamHandle = await client.live_data.stream_telemetry(sn="DOCK-1", on_data=consume)
 # ... later, from anywhere:
 await handle.close()
 ```
@@ -151,11 +150,9 @@ Don't catch `Exception` broadly — let programmer errors (validation, type erro
 Override the resilience policy when you have requirements that differ from the defaults:
 
 ```python
-from client_sdk.config import ZequentClientConfig
 from client_sdk.config.resilience import ResilienceConfig
 
-config = ZequentClientConfig.from_env()
-config.resilience = ResilienceConfig(
+resilience = ResilienceConfig(
     max_attempts=3,
     initial_backoff_ms=100,
     max_backoff_ms=2_000,
@@ -203,11 +200,11 @@ For integration tests, spin up the platform services (compose) and use a real `Z
 |----------------------------|-------------------------------------------------|-------------------------------------------------|
 | Concurrency                | `CompletableFuture<T>`, Mutiny                  | `async def` / `await` + `grpc.aio`              |
 | DI                         | CDI (`@Inject ZequentClient`)                   | Pass the client manually (FastAPI / DI of choice)|
-| Configuration              | `application.properties` + env                  | Env only (`from_env()`) or `ZequentClientConfig` |
+| Configuration              | `application.properties` + env                  | Env (`from_env()`) or explicit `ServiceConfig` |
 | Lifecycle                  | CDI `@PostConstruct` / `@PreDestroy`            | `async with` / lifespan hook                    |
 | Streaming                  | `Multi<T>` (Mutiny)                             | Async iterator (`async for`)                    |
 | Retries                    | SmallRye fault tolerance                        | Built-in `GrpcResilience`                       |
-| Error type                 | `ZequentClientException`                        | `ZequentClientError`                            |
+| Error type                 | `ErrorInfo` on the response (no exceptions)     | `ZequentClientError`                            |
 
 The Python SDK is intentionally lean — there is no DI, no annotations, no codegen step beyond `generate_protos.sh`. If something feels missing, check whether it can be expressed with stdlib `asyncio` + the patterns in this document.
 

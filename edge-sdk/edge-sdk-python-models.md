@@ -356,14 +356,15 @@ class MissionEvent:
     message: str | None = None
 
 @dataclass
-class CommandExecutionEvent:
-    """Vendor-neutral lifecycle feedback for one physical command dispatched to an edge adapter."""
-    external_execution_id: str
-    status: CommandExecutionStatus
-    sn: str = ""
-    command_id: str | None = None
-    progress: float | None = None  # 0.0-1.0, present when RUNNING
+class TaskEvent:
+    """Task lifecycle event."""
+    task_id: str
+    task_type: TaskType
+    status: TaskStatus
+    sn: str = ""  # asset serial number - required for multi-asset adapters
+    progress: float | None = None
     message: str | None = None
+    external_task_type: str | None = None
 ```
 
 See [Live Data — Notifications](edge-sdk-python-live-data.md#notifications).
@@ -412,7 +413,7 @@ Use `EdgeAdapter._auto_capabilities(sn, asset_type)` to construct one based on w
 | `TaskStatus`                  | `UNKNOWN`, `DRAFT`, `SCHEDULED`, `RUNNING`, `ERROR`, `COMPLETED`, `PREPARED`, `PAUSED`              |
 | `MissionType`                 | `STANDARD`, `REMOTE_OPS`, `DRF`, `MISSION`                                                         |
 | `MissionStatus`               | `UNKNOWN`, `DRAFT`, `ACTIVE`, `INACTIVE`, `ERROR`                                                  |
-| `CommandExecutionStatus`      | `UNSPECIFIED`, `ACCEPTED`, `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED`                            |
+| `TaskStatus`                  | `UNKNOWN`, `DRAFT`, `SCHEDULED`, `RUNNING`, `ERROR`, `COMPLETED`, `PREPARED`, `PAUSED`              |
 | `ErrorCode`                   | `SYSTEM_ERROR`, `CLIENT_ERROR`, `SDK_ERROR`, `SERVICE_ERROR`, `ASSET_ERROR`                         |
 | `Rainfall`                    | `NO`, `LIGHT`, `MODERATE`, `HEAVY`                                                                 |
 | `NetworkType`                 | `NETWORK_4G`, `ETHERNET`                                                                            |

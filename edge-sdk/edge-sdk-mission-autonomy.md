@@ -22,7 +22,7 @@ Most edge adapters never call `MissionAutonomyService` directly. The platform dr
 
 Pick whichever suits your device and be explicit about it in your capability advertisement. Note that the Go Edge SDK's connector client has no task lookup, so a Go adapter can only take the command-based route. Anything you leave unimplemented returns `NOT_IMPLEMENTED`, which is a valid and common choice.
 
-`cancelExecution(sn, externalExecutionId)` is the cancellation path for an asynchronously-running command you accepted via `sendCustomCommand`.
+To stop a running task, the platform calls `stopTask` on your adapter.
 
 `MissionAutonomyService` exists for the one case where an adapter needs scheduler metadata directly:
 
@@ -55,7 +55,7 @@ Scheduler CRUD (create/update/delete) is available through `ConnectorService` in
 
 | Concern | Where it lives |
 | --- | --- |
-| Receiving `prepareTask`/`startTask`/`pauseTask`/`resumeTask`/`stopTask`/`cancelExecution` calls | `EdgeAdapterService` — see [Edge Adapter](edge-sdk-adapter.md#task-execution) |
+| Receiving `prepareTask`/`startTask`/`pauseTask`/`resumeTask`/`stopTask` calls | `EdgeAdapterService` — see [Edge Adapter](edge-sdk-adapter.md#task-execution) |
 | Reporting progress/telemetry while a task runs | `LiveDataService` — see [Live Data](edge-sdk-live-data.md) |
 | Declaring which commands your adapter supports | `getCapabilities` on `EdgeAdapterService` — see [Connector](edge-sdk-connector.md#capabilities) |
 | Creating missions and tasks, and triggering them | The **Client SDK**, used by customer applications |

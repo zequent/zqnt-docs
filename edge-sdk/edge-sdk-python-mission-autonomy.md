@@ -31,11 +31,11 @@ from edge_sdk import EdgeAdapter, EdgeResponse, ErrorMessage, ErrorCode
 class MyAdapter(EdgeAdapter):
 
     async def prepare_task(self, ctx, task_id: str) -> EdgeResponse:
-        plan = await self._connector.get_asset_payload(asset_sn=ctx.sn, key=f"flight-plan-{task_id}")
-        if plan is None:
+        task = await self._connector.get_task(task_id, sn=ctx.sn)
+        if task is None:
             return EdgeResponse.fail(ctx.tid, ctx.sn,
-                ErrorMessage(message="No flight plan staged for this task", code=ErrorCode.CLIENT_ERROR))
-        self._pending[task_id] = plan
+                ErrorMessage(message="No task found for this id", code=ErrorCode.CLIENT_ERROR))
+        self._pending[task_id] = task
         return EdgeResponse.ok(ctx.tid, ctx.sn, "Task prepared")
 
     async def start_task(self, ctx, task_id: str) -> EdgeResponse:
@@ -68,7 +68,7 @@ class MyAdapter(EdgeAdapter):
         return CustomCommandResponse.not_supported(ctx.tid, ctx.sn, request.command_type)
 ```
 
-Set `external_execution_id` when the command you just accepted keeps running asynchronously — mission-autonomy uses it to later cancel the command (`StopTask`) and to correlate `CommandExecutionEvent` notifications back to this specific execution.
+Set `external_execution_id` when the command you just accepted keeps running asynchronously — mission-autonomy uses it to later cancel the command (`StopTask`) and to correlate progress notifications back to this specific execution.
 
 ---
 

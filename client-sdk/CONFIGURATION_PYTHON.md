@@ -1,6 +1,6 @@
 # Zequent Client SDK (Python) - Configuration
 
-The Python Client SDK is configured exclusively via **environment variables** read by `ZequentClient.from_env()` and `ZequentClientConfig.from_env()`. There is no `application.properties` equivalent and no DI container.
+The Python Client SDK is configured exclusively via **environment variables** read by `ZequentClient.from_env()`, or by passing a `ServiceConfig` per service explicitly. There is no `application.properties` equivalent and no DI container.
 
 For Java/Quarkus configuration see [CONFIGURATION.md](CONFIGURATION.md).
 
@@ -32,23 +32,20 @@ When env vars aren't a fit (multi-tenant apps, dynamic endpoints, tests):
 
 ```python
 from client_sdk import ZequentClient
-from client_sdk.config import ZequentClientConfig
+from client_sdk.config.service_config import ServiceConfig
 
-config = ZequentClientConfig(
-    remote_control_host="rc.example.com", remote_control_port=8002,
-    mission_autonomy_host="ma.example.com", mission_autonomy_port=8004,
-    live_data_host="ld.example.com", live_data_port=8003,
-)
-async with ZequentClient(config) as client:
+async with ZequentClient(
+    connector_config=ServiceConfig(service_name="connector", host="c.example.com", port=8010),
+    remote_control_config=ServiceConfig(service_name="remote-control", host="rc.example.com", port=8002),
+    mission_autonomy_config=ServiceConfig(service_name="mission-autonomy", host="ma.example.com", port=8004),
+    live_data_config=ServiceConfig(service_name="live-data", host="ld.example.com", port=8003),
+) as client:
     ...
 ```
 
-`ZequentClientConfig.from_env()` is also available if you want to take the env defaults and override a few fields:
-
-```python
-config = ZequentClientConfig.from_env()
-config.live_data_host = "live.example.com"
-```
+`ZequentClient.from_env()` builds every `ServiceConfig` from the environment. To take the env
+defaults and override one service, construct that one `ServiceConfig` yourself and pass all four
+explicitly as above.
 
 ---
 
@@ -124,18 +121,16 @@ The SDK never logs sensitive request bodies; only operation name + outcome + sta
 By default the SDK uses **insecure** gRPC channels for parity with local development. To use TLS or auth, pass a pre-built `grpc.aio.Channel` per service:
 
 ```python
-import grpc
 from client_sdk import ZequentClient
-from client_sdk.config import ZequentClientConfig
+from client_sdk.config.service_config import ServiceConfig
 
-creds = grpc.ssl_channel_credentials()
-
-config = ZequentClientConfig(
-    remote_control_channel=grpc.aio.secure_channel("rc.example.com:443", creds),
-    mission_autonomy_channel=grpc.aio.secure_channel("ma.example.com:443", creds),
-    live_data_channel=grpc.aio.secure_channel("ld.example.com:443", creds),
-)
-async with ZequentClient(config) as client:
+# TLS is selected per service with use_plaintext=False; the SDK builds the channel itself.
+async with ZequentClient(
+    connector_config=ServiceConfig(service_name="connector", host="c.example.com", port=443, use_plaintext=False),
+    remote_control_config=ServiceConfig(service_name="remote-control", host="rc.example.com", port=443, use_plaintext=False),
+    mission_autonomy_config=ServiceConfig(service_name="mission-autonomy", host="ma.example.com", port=443, use_plaintext=False),
+    live_data_config=ServiceConfig(service_name="live-data", host="ld.example.com", port=443, use_plaintext=False),
+) as client:
     ...
 ```
 

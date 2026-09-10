@@ -101,8 +101,8 @@ The base class organises methods into groups. You only override what your hardwa
 
 | Method                                                                       | Notes                       |
 |------------------------------------------------------------------------------|-----------------------------|
-| `change_camera_lens(ctx, request: ChangeCameraLensRequest) -> EdgeResponse`  | Switch lens.                |
-| `change_camera_zoom(ctx, request: ChangeCameraZoomRequest) -> EdgeResponse`  | Set zoom factor.            |
+| `change_lens(ctx, request: ChangeLensRequest) -> EdgeResponse`  | Switch lens.                |
+| `change_zoom(ctx, request: ChangeZoomRequest) -> EdgeResponse`  | Set zoom factor.            |
 | `look_at(ctx, coordinates: Coordinates) -> EdgeResponse`                     | Aim camera at a point.      |
 | `capture_photo(ctx) -> EdgeResponse`                                         |                             |
 | `start_recording(ctx) -> EdgeResponse`                                       |                             |
@@ -136,7 +136,7 @@ The base class organises methods into groups. You only override what your hardwa
 
 ## Reporting progress for long-running commands
 
-There is no streaming variant of `EdgeResponse` for progress updates — `start_task` (and `send_custom_command` for vendor-specific commands) should return immediately with `EdgeResponse.ok(...)` and report progress separately via `LiveDataService.produce_notification(CommandExecutionEvent(...))`. See [Live Data — Notifications](edge-sdk-python-live-data.md#notifications).
+There is no streaming variant of `EdgeResponse` for progress updates — `start_task` (and `send_custom_command` for vendor-specific commands) should return immediately with `EdgeResponse.ok(...)` and report progress separately via `LiveDataService.produce_notification(TaskEvent(...))`. See [Live Data — Notifications](edge-sdk-python-live-data.md#notifications).
 
 ```python
 async def start_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
@@ -145,9 +145,10 @@ async def start_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
 
 async def _on_progress(self, task_id: str, percent: float):
     await self._live.produce_notification(
-        CommandExecutionEvent(
-            external_execution_id=task_id,
-            status=CommandExecutionStatus.RUNNING,
+        TaskEvent(
+            task_id=task_id,
+            task_type=TaskType.WAYPOINT,
+            status=TaskStatus.RUNNING,
             sn=self._sn,
             progress=percent / 100,
         )

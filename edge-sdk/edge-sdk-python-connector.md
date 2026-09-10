@@ -99,5 +99,6 @@ async def boot(adapter):
     asset = await conn.get_asset_by_sn(os.environ["ZEQUENT_EDGE_SN"])
     if asset is None:
         asset_id = await conn.register_asset(default_asset_from_env())
-    adapter.bind_connector(conn)
+    # hand `conn` to your adapter however it expects it -- EdgeAdapterRuntime does this
+    # wiring for you when you use it (see the Quickstart).
 ```

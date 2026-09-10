@@ -111,23 +111,23 @@ await live.produce_detection(
 
 ## Notifications
 
-Two cases: reporting an asset's online/offline transitions, and reporting progress/completion of a command your adapter accepted asynchronously (see [`CustomCommandResponse.ok(..., external_execution_id=...)`](edge-sdk-python-mission-autonomy.md#custom-commands)).
+Two cases: reporting an asset's online/offline transitions, and reporting progress or completion of a task your adapter is running.
 
 ```python
-from edge_sdk import AssetStatusEvent, CommandExecutionEvent, CommandExecutionStatus
+from edge_sdk import AssetStatusEvent, TaskEvent, TaskStatus, TaskType
 
 # Asset went offline
 await live.produce_notification(
     AssetStatusEvent(sn="DOCK-1", online=False, message="Lost connection to device")
 )
 
-# Progress for a previously-accepted async command
+# Progress for a task your adapter is running
 await live.produce_notification(
-    CommandExecutionEvent(
-        external_execution_id=execution_id,
-        status=CommandExecutionStatus.RUNNING,
+    TaskEvent(
+        task_id=task_id,
+        task_type=TaskType.WAYPOINT,
+        status=TaskStatus.RUNNING,
         sn="DRONE-1",
-        command_id="mission.waypoint.execute",
         progress=0.42,
     )
 )
