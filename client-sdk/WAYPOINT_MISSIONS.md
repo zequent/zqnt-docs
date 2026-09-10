@@ -22,6 +22,13 @@ Both paths are configured with the **same** `WaypointTaskConfig` object (see
 [Configuration](#configuration)). Only the delivery differs: the task-based path persists it on a
 Task record that the adapter fetches, and the command-based path sends it inline with the command.
 
+> **Coming for DJI.** Command-based execution (`mission.waypoint.execute`, plus `mission.pause` /
+> `mission.resume`) has landed on the DJI adapter's main branch and will be available in its next
+> release. The table above describes the currently published `zqnt-edge-adapter-dji:1.3.0` image,
+> which supports the task-based path only. Once the newer image is released, a DJI dock accepts the
+> same command the MAVLink adapter and the simulator already do — and because both paths take the
+> same `WaypointTaskConfig`, moving across is a change of call, not a change of flight definition.
+
 ## Path A — command-based (MAVLink, Simulator)
 
 No Mission or Task record is created. The waypoints and configuration travel inside a single
