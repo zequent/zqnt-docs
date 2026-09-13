@@ -10,12 +10,16 @@ This SDK has a narrower surface than its Java and Python counterparts. Its `conn
 covers assets and organizations only — there is no task or mission lookup, so a Go adapter cannot
 resolve a bare task id and can only take the command-based execution path (see
 [Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md)). Its `missionautonomy` client exposes
-scheduler lookup only. `GetCapabilities` uses a 2-value `available bool` schema rather than the
-richer state enum the Java SDK reports.
+scheduler lookup only. Its `Capability` struct is near-parity with Java's, though — confirmed
+field-for-field against source, it's missing only the three JSON-Schema-shaped fields
+(`constraints`, `inputSchema`, `outputSchema`); see
+[Edge Adapter — Capability reporting](edge-sdk-go-adapter.md#capability-reporting).
 
 It is real, tagged, published (`go get github.com/Zequent/zqnt-edge-sdk-go@latest` works) and CI'd
 — just smaller in scope. Build a Go adapter on it when the command surface is enough for your
-device; use the Java or Python Edge SDK when you need the task lifecycle.
+device; use the Java or Python Edge SDK when you need the task lifecycle. **No confirmed real Go
+adapter exists in this ecosystem today** — every real, in-production adapter found (DJI, MAVLink,
+SAPIENT, Betaflight, RNS) is a Java or Python implementation.
 
 ## Tech Specs
 

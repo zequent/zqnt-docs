@@ -35,9 +35,10 @@ paired-drone/sub-asset telemetry (`TelemetryTypeSubAsset`).
 ## Connector
 
 `ConnectorService` (`github.com/Zequent/zqnt-edge-sdk-go/connector`) is this SDK's **old-API**
-Connector surface — asset registration and the old Mission/Task/Scheduler CRUD, not the
-current-model Connector the Java/Python Edge SDKs and the Go **client** SDK's
-[`connector` package](../client-sdk/CONNECTOR_GO.md) expose.
+Connector surface — asset registration and organization lookup only, not the current-model
+Connector the Java/Python Edge SDKs and the Go **client** SDK's
+[`connector` package](../client-sdk/CONNECTOR_GO.md) expose. No scheduler or Mission/Task methods
+exist on it at all — see below.
 
 | Category | Methods |
 |----------|---------|
@@ -56,14 +57,14 @@ asset, err := client.Connector().GetAssetBySN(ctx, "YOUR-DEVICE-SN")
 ## Mission Autonomy
 
 `MissionAutonomyService` (`github.com/Zequent/zqnt-edge-sdk-go/missionautonomy`) is likewise the
-**old** Mission/Task model — scheduler and mission/task CRUD driven from the adapter side, not the
-Application/Skill execution engine.
+**old** Mission/Task model's namesake, not the Application/Skill execution engine — but its surface
+here is a single read, not CRUD:
 
 | Category | Methods |
 |----------|---------|
 | Schedulers | `GetScheduler` |
 
 That is the whole surface: the Go Edge SDK's `missionautonomy` package exposes scheduler lookup
-only. Creating and managing missions and tasks belongs to the **Client SDK**, used by customer
-applications.
+only — no create/update/delete, and no mission or task methods at all. Creating and managing
+missions and tasks belongs to the **Client SDK**, used by customer applications.
 

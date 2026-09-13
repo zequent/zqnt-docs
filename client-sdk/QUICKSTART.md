@@ -12,7 +12,7 @@ Add the Zequent Client SDK to your `pom.xml`:
 <dependency>
     <groupId>com.zqnt.sdk</groupId>
     <artifactId>client-java-sdk</artifactId>
-    <version>1.2.10</version>
+    <version>1.3.2</version>
 </dependency>
 ```
 
@@ -250,22 +250,10 @@ env:
 
 ## Available Services
 
-### Remote Control
-```java
-client.remoteControl().takeoff(...)
-client.remoteControl().goTo(...)
-client.remoteControl().returnToHome(...)
-client.remoteControl().lookAt(...)
-client.remoteControl().openCover(...)
-client.remoteControl().closeCover(...)
-client.remoteControl().startCharging(...)
-client.remoteControl().stopCharging(...)
-client.remoteControl().rebootAsset(...)
-client.remoteControl().liveStreamSplitScreen(...)
-client.remoteControl().getCapabilities(sn)
-client.remoteControl().sendCustomCommand(...)
-```
-See [Remote Control](REMOTE_CONTROL.md) for the full method reference.
+`client.remoteControl()` sends direct, imperative commands (flight, dock, manual control,
+capability discovery) — see [Remote Control](REMOTE_CONTROL.md). `client.connector()` and
+`client.missionAutonomy()` cover assets, missions, tasks, and schedulers — see the sections below.
+`client.liveData()` streams telemetry and detections.
 
 ### Flying a waypoint mission
 
@@ -286,22 +274,23 @@ Both are configured with the same `WaypointTaskConfig`. Read
 the full parameter contract and progress tracking.
 
 ### Mission Autonomy — missions, tasks & scheduling
+
+`client.missionAutonomy()` creates missions/tasks/schedulers (route-optimized — see the
+[reference](../api-reference/client-sdk-mission-autonomy.md) for why this differs from Connector's
+copies of the same methods) and is the only interface that can start, stop, pause, or resume a task:
+
 ```java
-client.missionAutonomy().createMission(missionDTO)
 client.missionAutonomy().createTask(taskDTO)
 client.missionAutonomy().startTask(taskId)
 client.missionAutonomy().pauseTask(taskId)
-client.missionAutonomy().resumeTask(taskId)
-client.missionAutonomy().stopTask(taskId)
-client.missionAutonomy().uploadMissionNfzZones(missionId, zones, replaceExisting)
-client.missionAutonomy().createScheduler(schedulerDTO)
 ```
 
-The task lifecycle methods forward a bare task ID to the adapter, which then fetches the Task
-itself. They work only where the adapter implements them — DJI and SAPIENT do; MAVLink, the
-simulator, Betaflight and RNS do not, and return `startTask is not implemented for this asset`.
-See [Waypoint Missions](WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use).
-
+The task lifecycle methods forward a bare task ID to the adapter. Only DJI resolves it via the
+Connector service; MAVLink and the simulator never receive a bare task ID at all (they take the
+command-based path above instead); SAPIENT implements the methods but passes the ID straight
+through as its own protocol's identifier, without a Connector lookup. Betaflight and RNS implement
+none of them and return `startTask is not implemented for this asset`. See
+[Waypoint Missions](WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use) for the full picture.
 
 ### Live Data
 ```java
@@ -309,12 +298,10 @@ client.liveData().streamTelemetryData(request, onData, onError)
 ```
 
 ### Connector — assets, organizations, schedulers, technical config
-```java
-client.connector().getAssetBySn(request)
-client.connector().getOrganization(request)
-client.connector().createScheduler(request)
-```
-See [Connector](CONNECTOR.md) for the full method reference.
+
+`client.connector()` covers what `missionAutonomy()` doesn't: asset lookup, asset payloads,
+organizations, and technical config/policies — see [Connector](CONNECTOR.md) for the full method
+reference.
 
 ## Built-in Features
 
@@ -393,6 +380,7 @@ cat .env
 
 ## Support
 
+- Full from-scratch tutorial (project scaffold to running container): [CUSTOMER_EXAMPLE.md](CUSTOMER_EXAMPLE.md)
 - Documentation: [CONFIGURATION.md](CONFIGURATION.md)
 - Email: support@zequent.com
 

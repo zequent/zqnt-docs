@@ -12,7 +12,7 @@ how to track progress.
 
 | Adapter (released 1.3.x) | Execution path | Pause / resume |
 | --- | --- | --- |
-| **DJI** `1.3.0` | **Task-based** — `createTask` + `startTask` | `pauseTask` / `resumeTask` |
+| **DJI** `1.3.1` | **Both** — task-based (`createTask` + `startTask`) or command-based (`mission.waypoint.execute`), added alongside each other, not a replacement | `pauseTask`/`resumeTask` (task-based) or `mission.pause`/`mission.resume` (command-based) |
 | **MAVLink** `1.3.0` | **Command-based** — `mission.waypoint.execute` | `stopTask` (pauses the mission) |
 | **Simulator** `1.3.3` | **Command-based** — `mission.waypoint.execute` | `mission.pause` / `mission.resume` commands |
 | **SAPIENT** `1.3.0` | Task-based — its own protocol owns the task | via task methods |
@@ -22,14 +22,15 @@ Both paths are configured with the **same** `WaypointTaskConfig` object (see
 [Configuration](#configuration)). Only the delivery differs: the task-based path persists it on a
 Task record that the adapter fetches, and the command-based path sends it inline with the command.
 
-> **Coming for DJI.** Command-based execution (`mission.waypoint.execute`, plus `mission.pause` /
-> `mission.resume`) has landed on the DJI adapter's main branch and will be available in its next
-> release. The table above describes the currently published `zqnt-edge-adapter-dji:1.3.0` image,
-> which supports the task-based path only. Once the newer image is released, a DJI dock accepts the
-> same command the MAVLink adapter and the simulator already do — and because both paths take the
-> same `WaypointTaskConfig`, moving across is a change of call, not a change of flight definition.
+> **DJI got command-based execution in `v1.3.1`.** `mission.waypoint.execute` deserializes into the
+> exact same `WaypointTaskConfig` the task-based path uses — confirmed directly against the
+> release's commit — and `mission.pause`/`mission.resume` map onto the same idempotent
+> `FLIGHTTASK_PAUSE`/`FLIGHTTASK_RECOVERY` operations the task-based path's `pauseTask`/`resumeTask`
+> already used. This was added **alongside** the existing task-based path, not as a replacement for
+> it — a DJI dock on `v1.3.1`+ accepts either. Which one to prefer for DJI specifically isn't stated
+> anywhere in the release itself; this page doesn't have a confirmed recommendation either way.
 
-## Path A — command-based (MAVLink, Simulator)
+## Path A — command-based (MAVLink, Simulator, DJI `1.3.1`+)
 
 No Mission or Task record is created. The waypoints and configuration travel inside a single
 command:

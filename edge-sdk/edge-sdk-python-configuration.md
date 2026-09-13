@@ -55,7 +55,13 @@ from edge_sdk import RegistrationConfig
 registration = RegistrationConfig.from_env()  # reads EDGE_ENDPOINT / ASSET_TYPE / ASSET_VENDOR / REDIS_URL
 ```
 
-Redis key format: `edge-endpoints:{VENDOR}` (matches the Java SDK's equivalent cache key).
+**Redis key format: `zqnt:edge-endpoints:{VENDOR}`.** This does *not* currently match the Java SDK's
+own `CacheKeys.EDGE_ENDPOINTS` key (`edge-endpoints:{vendor}`, no `zqnt:` prefix) or the Go SDK's
+`discovery` package (which explicitly mirrors Java's un-prefixed key, per its own code comment). This
+is a real, confirmed cross-language mismatch in the current Python Edge SDK, not a documentation
+choice — a Python adapter's `EDGE_ENDPOINT` registration writes to a different Redis key than what
+Java-side code reads from, so it will not be discovered the way a Java or Go adapter's registration
+would be.
 
 ---
 
@@ -72,17 +78,13 @@ logging.getLogger("edge_sdk").setLevel(logging.DEBUG)
 
 ## TLS / authentication
 
-The SDK uses insecure gRPC channels by default for parity with the local-development workflow. To enable TLS or auth, construct the individual clients (`ConnectorClient`, `TelemetryPublisher`, `MissionAutonomyClient`) with a custom `grpc.aio.Channel` instead of going through `EdgeAdapterConfig.runtime()`:
-
-```python
-import grpc
-creds = grpc.ssl_channel_credentials()
-channel = grpc.aio.secure_channel("livedata.example.com:443", creds)
-
-pub = TelemetryPublisher(channel=channel, sn="DOCK-1")
-```
-
-For per-call metadata (bearer tokens, etc.), pass `metadata=[(...)]` to `connect()` where supported.
+**Not supported, at any layer.** Confirmed directly in source: `ConnectorClient.connect()`,
+`TelemetryPublisher`'s internal stream setup, and `MissionAutonomyClient.connect()` each construct
+their gRPC channel with a hardcoded `grpc.aio.insecure_channel(host:port)` call — none of these
+classes accepts a `channel`, credentials, or any other override in their constructor or `connect()`.
+There is currently no way to reach the platform over TLS, or attach per-call auth metadata, from the
+Python Edge SDK's own client classes. If your deployment requires TLS between the adapter and the
+platform, terminate it at a sidecar/proxy in front of the platform services instead.
 
 ---
 

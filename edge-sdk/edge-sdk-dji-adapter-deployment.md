@@ -66,7 +66,7 @@ A dock or drone not matching either profile still works for standard flight/dock
 | `LIVE_DATA_SERVICE_PORT` | `8003` | Live Data Service gRPC port |
 | `MISSION_AUTONOMY_SERVICE_PORT` | `8004` | Mission Autonomy Service gRPC port |
 | `REMOTE_CONTROL_SERVICE_PORT` | `8002` | Remote Control Service gRPC port |
-| `EDGE_ADAPTER_TARGET_ENDPOINTS` | `edge-dji:9001` | Address at which this adapter is reachable by the platform |
+| `EDGE_ADAPTER_TARGET_ENDPOINTS` | `edge-adapter-dji:9001` | Address at which this adapter is reachable by the platform |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection used by the adapter's caching layer |
 | `ZQNT_DOCK_OFFLINE_TIMEOUT` | `10s` | A dock is reported offline if no OSD telemetry arrives within this window |
 | `ZQNT_DOCK_WATCHDOG_INTERVAL` | `2s` | How often the adapter checks each dock's telemetry age against `ZQNT_DOCK_OFFLINE_TIMEOUT` |
@@ -86,11 +86,21 @@ Use the same deployment-local `.env` file as the platform stack.
 services:
   edge-dji:
     image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
+    container_name: edge-adapter-dji
     env_file:
       - .env
     ports:
       - "9001:9001"
 ```
+
+The **container** (not necessarily the service key) must be named `edge-adapter-dji` — the Admin
+Console's adapter manager (`AdapterManagementService`) resolves the container to start/stop/restart
+by building that exact name (`edge-adapter-` + vendor) and shells out to it directly; it does not
+look this up any other way. Set `container_name` explicitly as shown — Docker Compose's default
+container naming from a `edge-dji` service key would not produce this name on its own. The public
+`docker-compose.customer.yml` template in this repo does not currently set `container_name` for its
+`edge-dji` service, so the Admin Console's start/stop/restart controls will not find that container
+as shipped.
 
 Set the required MQTT, service endpoint, and optional storage values in `.env`.
 
@@ -198,6 +208,11 @@ spec:
       targetPort: 9001
 ```
 
+The `container_name` requirement above is specific to the Docker Compose path — the Admin Console's
+adapter manager shells out to a configured container runtime (`docker`/`podman`) by that exact name,
+which has no equivalent concept in Kubernetes. Start/stop/restart from the Admin Console is not
+expected to work against a Kubernetes deployment of this adapter.
+
 > **Note:** In Kubernetes deployments, keep credentials in Kubernetes Secrets and expose only the service hostnames required by the adapter.
 
 ---
@@ -210,6 +225,7 @@ The adapter subscribes and publishes to the following MQTT topics. The `+` wildc
 |-------|-----------|---------|
 | `thing/product/+/osd` | Incoming | Drone telemetry (OSD data) |
 | `thing/product/+/state` | Incoming | Device state updates |
+| `thing/product/+/events` | Incoming | Device-reported events (e.g. flight-task lifecycle) — feeds task progress/asset status notifications back to the platform |
 | `sys/product/+/status` | Incoming | Dock/drone topology updates |
 | `thing/product/+/services_reply` | Incoming | Replies to service commands |
 | `thing/product/+/property/set_reply` | Incoming | Replies to dynamic property-set commands (see [Supported Device Models & Dynamic Capabilities](#supported-device-models--dynamic-capabilities)) |

@@ -1,4 +1,4 @@
-# Spring Boot Integration - Final Solution
+# Spring Boot Integration
 
 The **simplest** way to use ZequentClient in Spring Boot.
 
@@ -14,7 +14,7 @@ Uses `ZequentClientProducer` internally for consistent bean creation.
 <dependency>
     <groupId>com.zqnt.sdk</groupId>
     <artifactId>client-java-sdk</artifactId>
-    <version>1.2.10</version>
+    <version>1.3.2</version>
 </dependency>
 ```
 
@@ -50,17 +50,20 @@ public class ZequentConfig {
 package com.yourcompany.service;
 
 import com.zqnt.sdk.client.ZequentClient;
+import com.zqnt.sdk.client.livedata.domains.StreamTelemetryRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LiveDataService {
 
     private final ZequentClient zequentClient;  // ← Automatically injected!
 
-    public void streamTelemetry() {
-        zequentClient.liveData().streamTelemetryData();
+    public void streamTelemetry(StreamTelemetryRequest request) {
+        zequentClient.liveData().streamTelemetryData(request, telemetry -> log.info("{}", telemetry));
     }
 }
 ```
@@ -73,7 +76,7 @@ That's the whole integration.
 
 If you want to use properties from `application.properties`:
 
-### Bean mit @Value
+### Bean with @Value
 
 ```java
 package com.yourcompany.config;
@@ -154,7 +157,7 @@ public class MyService {
     private final ZequentClient zequentClient;
 
     public void doSomething() {
-        zequentClient.liveData().streamTelemetryData();
+        zequentClient.liveData().streamTelemetryData(...);
         zequentClient.remoteControl().takeoff(...);
     }
 }

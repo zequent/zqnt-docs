@@ -219,7 +219,9 @@ docker compose -f docker-compose.customer.yml up -d
 ## Next steps
 
 - [Waypoint Missions](WAYPOINT_MISSIONS.md) — flying a waypoint mission
+- [Remote Control](REMOTE_CONTROL_PYTHON.md) — flight ops, dock ops, manual control
+- [Mission Autonomy](MISSION_AUTONOMY_PYTHON.md) — creating missions, tasks & schedulers
 - [Connector reference](CONNECTOR_PYTHON.md) — assets, organizations, schedulers, technical config
 - [Configuration reference](CONFIGURATION_PYTHON.md) — every env var the SDK reads
 - [Customer example](CUSTOMER_EXAMPLE_PYTHON.md) — full working FastAPI sample
-- [Asyncio patterns](ASYNCIO_FINAL.md) — lifecycles, streaming, cancellation
+- [Asyncio patterns](ASYNCIO.md) — lifecycles, streaming, cancellation

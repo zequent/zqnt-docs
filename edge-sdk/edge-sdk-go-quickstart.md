@@ -65,6 +65,14 @@ func main() {
 }
 ```
 
+**This single-address form only works if something in front of the platform multiplexes Connector,
+Live Data, and Mission Autonomy onto one address/port** — in every real deployment topology in this
+ecosystem, those are three independent Quarkus services on three independent ports (confirmed
+directly in the SDK's own `config.go` doc comments). For a real deployment, pass
+`WithConnectorAddr`/`WithLiveDataAddr`/`WithMissionAutonomyAddr` explicitly — see
+[Configuration options](#configuration-options) below. Leaving them unset and pointing
+`backendAddr` at just one of the three services will silently fail to reach the other two.
+
 ## Step 3: Run it
 
 ```bash
@@ -89,8 +97,20 @@ client, err := edgesdk.NewEdgeClient(
     edgesdk.WithAssetType("ASSET_TYPE_DOCK"),
     edgesdk.WithAssetVendor("DJI"),
     edgesdk.WithAssetID("your-platform-asset-id"),
+    edgesdk.WithConnectorAddr("connector-service:8010"),         // see note below
+    edgesdk.WithLiveDataAddr("live-data-service:8003"),          // see note below
+    edgesdk.WithMissionAutonomyAddr("mission-autonomy-service:8004"), // see note below
 )
 ```
+
+**`WithConnectorAddr`/`WithLiveDataAddr`/`WithMissionAutonomyAddr` matter more than the rest of
+this list.** `backendAddr` alone only reaches whichever one service happens to be listening at that
+address — Connector, Live Data, and Mission Autonomy are three independent Quarkus services on
+three independent ports in every real deployment topology in this ecosystem (confirmed directly in
+the SDK's own `config.go` doc comments). Set all three explicitly for any deployment that isn't
+proxying all three services onto one address; leaving them unset is easy to miss since it fails
+silently for whichever two services `backendAddr` doesn't happen to reach, rather than erroring at
+startup.
 
 The backend connection uses insecure gRPC credentials by default — wrap with your own
 `grpc.WithTransportCredentials` (via a lower-level constructor, or by dialing yourself) for TLS in

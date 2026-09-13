@@ -1,5 +1,10 @@
 # Minimal Customer Example
 
+A from-scratch walkthrough: scaffold a new Quarkus project, add the SDK, and have a working
+`/drone/takeoff` endpoint running in a container. For an explanation of each piece (CDI injection,
+standalone usage, configuration, the other client interfaces), see [QUICKSTART.md](QUICKSTART.md) —
+this page assumes you've skimmed it and just want the sequence of steps.
+
 ## Step by Step: Your First Project with Zequent Client SDK
 
 ### 1. Create New Quarkus Project
@@ -21,7 +26,7 @@ Open `pom.xml` and add:
 <dependency>
     <groupId>com.zqnt.sdk</groupId>
     <artifactId>client-java-sdk</artifactId>
-    <version>1.2.10</version>
+    <version>1.3.2</version>
 </dependency>
 ```
 
@@ -107,35 +112,9 @@ That's the whole integration — no interfaces to implement, no manual gRPC chan
 
 ## Switch Environment
 
-### Development → Staging
-
-```bash
-# Old .env
-REMOTE_CONTROL_SERVICE_HOST=localhost
-REMOTE_CONTROL_SERVICE_PORT=8002
-
-# New .env (Docker Compose)
-REMOTE_CONTROL_SERVICE_HOST=remote-control-service
-REMOTE_CONTROL_SERVICE_PORT=8002
-```
-
-**No code change!** Just restart:
-```bash
-docker compose up
-```
-
-### Staging → Production (Kubernetes)
-
-```yaml
-# deployment.yaml
-env:
-  - name: REMOTE_CONTROL_SERVICE_USE_STORK
-    value: "true"
-  - name: REMOTE_CONTROL_SERVICE_STORK_NAME
-    value: "remote-control-service"
-```
-
-**Still no code change!** Only deployment config.
+Moving this same project from your machine to staging to Kubernetes is a `.env`/deployment-config
+change, not a code change — see [QUICKSTART.md — Environment-Specific Configuration](QUICKSTART.md#environment-specific-configuration)
+for the Docker Compose and Kubernetes settings.
 
 ## Complete Project Structure
 
@@ -261,17 +240,9 @@ public class TelemetryWebSocket {
 
 ## Summary
 
-What you get out of the box:
-
-- Add the dependency, `@Inject ZequentClient` — auto-configured.
-- Switch environment via `.env` — no code change.
-- Retry logic, circuit breaker, load balancing, service discovery, and connection management included.
-
-What you don't have to write yourself:
-
-- gRPC channel setup or stub configuration.
-- Retry/circuit-breaker logic.
-- Environment-switch handling in code.
+That's the full loop: scaffold, add the dependency, inject `ZequentClient`, and it just works — see
+[QUICKSTART.md — Built-in Features](QUICKSTART.md#built-in-features) for what the SDK is doing for
+you under the hood (retry, circuit breaker, load balancing, service discovery).
 
 For flying a waypoint mission instead of one-off commands, see [Waypoint Missions](WAYPOINT_MISSIONS.md).
 

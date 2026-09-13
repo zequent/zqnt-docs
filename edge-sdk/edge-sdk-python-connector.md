@@ -1,6 +1,8 @@
 # Edge SDK (Python) — Connector
 
-`ConnectorClient` gives an edge adapter access to the platform's asset registry over gRPC — what an adapter itself needs (registering its own asset, watching asset state, reporting supported commands), not general mission/task management. It does expose `get_mission`, `get_task` and `get_task_by_flight_id` so an adapter can resolve a task the platform asked it to run; creating and managing missions and tasks belongs to the **Client SDK**, used by customer applications.
+`ConnectorClient` gives an edge adapter access to the platform's asset registry over gRPC — what an adapter itself needs (registering its own asset, watching asset state, reporting supported commands). It also exposes `get_mission`, `get_task` and `get_task_by_flight_id`, for an adapter to resolve a task the platform asked it to run — but checked against all five real Python adapters (MAVLink, Sapient, AI, Betaflight, RNS), **none of them actually call these three methods**. Every real one drives its mission/task work entirely through `EdgeAdapter.send_custom_command`/`prepare_task`/`start_task` instead (see [MAVLink](edge-sdk-mavlink-adapter-deployment.md) for a concrete example), with no dependency on resolving a task via `ConnectorClient`. Creating and managing missions and tasks belongs to the **Client SDK**, used by customer applications.
+
+Full method-by-method reference, including retry/timeout behavior: [Connector API Reference](../api-reference/edge-sdk-python-connector-reference.md).
 
 For Java, see [edge-sdk-connector.md](edge-sdk-connector.md).
 
@@ -69,6 +71,16 @@ rather than failing at execution time.
 
 Return an empty set for an asset you do not recognise. See
 [Edge Adapter](edge-sdk-python-adapter.md) for the full `EdgeAdapter` surface.
+
+> **Beta preview — 2.0.x, not yet released.** An unmerged branch adds four Skill Registry methods
+> to `ConnectorClient` (`observe_skill_contract`, `list_skill_contracts`,
+> `set_skill_contract_status`, `set_skill_contract_permissions`) that let an adapter push its own
+> command contracts into a persisted registry directly, instead of only ever being polled
+> indirectly through `get_capabilities` above. It also removes `get_mission`/`get_task`/
+> `get_task_by_flight_id` from this client outright. None of this is on `main`/the current 1.3.x
+> release yet — see the
+> [2.0.x Beta Connector reference](../api-reference/edge-sdk-python-connector-reference-2.0.md) if
+> you want to see where this is headed.
 
 ## Error handling
 

@@ -342,6 +342,6 @@ Note that `sn` at the frame level is the **parent Asset's** serial number, while
 ## See also
 
 - [Java Edge SDK — Live Data](../edge-sdk/edge-sdk-live-data.md) — publishing telemetry from an adapter
-- [Java Edge SDK — Models Reference](../edge-sdk/edge-sdk-models.md#telemetrydata) — the complete `TelemetryData` field list
+- [Java Edge SDK — Models Reference](../api-reference/edge-sdk-models.md#telemetrydata) — the complete `TelemetryData` field list
 - [Python Edge SDK — Live Data](../edge-sdk/edge-sdk-python-live-data.md) — the `AssetTelemetry` / `SubAssetTelemetry` dataclasses
 - [Java Client SDK — Streaming responses](../client-sdk/FUNCTIONAL_RESPONSES.md) — consuming telemetry in a customer application

@@ -1,6 +1,9 @@
 # Edge SDK -- Mission Autonomy Service
 
-`MissionAutonomyService` is a small, focused interface: it lets an edge adapter look up a **scheduler** definition directly from the Mission Autonomy service. Everything else related to running automated behavior on an asset — receiving task lifecycle calls, receiving commands, reporting progress — happens through other parts of the SDK, described below.
+`MissionAutonomyService` gives an edge adapter six methods — mission create/update/get, task get (by ID or flight ID), and scheduler get — reaching the platform's `mission-autonomy-service` directly instead of `connector-service`. **No confirmed real-adapter usage of any of them**: `edge-dji`, the one production Java adapter, wires up a `MissionAutonomyService` bean but calls none of its methods anywhere in its source. Everything related to actually running automated behavior on an asset — receiving task lifecycle calls, receiving commands, reporting progress — happens through other parts of the SDK, described below.
+
+Full method-by-method reference, including which methods are route-optimized and which are plain
+passthroughs: [Mission Autonomy API Reference](../api-reference/edge-sdk-mission-autonomy-reference.md).
 
 ## Table of Contents
 
@@ -24,10 +27,21 @@ Pick whichever suits your device and be explicit about it in your capability adv
 
 To stop a running task, the platform calls `stopTask` on your adapter.
 
-`MissionAutonomyService` exists for the one case where an adapter needs scheduler metadata directly:
+### MissionAutonomyService Interface
+
+`MissionAutonomyService` has six methods — mission create/update/get, task get (by ID or flight ID),
+and scheduler get — reaching `mission-autonomy-service` directly rather than `connector-service`.
+None have confirmed real-adapter usage; the interface exists for an adapter that wants a
+route-optimized mission write, or a read that happens to already be wired through this service
+rather than `ConnectorService`:
 
 ```java
 public interface MissionAutonomyService {
+    CompletableFuture<MissionDTO> createMission(CreateMissionRequest createMissionRequest);
+    CompletableFuture<MissionDTO> updateMission(UpdateMissionRequest updateMissionRequest);
+    CompletableFuture<MissionDTO> getMission(GetMissionRequest getRequest);
+    CompletableFuture<TaskDTO> getTask(GetTaskRequest getTaskRequest);
+    CompletableFuture<TaskDTO> getTaskByFlightId(GetTaskByFlightIdRequest getTaskRequest);
     CompletableFuture<SchedulerDTO> getScheduler(GetSchedulerRequest getSchedulerRequest);
 }
 ```
@@ -47,7 +61,18 @@ missionAutonomyService.getScheduler(request)
     });
 ```
 
-Scheduler CRUD (create/update/delete) is available through `ConnectorService` instead — see [Connector](edge-sdk-connector.md#schedulers).
+`createMission`/`updateMission` are route-optimized; every other method here (including this
+`getScheduler` example) is a plain passthrough to `connector-service` — functionally identical to
+calling the equivalent [`ConnectorService`](edge-sdk-connector.md) method directly. See the
+[reference](../api-reference/edge-sdk-mission-autonomy-reference.md) for the full breakdown. Scheduler
+create/update/delete is available only through `ConnectorService` — see
+[Connector](edge-sdk-connector.md#schedulers).
+
+> **Beta preview — 2.0.x, not yet released.** An unmerged branch shrinks this interface to
+> `getScheduler` alone — every Mission/Task method above is gone outright, not deprecated. Given
+> [no confirmed real-adapter usage](#overview) of any of them today, this is unlikely to affect a
+> real adapter migrating forward. See the
+> [2.0.x Beta reference](../api-reference/edge-sdk-mission-autonomy-reference-2.0.md).
 
 ---
 
@@ -55,7 +80,7 @@ Scheduler CRUD (create/update/delete) is available through `ConnectorService` in
 
 | Concern | Where it lives |
 | --- | --- |
-| Receiving `prepareTask`/`startTask`/`pauseTask`/`resumeTask`/`stopTask` calls | `EdgeAdapterService` — see [Edge Adapter](edge-sdk-adapter.md#task-execution) |
+| Receiving `prepareTask`/`startTask`/`pauseTask`/`resumeTask`/`stopTask` calls | `EdgeAdapterService` — see [Edge Adapter Reference](../api-reference/edge-sdk-adapter-reference.md#task-execution) |
 | Reporting progress/telemetry while a task runs | `LiveDataService` — see [Live Data](edge-sdk-live-data.md) |
 | Declaring which commands your adapter supports | `getCapabilities` on `EdgeAdapterService` — see [Connector](edge-sdk-connector.md#capabilities) |
 | Creating missions and tasks, and triggering them | The **Client SDK**, used by customer applications |

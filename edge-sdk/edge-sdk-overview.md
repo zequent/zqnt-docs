@@ -49,7 +49,7 @@ Communicates with the Mission Autonomy Service over gRPC to look up scheduler de
 | [Live Data](edge-sdk-live-data.md) | Producing telemetry data streams |
 | [Connector](edge-sdk-connector.md) | Asset and resource management via the Connector Service |
 | [Mission Autonomy](edge-sdk-mission-autonomy.md) | Scheduler lookup, task lifecycle, and custom commands |
-| [Models Reference](edge-sdk-models.md) | Request, response, and telemetry data model reference |
+| [Models Reference](../api-reference/edge-sdk-models.md) | Request, response, and telemetry data model reference |
 | [Go Edge SDK](edge-sdk-go-overview.md) | Go equivalent — an older API surface than this one, see its status note |
 
 ## Quick Start
@@ -60,7 +60,7 @@ Add the Edge SDK dependency to your project:
 <dependency>
   <groupId>com.zqnt.sdk</groupId>
   <artifactId>edge-java-sdk</artifactId>
-  <version>1.2.7</version>
+  <version>1.3.0</version>
 </dependency>
 ```
 

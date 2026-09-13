@@ -2,6 +2,8 @@
 
 `LiveDataService` is the recommended facade for all outbound data from an adapter — it composes a `TelemetryPublisher`, a `DetectionPublisher`, and notification publishing behind one connection lifecycle. (`TelemetryPublisher` and `DetectionPublisher` are also available standalone if you only need one of the three.)
 
+Full method-by-method reference, including reconnection/queueing behavior: [Live Data API Reference](../api-reference/edge-sdk-python-live-data-reference.md).
+
 For Java, see [edge-sdk-live-data.md](edge-sdk-live-data.md).
 
 ---
@@ -82,7 +84,7 @@ The choice is about **which entity the reading describes**, not what kind of dev
 
 `AssetTelemetry` is a superset covering every kind of Asset, so a standalone drone simply leaves the dock-only fields (`cover_state`, `air_conditioner`, `inside_temp`, `working_voltage`) as `None`. That is complete telemetry, not partial.
 
-See [Assets & Sub-Assets](../concepts/assets-and-sub-assets.md) for fully-populated examples of both configurations, and [Models Reference](edge-sdk-python-models.md#telemetry) for the complete field list.
+See [Assets & Sub-Assets](../concepts/assets-and-sub-assets.md) for fully-populated examples of both configurations, and [Models Reference](../api-reference/edge-sdk-python-models.md#telemetry) for the complete field list.
 
 ---
 
@@ -111,7 +113,7 @@ await live.produce_detection(
 
 ## Notifications
 
-Two cases: reporting an asset's online/offline transitions, and reporting progress or completion of a task your adapter is running.
+Three cases: reporting an asset's online/offline transitions, reporting progress or completion of a task your adapter is running, and (less commonly — no confirmed usage in any current adapter) mission-level events. See the [reference](../api-reference/edge-sdk-python-live-data-reference.md#notifications) for `MissionEvent`'s fields.
 
 ```python
 from edge_sdk import AssetStatusEvent, TaskEvent, TaskStatus, TaskType
@@ -137,18 +139,11 @@ await live.produce_notification(
 
 ## Error handling and reconnection
 
-`produce_*` methods raise `grpc.aio.AioRpcError` if the call fails after the underlying publisher has exhausted its internal retry budget. Treat them as transient and back off your producer loop:
+`produce_*` calls don't raise for a disconnected stream — each one enqueues onto an internal bounded queue (1000 items by default) and returns immediately; the background stream task retries the actual gRPC call with exponential backoff (1s up to 60s, no attempt limit) and drains the queue once reconnected. If you publish faster than the queue drains while disconnected, new calls made once the queue is full are silently dropped (logged at `debug`, not raised) — see the [reference](../api-reference/edge-sdk-python-live-data-reference.md#reconnection-and-queueing-behavior) for the exact behavior. A simple producer loop needs no explicit error handling:
 
 ```python
-import asyncio
-import grpc
-
 while True:
-    try:
-        await live.produce_telemetry(read_from_device())
-    except grpc.aio.AioRpcError as e:
-        log.warning("telemetry push failed: %s; backing off", e.code())
-        await asyncio.sleep(1.0)
+    await live.produce_telemetry(read_from_device())
     await asyncio.sleep(0.1)
 ```
 

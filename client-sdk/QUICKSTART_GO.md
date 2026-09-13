@@ -98,7 +98,7 @@ rc.GoTo(ctx, sn, coordinate)
 rc.ReturnToHome(ctx, sn, altitude)
 rc.EnterManualControl(ctx, sn, clientID, userID, sessionID)
 rc.LookAt(ctx, ...)
-rc.OpenCover(ctx, sn) / rc.CloseCover(ctx, sn)
+rc.OpenCover(ctx, sn) / rc.CloseCover(ctx, sn, force)
 rc.StartCharging(ctx, sn) / rc.StopCharging(ctx, sn)
 rc.RebootAsset(ctx, sn)
 rc.GetAssetRuntime(ctx, sn, assetID)
@@ -107,7 +107,8 @@ rc.GetCapabilities(ctx, sn)
 
 Shares its request/response shapes with `EdgeAdapterService` (`devicecontrol` package) — the same
 types flow end to end from this client through to the edge adapter that actually talks to the
-hardware.
+hardware. See the [Remote Control API Reference](../api-reference/client-sdk-remote-control-go.md)
+for every method (23 total — this list is illustrative, not exhaustive).
 
 ### `missionautonomy` — missions, tasks & schedulers
 
@@ -123,11 +124,12 @@ ma.GetTask(ctx, taskID)  / ma.GetTaskByFlightID(ctx, flightID)
 ma.StartTask(ctx, taskID) / ma.StopTask(ctx, taskID)
 ma.PauseTask(ctx, taskID) / ma.ResumeTask(ctx, taskID)
 
-ma.ListSchedulers(ctx)
+ma.ListSchedulers(ctx, taskID)   // taskID == "" lists every scheduler, unfiltered
 ```
 
 See [Waypoint Missions](WAYPOINT_MISSIONS.md) for which of these actually flies an asset — the task
-lifecycle reaches the device only on adapters that implement it.
+lifecycle reaches the device only on adapters that implement it. Full reference, including which
+methods are route-optimized: [Mission Autonomy API Reference](../api-reference/client-sdk-mission-autonomy-go.md).
 
 ### `connector` — assets, schedulers, policies, config
 
@@ -136,11 +138,13 @@ c := connector.New(conn)   // dial connector-service, default port 8010
 
 c.GetAssetBySn(ctx, sn)
 
-// Schedulers
-c.GetScheduler(ctx, schedulerID) / c.ListSchedulers(ctx)
+// Schedulers -- listing lives on missionautonomy.Client instead (ma.ListSchedulers above);
+// ConnectorService has no ListSchedulers RPC at this contract version.
+c.GetScheduler(ctx, schedulerID)
 c.CreateScheduler(ctx, scheduler) / c.CreateSchedulers(ctx, schedulers)
 c.UpdateScheduler(ctx, schedulerID, scheduler)
 c.DeleteScheduler(ctx, schedulerID) / c.DeleteSchedulers(ctx, schedulerIDs)
+c.DeleteSchedulersByTask(ctx, taskID)
 
 // Policies & technical config (read-only)
 c.GetActivePoliciesByType(ctx, policyType)
@@ -181,9 +185,6 @@ gRPC streaming client and leaves redialing a broken stream to the caller.
   your own retry/backoff (e.g. `google.golang.org/grpc/backoff`) if you need it, or dial through
   whatever service mesh/proxy your deployment already uses.
 - **No auto-reconnecting streams** (see `livedata` above).
-- **The deprecated Mission/Task API.** Like the Java SDK, `MissionAutonomyService`'s old
-  Mission/Task methods aren't backed by any RPC in the current proto contract — there was nothing
-  working to mirror, so this package only has the current Application/Skill surface.
 
 ## Troubleshooting
 

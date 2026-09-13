@@ -19,6 +19,16 @@ finally:
     await client.close()
 ```
 
+> **Beta preview — 2.0.x, not yet released.** This client's surface itself doesn't change on the
+> unmerged branch (it's already just scheduler lookup today) — but the `SchedulerDTO` it returns
+> does: `mission_id`/`task_id` are retired on the wire, replaced with a direct capability-execution
+> target (`asset_sn` + `command_id`, or `asset_sn` + `application_id` + `skill_id`). This SDK's
+> `edge_sdk.models.scheduler.SchedulerDTO` is its own plain-Python model, separate from (but
+> field-equivalent to) the client SDK's own `SchedulerDTO` — both mirror the same
+> `SchedulerProtoDTO` wire message. See the
+> [Client SDK 2.0.x reference](../api-reference/client-sdk-mission-autonomy-python-2.0.md#schedulers--same-methods-different-schedulerdto-shape)
+> for the full field breakdown.
+
 ---
 
 ## Receiving tasks (the common case)
@@ -92,10 +102,12 @@ Progress flows back to the platform via `LiveDataService.produce_notification`, 
 
 ## Best practices
 
-> These apply if your adapter implements the task methods — that is, it can resolve a task ID
-> through the Connector, as the SAPIENT adapter does. If it instead accepts
-> `mission.waypoint.execute` through `send_custom_command` (the MAVLink approach), the waypoints
-> and configuration arrive inline and none of this applies. See
+> These apply if your adapter implements the task methods at all. SAPIENT does — but by passing
+> `task_id` straight through as its own protocol's task identifier, not by resolving it through
+> `ConnectorClient`: its `prepare_task` is a no-op acknowledgment, and `start_task`/`stop_task`
+> forward `task_id` directly into a SAPIENT control command. MAVLink implements none of the task
+> methods — it accepts `mission.waypoint.execute` through `send_custom_command` instead, with
+> waypoints and configuration arriving inline, and none of this applies. See
 > [Edge Adapter](edge-sdk-python-adapter.md#tasks).
 
 - **Validate in `prepare_task`**; return an error there if you can't handle the task. Don't accept and then fail in `start_task`.

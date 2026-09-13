@@ -34,7 +34,7 @@ Open `pom.xml` and add the Edge SDK and the GitHub Packages repository:
     <dependency>
         <groupId>com.zqnt.sdk</groupId>
         <artifactId>edge-java-sdk</artifactId>
-        <version>1.2.7</version>
+        <version>1.3.0</version>
     </dependency>
 </dependencies>
 
@@ -297,6 +297,6 @@ my-edge-adapter/
 - [Configuration Guide](edge-sdk-configuration.md) -- All configuration properties
 - [Live Data](edge-sdk-live-data.md) -- In-depth telemetry streaming guide
 - [Connector](edge-sdk-connector.md) -- Asset and mission management
-- [Models Reference](edge-sdk-models.md) -- Complete model documentation
+- [Models Reference](../api-reference/edge-sdk-models.md) -- Complete model documentation
 
 For a ready-made DJI deployment, see [DJI Adapter Deployment](edge-sdk-dji-adapter-deployment.md).

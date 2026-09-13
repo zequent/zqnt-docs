@@ -55,7 +55,7 @@ Starting, stopping, and toggling tracking is done through `SendCustomCommand` wi
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `AI_MODEL_PATH` | adapter-specific default | Path to the YOLO model file |
+| `AI_MODEL_PATH` | `yolov12_custom.onnx` | Path to the YOLO model file |
 | `AI_FRAME_WIDTH` | `1280` | Expected video frame width (px) |
 | `AI_FRAME_HEIGHT` | `720` | Expected video frame height (px) |
 | `AI_CAMERA_HFOV_DEG` | `82.0` | Camera horizontal field of view (degrees) — tune to your actual camera |

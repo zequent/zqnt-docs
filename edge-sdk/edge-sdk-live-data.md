@@ -2,6 +2,8 @@
 
 The `LiveDataService` interface manages persistent gRPC streams between the edge adapter and the platform's Live Data Service, for three kinds of outbound data: **telemetry**, **detections**, and **notifications**. It provides both a POJO-based API (recommended for most use cases) and a raw Proto-based API for advanced scenarios.
 
+Full method-by-method reference: [Live Data API Reference](../api-reference/edge-sdk-live-data-reference.md).
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -10,6 +12,7 @@ The `LiveDataService` interface manages persistent gRPC streams between the edge
 - [Detections](#detections)
 - [Notifications](#notifications)
 - [Stream Management](#stream-management)
+- [Wiring and shutdown](#wiring-and-shutdown)
 - [Configuration](#configuration)
 - [Best Practices](#best-practices)
 
@@ -21,9 +24,9 @@ Edge adapters continuously push data to the Live Data Service, where it's broadc
 
 - **Telemetry** -- position, battery, environmental readings, camera state, and more.
 - **Detections** -- AI/vision detection results.
-- **Notifications** -- asset online/offline events, and task progress/completion events (see [Edge Adapter](edge-sdk-adapter.md#task-execution)).
+- **Notifications** -- asset online/offline events, task progress/completion events, and (less commonly) mission-level events (see [API Reference — Notifications](../api-reference/edge-sdk-live-data-reference.md#notifications)).
 
-The `LiveDataService` abstracts the complexity of managing gRPC streams: one persistent stream per device per data kind, with automatic reconnection on failure (exponential backoff, 1s to 30s, 20% jitter, up to 10 attempts).
+The `LiveDataService` abstracts the complexity of managing gRPC streams: one persistent stream per device per data kind, with automatic reconnection on failure.
 
 ---
 
@@ -43,9 +46,13 @@ Per-device stream --> Live Data Service (platform)
 ```
 
 - **One stream per device, per data kind.** Reused across subsequent pushes.
-- **Automatic reconnection** with exponential backoff; a final failed attempt schedules a retry after 30 seconds.
-- **Graceful shutdown** via `@PreDestroy` -- all streams are closed on application shutdown.
+- **Automatic reconnection** with capped exponential backoff and no attempt limit — see
+  [API Reference — Reconnection behavior](../api-reference/edge-sdk-live-data-reference.md#reconnection-behavior)
+  for the exact numbers.
 - **Thread-safe** -- device-to-stream mappings are stored in a `ConcurrentHashMap`.
+- **Shutdown is not automatic.** The SDK registers no shutdown hook of its own — your adapter
+  project has to call it, the same way it has to produce the `LiveDataService` bean in the first
+  place. See [Wiring and shutdown](#wiring-and-shutdown).
 
 ---
 
@@ -126,7 +133,7 @@ TelemetryData telemetry = TelemetryData.builder()
     .build();
 ```
 
-See [Models Reference](edge-sdk-models.md#telemetrydata) for the full field list.
+See [Models Reference](../api-reference/edge-sdk-models.md#telemetrydata) for the full field list.
 
 ### Proto-based API (advanced)
 
@@ -151,6 +158,8 @@ liveDataService.produceTelemetry("YOUR_DEVICE_SN", protoRequest)
 ```
 
 Both APIs share the same underlying stream infrastructure, so there is no performance difference.
+Detections and notifications have the same two-API shape — see the
+[reference](../api-reference/edge-sdk-live-data-reference.md) for their Proto-based method signatures.
 
 ---
 
@@ -189,7 +198,10 @@ liveDataService.produceDetectionData(batch)
 
 ## Notifications
 
-Notifications cover two cases: reporting an asset's online/offline transitions, and reporting progress or completion of a task your adapter is running. Exactly one event field should be set per call.
+Notifications cover three cases: reporting an asset's online/offline transitions, reporting progress
+or completion of a task your adapter is running, and (less commonly — no confirmed usage in any
+current adapter) mission-level events. Exactly one event field should be set per call — see the
+[reference](../api-reference/edge-sdk-live-data-reference.md#notifications) for the full field list of each.
 
 ```java
 import com.zqnt.sdk.edge.adapter.domains.NotificationRequestData;
@@ -243,10 +255,57 @@ Each of telemetry, detections, and notifications has its own stream lifecycle:
 liveDataService.closeStream("YOUR_DEVICE_SN");           // telemetry stream for one device
 liveDataService.closeDetectionStream("YOUR_DEVICE_SN");   // detection stream for one device
 liveDataService.closeNotificationStream("YOUR_DEVICE_SN"); // notification stream for one device
-liveDataService.closeAllStreams();                        // all telemetry streams (shutdown)
+liveDataService.closeAllStreams();                        // all telemetry streams — not detection/notification, see below
 ```
 
-The `LiveDataServiceImpl` also registers a `@PreDestroy` callback that automatically closes streams with a 10-second timeout on application shutdown.
+`closeAllStreams()` only closes telemetry streams despite the name — it does not touch detection or
+notification streams. For a complete shutdown across all three, use `LiveDataServiceImpl.shutdown()`
+instead (see below).
+
+---
+
+## Wiring and shutdown
+
+The SDK does not wire `LiveDataService` into CDI by itself, and does not close anything on
+application shutdown automatically — there is no `@PreDestroy`/`@Shutdown` hook inside the SDK.
+Your adapter project has to produce the bean and shut it down itself, the same way the DJI adapter
+does it:
+
+```java
+@ApplicationScoped
+public class LiveDataProducer {
+
+    private final TelemetryMapper telemetryMapper;
+    private final DetectionMapper detectionMapper;
+    private final NotificationMapper notificationMapper;
+    private final LiveDataServiceGrpc.LiveDataServiceStub stub;
+    private LiveDataServiceImpl liveDataService;
+
+    // ... constructor injecting the mappers and a stub built from your gRPC ManagedChannel ...
+
+    @Produces
+    @ApplicationScoped
+    public LiveDataService produceLiveDataService() {
+        if (liveDataService == null) {
+            liveDataService = new LiveDataServiceImpl(telemetryMapper, detectionMapper,
+                notificationMapper, stub);
+        }
+        return liveDataService;
+    }
+
+    @Shutdown
+    void shutdown() {
+        if (liveDataService != null) {
+            liveDataService.shutdown();
+        }
+    }
+}
+```
+
+`LiveDataServiceImpl.shutdown()` closes every stream of all three kinds and shuts down the internal
+reconnect scheduler — it's the one method that gives you a complete, orderly shutdown in one call.
+`@Shutdown` here is Quarkus's own runtime shutdown-event annotation (`io.quarkus.runtime.Shutdown`),
+not a CDI `@PreDestroy`.
 
 ---
 
@@ -283,6 +342,6 @@ See the [Configuration Guide](edge-sdk-configuration.md) for the complete refere
 
 5. **Keep the task id stable.** Use the same `taskId` across every `TaskEventData` notification for one run, so the platform can follow that run's progress through to completion.
 
-6. **Do not manually manage streams.** Let the SDK handle stream creation, reconnection, and teardown. If you need to reset a stream, call the relevant `close*Stream(deviceSn)` and the next `produce*` call will create a new one automatically.
+6. **Do not manually manage streams.** Let the SDK handle reconnection. If you need to reset a stream, call the relevant `close*Stream(deviceSn)` and the next `produce*` call will create a new one automatically.
 
-7. **Handle shutdown gracefully.** If your adapter has its own shutdown logic, call `closeAllStreams()` before tearing down other resources. The SDK does this automatically via `@PreDestroy`, but explicit ordering can prevent race conditions.
+7. **Call `LiveDataServiceImpl.shutdown()` from your own shutdown hook.** The SDK will not do this for you — see [Wiring and shutdown](#wiring-and-shutdown). Do it before tearing down the gRPC channel the stub was built from.

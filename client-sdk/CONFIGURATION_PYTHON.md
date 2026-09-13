@@ -10,6 +10,8 @@ For Java/Quarkus configuration see [CONFIGURATION.md](CONFIGURATION.md).
 
 | Variable                          | Default     | Description                                  |
 |-----------------------------------|-------------|----------------------------------------------|
+| `CONNECTOR_SERVICE_HOST`          | `localhost` | Hostname of the Connector service            |
+| `CONNECTOR_SERVICE_PORT`          | `8010`      | gRPC port                                    |
 | `REMOTE_CONTROL_SERVICE_HOST`     | `localhost` | Hostname of the Remote Control service       |
 | `REMOTE_CONTROL_SERVICE_PORT`     | `8002`      | gRPC port                                    |
 | `MISSION_AUTONOMY_SERVICE_HOST`   | `localhost` | Hostname of the Mission Autonomy service     |
@@ -17,12 +19,28 @@ For Java/Quarkus configuration see [CONFIGURATION.md](CONFIGURATION.md).
 | `LIVE_DATA_SERVICE_HOST`          | `localhost` | Hostname of the Live Data service            |
 | `LIVE_DATA_SERVICE_PORT`          | `8003`      | gRPC port                                    |
 
+Unlike the Python Edge SDK's own client classes (whose built-in port defaults don't match the
+platform's real ports — see [Edge SDK Configuration](../edge-sdk/edge-sdk-python-configuration.md)),
+these Client SDK defaults are the platform's actual ports directly — no override needed for a local
+Compose deployment.
+
 ```python
 from client_sdk import ZequentClient
 
 async with ZequentClient.from_env() as client:
     ...
 ```
+
+Each of the four services above also accepts four more env vars with the same prefix, for TLS and
+Kubernetes service discovery — see [TLS, auth, and custom channels](#tls-auth-and-custom-channels)
+below, including its [Stork service discovery](#stork-service-discovery-kubernetes) subsection:
+
+| Suffix | Default | Description |
+| --- | --- | --- |
+| `_USE_PLAINTEXT` | `true` | Set to `false` for TLS |
+| `_USE_STORK` | `false` | Enable Stork-based service discovery instead of a fixed host/port |
+| `_STORK_NAME` | `<service-name>-service` | Stork service name to resolve, when `_USE_STORK=true` |
+| `_LOAD_BALANCER` | `ROUND_ROBIN` | Load-balancer strategy when `_USE_STORK=true` |
 
 ---
 
@@ -51,20 +69,42 @@ explicitly as above.
 
 ## Resilience configuration
 
-Unary RPCs are wrapped with retry + circuit-breaker policies. Defaults are sane; override via `ResilienceConfig`:
+Unary RPCs are wrapped with retry + circuit-breaker policies. `resilience` is a read-only property
+set once at construction — either automatically from environment variables (see below) or by
+passing a `ResilienceConfig` yourself:
 
 ```python
+from client_sdk import ZequentClient
 from client_sdk.config.resilience import ResilienceConfig
 
-config.resilience = ResilienceConfig(
-    max_attempts=5,                  # total attempts including the initial call
-    initial_backoff_ms=200,          # first retry delay
-    max_backoff_ms=5_000,            # cap on exponential backoff
-    backoff_multiplier=2.0,
-    breaker_failure_threshold=10,    # consecutive failures before tripping
-    breaker_reset_seconds=30,        # half-open window
-)
+async with ZequentClient(
+    resilience=ResilienceConfig(
+        max_retry_attempts=5,
+        retry_delay_millis=200,
+        circuit_breaker_failure_threshold=10,
+        circuit_breaker_wait_duration_millis=30_000,
+        connection_timeout_seconds=30,
+        request_timeout_seconds=60,
+    ),
+    connector_config=...,
+    remote_control_config=...,
+    mission_autonomy_config=...,
+    live_data_config=...,
+) as client:
+    ...
 ```
+
+`ZequentClient.from_env()` builds the same `ResilienceConfig` from env vars — the exact names the
+Java SDK uses:
+
+| Variable | Default | Maps to |
+| --- | --- | --- |
+| `ZEQUENT_MAX_RETRY_ATTEMPTS` | `3` | `max_retry_attempts` |
+| `ZEQUENT_RETRY_DELAY_MS` | `1000` | `retry_delay_millis` |
+| `ZEQUENT_CIRCUIT_BREAKER_THRESHOLD` | `5` | `circuit_breaker_failure_threshold` |
+| `ZEQUENT_CIRCUIT_BREAKER_WAIT_MS` | `30000` | `circuit_breaker_wait_duration_millis` |
+| `ZEQUENT_CONNECTION_TIMEOUT_SEC` | `30` | `connection_timeout_seconds` |
+| `ZEQUENT_REQUEST_TIMEOUT_SEC` | `60` | `request_timeout_seconds` |
 
 Retryable gRPC status codes:
 
@@ -135,6 +175,22 @@ async with ZequentClient(
 ```
 
 For per-call metadata (e.g. JWT bearers), pass `metadata=[(...)]` to SDK methods or attach a gRPC interceptor to the channel.
+
+The same switch is available per service as an env var, without touching code —
+`CONNECTOR_SERVICE_USE_PLAINTEXT=false`, `REMOTE_CONTROL_SERVICE_USE_PLAINTEXT=false`, etc., read by
+`ZequentClient.from_env()` (see [Service endpoints](#service-endpoints) above).
+
+### Stork service discovery (Kubernetes)
+
+Each service also accepts `<PREFIX>_USE_STORK=true` (with `<PREFIX>_STORK_NAME` and
+`<PREFIX>_LOAD_BALANCER` to override the defaults) to resolve the endpoint via Stork instead of a
+fixed host/port — the same mechanism the Java SDK uses in Kubernetes, e.g.:
+
+```bash
+REMOTE_CONTROL_SERVICE_USE_STORK=true
+REMOTE_CONTROL_SERVICE_STORK_NAME=remote-control-service
+REMOTE_CONTROL_SERVICE_LOAD_BALANCER=ROUND_ROBIN
+```
 
 ---
 

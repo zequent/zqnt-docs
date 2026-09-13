@@ -2,7 +2,7 @@
 
 The Java Client SDK integrates tightly with Quarkus / CDI / Mutiny. The Python Client SDK is plain `asyncio` + `grpc.aio`. This document covers the lifecycle, streaming, cancellation, and error patterns that make the Python SDK pleasant to use in real applications.
 
-This is the Python counterpart of [SPRING_BOOT_FINAL.md](SPRING_BOOT_FINAL.md).
+This is the Python counterpart of [SPRING_BOOT.md](SPRING_BOOT.md).
 
 ---
 

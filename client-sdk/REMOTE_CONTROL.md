@@ -2,16 +2,11 @@
 
 `client.remoteControl()` sends direct, imperative commands to a connected asset — flight ops, dock ops, manual control, and dynamic capability discovery for payload/integrator-defined commands. Every call targets a single asset by serial number (`sn`).
 
+Full method-by-method reference: [Remote Control API Reference](../api-reference/client-sdk-remote-control.md).
+
 For response semantics — what "success" actually means, and how command responses relate to progress/telemetry — see [Functional Responses](FUNCTIONAL_RESPONSES.md).
 
 ## Flight ops
-
-| Method | Purpose |
-| --- | --- |
-| `takeoff(TakeoffRequest)` | Take off and fly to a target lat/lon/altitude |
-| `goTo(GoToRequest)` | Fly to a target lat/lon/altitude |
-| `returnToHome(ReturnToHomeRequest)` | Return to home, optionally at a given altitude |
-| `lookAt(LookAtRequest)` | Point the gimbal/camera at a lat/lon/altitude |
 
 ```java
 var request = TakeoffRequest.builder()
@@ -31,17 +26,11 @@ client.remoteControl().takeoff(request)
     });
 ```
 
-`missionId`/`taskId` on `TakeoffRequest`/`GoToRequest` are optional — set them to correlate the command with a mission/task you already created via [Connector](CONNECTOR.md#missions).
+`missionId`/`taskId` on `TakeoffRequest`/`GoToRequest` are optional — set them to correlate the command with a mission/task you already created via [Connector](CONNECTOR.md#missions-and-tasks-are-records-not-flights).
 
 ## Manual control
 
-| Method | Purpose |
-| --- | --- |
-| `enterManualControl(ManualControlRequest)` | Take exclusive manual control of an asset |
-| `exitManualControl(ManualControlRequest)` | Release manual control |
-| `startManualControlInput(sn, assetId)` | Open a gRPC streaming session for continuous stick input |
-
-`startManualControlInput` returns a `ManualControlInputSession` — call `sendInput` repeatedly, then `complete()` to close the stream and get the final response:
+`startManualControlInput(sn, assetId)` returns a `ManualControlInputSession` — call `sendInput` repeatedly, then `complete()` to close the stream and get the final response. `enterManualControl`/`exitManualControl` take/release exclusive control around the session:
 
 ```java
 try (ManualControlInputSession session = client.remoteControl().startManualControlInput(sn, assetId)) {
@@ -60,20 +49,10 @@ try (ManualControlInputSession session = client.remoteControl().startManualContr
 
 ## Dock & asset ops
 
-All of these take a `DockOperationRequest` (`sn`, `assetId`, optional `value`) except `liveStreamSplitScreen`.
-
-| Method | `value` meaning |
-| --- | --- |
-| `openCover(DockOperationRequest)` | ignored |
-| `closeCover(DockOperationRequest)` | `true` forces the close |
-| `startCharging(DockOperationRequest)` | ignored |
-| `stopCharging(DockOperationRequest)` | ignored |
-| `rebootAsset(DockOperationRequest)` | ignored |
-| `bootSubAsset(DockOperationRequest)` | `true`/`false` — boot the paired sub-asset on or off |
-| `debugMode(DockOperationRequest)` | `true`/`false` — enable/disable debug mode |
-| `changeAcMode(DockOperationRequest)` | ignored |
-| `takePhoto(DockOperationRequest)` | ignored |
-| `liveStreamSplitScreen(LiveStreamSplitScreenRequest)` | `enabled` (`true`/`false`) — toggle split-screen live view |
+All of these take a `DockOperationRequest` (`sn`, `assetId`, optional `value`) except
+`liveStreamSplitScreen` — what `value` means differs per method (e.g. forcing `closeCover`, toggling
+`debugMode`); see the [reference](../api-reference/client-sdk-remote-control.md#dock--asset-ops) for
+the full list.
 
 ```java
 var request = DockOperationRequest.builder()
@@ -139,3 +118,8 @@ client.remoteControl().goTo(request)
         return null;
     });
 ```
+
+## See also
+
+- [Remote Control API Reference](../api-reference/client-sdk-remote-control.md) — every method, grouped by area
+- [Functional Responses](FUNCTIONAL_RESPONSES.md) — what a response actually confirms

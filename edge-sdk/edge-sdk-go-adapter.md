@@ -85,6 +85,7 @@ for anything you don't override.
 |--------|--------------|
 | `StartLiveStream(ctx, *LiveStreamStartRequest)` | Start pushing a live video stream |
 | `StopLiveStream(ctx, *LiveStreamStopRequest)` | Stop the live video stream |
+| `LiveStreamSplitScreen(ctx, sn, enabled bool)` | Toggle split-screen view across multiple lenses/payloads |
 
 ### Debug and maintenance
 | Method | Description |
@@ -103,18 +104,28 @@ for anything you don't override.
 |--------|--------------|
 | `GetCapabilities(ctx, sn)` | Report the device's current capability snapshot (`*domains.CurrentCapabilities`) |
 
-Note: this reports the 2-value (`available bool`) capability schema, rather than the richer
-capability state the Java Edge SDK reports.
+Go's `Capability` struct is near-parity with Java's, not a bare 2-value schema — confirmed
+field-for-field against `adapter/domains/capability.go`: `Command`, `Description`, `Available`,
+`UnavailableReason`, `Metadata`, `TargetType`, `TargetRef`, `SchemaVersion` all exist here exactly
+as they do on Java's `Capability`. The only fields Go is missing are the three JSON-Schema-shaped
+ones — `constraints`, `inputSchema`, `outputSchema`.
 
 ### Task execution
 | Method | Description |
 |--------|--------------|
-| `StartTask(ctx, taskID, tid string)` | Start executing a task |
-| `StopTask(ctx, taskID string)` | Stop a running task |
 | `PrepareTask(ctx, taskID, tid string)` | Prepare a task before starting it |
+| `StartTask(ctx, taskID, tid string)` | Start executing a task |
+| `PauseTask(ctx, taskID, tid string)` | Pause a running task |
+| `ResumeTask(ctx, taskID, tid string)` | Resume a paused task |
+| `StopTask(ctx, taskID string)` | Stop a running task |
 
 These correspond to the platform's Mission/Task model — see
 [Overview](edge-sdk-go-overview.md) for what that means for this SDK.
+
+### Custom commands
+| Method | Description |
+|--------|--------------|
+| `SendCustomCommand(ctx, *CustomCommandRequest)` | Handle a command that doesn't map to a standard method above. `CustomCommandRequest` carries `SN`, `TID`, `CommandID`, an optional `TargetRef`, and `Params map[string]any` |
 
 ## `CommandResult`
 

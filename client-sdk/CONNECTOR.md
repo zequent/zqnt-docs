@@ -2,6 +2,8 @@
 
 `client.connector()` gives your application direct access to the platform's system of record: asset lookups, organization info, scheduler management, technical configuration, operational policies, and asset payloads. Most integrations only need a handful of these — asset lookup and scheduler management are the most common.
 
+Full method-by-method reference: [Connector API Reference](../api-reference/client-sdk-connector.md).
+
 For Python, see [CONNECTOR_PYTHON.md](CONNECTOR_PYTHON.md).
 
 ## Requests share a context
@@ -19,17 +21,7 @@ client.connector().getAssetBySn(request)
     .thenAccept(response -> System.out.println("Asset: " + response));
 ```
 
-## Assets
-
-| Method | Purpose |
-| --- | --- |
-| `getAssetBySn(GetAssetBySnRequest)` | Look up an asset by its serial number |
-| `getAssetById(GetAssetByIdRequest)` | Look up an asset by its platform ID |
-| `getSubAssetBySn(GetSubAssetBySnRequest)` | Look up a sub-asset (e.g. the drone paired to a dock) |
-| `registerAsset(RegisterAssetRequest)` | Register a new asset (normally done by an edge adapter, not a customer app) |
-| `updateAsset(UpdateAssetRequest)` | Update asset metadata |
-| `updateSubAsset(UpdateSubAssetRequest)` | Update sub-asset metadata |
-| `deregisterAsset(DeregisterAssetRequest)` | Remove an asset |
+## Looking up an asset
 
 ```java
 var request = GetAssetByIdRequest.builder()
@@ -40,39 +32,21 @@ client.connector().getAssetById(request)
     .thenAccept(response -> System.out.println(response));
 ```
 
-## Asset payloads
+Asset payload storage (arbitrary versioned metadata — flight-plan artifacts, calibration data),
+organization lookup, and scheduler CRUD follow the same request/response shape — see the
+[reference](../api-reference/client-sdk-connector.md) for the full method list.
 
-Payloads are arbitrary, versioned metadata blobs attached to an asset (e.g. flight-plan artifacts, calibration data).
+## Missions and tasks are records, not flights
 
-| Method | Purpose |
-| --- | --- |
-| `upsertAssetPayload(UpsertAssetPayloadRequest)` | Create or update a payload |
-| `listAssetPayloads(ListAssetPayloadsRequest)` | List payloads for an asset |
-| `deleteAssetPayload(DeleteAssetPayloadRequest)` | Remove a payload |
-
-## Organizations
-
-```java
-var request = GetOrganizationRequest.builder().build();
-client.connector().getOrganization(request)
-    .thenAccept(response -> System.out.println("Org: " + response));
-```
-
-## Missions
-
-| Method | Purpose |
-| --- | --- |
-| `getMission(GetMissionRequest)` | Get a mission by ID |
-| `createMission(CreateMissionRequest)` | Create a mission |
-| `updateMission(UpdateMissionRequest)` | Update a mission |
-| `deleteMission(DeleteMissionRequest)` | Delete a mission |
-| `uploadMissionNfzZones(UploadMissionZonesRequest)` | Attach no-fly zones to a mission |
-
-`MissionResponse`/`TaskResponse`/`WaypointsResponse` use `isSuccess()` + `getError()` rather than the `getHasErrors()` pattern above — check `success` before reading the response payload.
-
-> These methods create and read mission **records**. Creating one does not fly anything by itself.
-> How a flight is actually triggered depends on the adapter — see
+> These methods create and read mission/task **records**. Creating one does not fly anything by
+> itself. How a flight is actually triggered depends on the adapter — see
 > [Waypoint Missions](WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use).
+
+> **For real use, create missions and waypoint tasks through `client.missionAutonomy()` instead** —
+> confirmed against the backend, its `createMission`/`createTask` route-optimize (and, for a task,
+> expand around the mission's no-fly zones) before writing the exact same record shown below. The
+> example here still works — same record, no optimization — but `missionAutonomy()` is what you
+> want day to day. See the [Mission Autonomy reference](../api-reference/client-sdk-mission-autonomy.md).
 
 ```java
 import com.zqnt.utils.missionautonomy.domains.MissionDTO;
@@ -96,7 +70,7 @@ client.connector().createMission(request)
 
 ### No-fly zones
 
-A mission's no-fly zones (NFZ) tell the platform's route planner where it must route drones — and dock-return paths — around. A zone's `area` can be a polygon, bounding box, circle, or raw GeoJSON, controlled by `GeoAreaDTO.type`:
+A mission's no-fly zones (NFZ) tell the platform's route planner where it must route drones — and dock-return paths — around. A zone's `area` can be a polygon, bounding box, circle, or raw GeoJSON, controlled by `GeoAreaDTO.type` (full requirements per type in the [reference](../api-reference/client-sdk-connector.md#geoareadtotype-requirements)):
 
 ```java
 import com.zqnt.utils.missionautonomy.domains.*;
@@ -126,22 +100,7 @@ client.connector().uploadMissionNfzZones(request)
     .thenAccept(response -> System.out.println("Zones uploaded: " + response.isSuccess()));
 ```
 
-`GeoAreaDTO.type` requirements: `GEO_AREA_TYPE_POLYGON` needs 3+ `vertices`; `GEO_AREA_TYPE_BOUNDING_BOX` needs exactly 2; `GEO_AREA_TYPE_CIRCLE` needs `center` + a positive `radiusMeters`; `GEO_AREA_TYPE_GEO_JSON` needs `geoJson`. `replaceExisting(true)` replaces the mission's whole zone set instead of appending.
-
-## Tasks
-
-| Method | Purpose |
-| --- | --- |
-| `getTask(GetTaskRequest)` | Get a task by ID |
-| `getTaskByFlightId(GetTaskByFlightIdRequest)` | Get a task by its external flight ID |
-| `createTask(CreateTaskRequest)` | Create a task |
-| `updateTask(UpdateTaskRequest)` | Update a task |
-| `deleteTask(DeleteTaskRequest)` | Delete a task |
-| `getWaypointsByTaskId(GetWaypointsByTaskIdRequest)` | Get the resolved waypoint list for a task |
-
-> As with missions, these manage task **records**. Creating a task does not start it. `startTask`
-> reaches the device only where the adapter implements the task methods (DJI, SAPIENT) — see
-> [Waypoint Missions](WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use).
+### Correlating a task with an external flight record
 
 ```java
 var request = GetTaskByFlightIdRequest.builder()
@@ -154,45 +113,14 @@ client.connector().getTaskByFlightId(request)
 
 `getTaskByFlightId` looks up a task by the external flight ID an edge adapter assigned it (`TaskDTO.externalTaskId`) — useful for correlating a vendor-side flight record back to its Zequent task without knowing the platform's task ID up front.
 
-## Schedulers
+> **Beta preview — 2.0.x, not yet released.** An unmerged branch keeps every Mission/Task method
+> above on the interface, but only as `@Deprecated` stubs that fail immediately with
+> `UnsupportedOperationException` — none of them reach the backend at all. None of this is on
+> `main`/the current 1.3.x release yet. See
+> [Applications & Skills](../concepts/applications-and-skills-2.0.md) for the
+> Application → Skill → SkillExecution model that replaces Mission/Task on that branch.
 
-Schedulers define when and how often a task or command runs.
-
-| Method | Purpose |
-| --- | --- |
-| `getScheduler(GetSchedulerRequest)` | Get a scheduler by ID |
-| `createScheduler(CreateSchedulerRequest)` | Create a scheduler |
-| `createSchedulers(CreateSchedulersRequest)` | Create several schedulers in one call |
-| `updateScheduler(UpdateSchedulerRequest)` | Update a scheduler |
-| `deleteScheduler(DeleteSchedulerRequest)` | Delete a scheduler |
-| `deleteSchedulers(DeleteSchedulersRequest)` | Delete several schedulers in one call |
-
-```java
-import com.zqnt.utils.missionautonomy.domains.SchedulerDTO;
-
-var scheduler = SchedulerDTO.builder()
-    .name("Nightly patrol")
-    // .cron(...), .assetSn(...), etc. — see SchedulerDTO for the full field set
-    .build();
-
-var request = CreateSchedulerRequest.builder().scheduler(scheduler).build();
-client.connector().createScheduler(request)
-    .thenAccept(response -> System.out.println("Scheduler created: " + response));
-```
-
-## Technical configuration & policies
-
-Read-only lookups useful when your application needs to mirror platform-side configuration or operational policy (e.g. no-fly zones, altitude limits) rather than hard-coding it.
-
-| Method | Purpose |
-| --- | --- |
-| `getTechnicalConfigs(GetTechnicalConfigsRequest)` | Fetch technical configuration values |
-| `getActivePoliciesByType(GetPoliciesRequest)` | Fetch active operational policies of a given type |
-| `getAllActivePolicies(GetAllActivePoliciesRequest)` | Fetch every active operational policy |
-
-## Capabilities
-
-A customer application can ask what an asset supports before offering it as an option:
+## Checking what an asset supports
 
 ```java
 client.remoteControl().getCapabilities(sn)
@@ -222,3 +150,9 @@ client.connector().getAssetBySn(request)
         return null;
     });
 ```
+
+## See also
+
+- [Connector API Reference](../api-reference/client-sdk-connector.md) — every method, grouped by area
+- [Waypoint Missions](WAYPOINT_MISSIONS.md) — which adapter uses which execution path
+- [Functional Responses](FUNCTIONAL_RESPONSES.md) — what a response actually confirms

@@ -39,7 +39,7 @@ Quarkus maps property names to environment variable names by converting to upper
 
 ## Edge Identity Configuration
 
-These properties identify your edge adapter instance to the platform. They are mapped through the `EdgeClientConfig` interface using Quarkus `@ConfigMapping(prefix = "zequent.edge")`.
+These properties identify your edge adapter instance to the platform, populated from `application.properties` (with `${VAR:default}` substitution) into `EdgeClientConfig` — a plain builder class (`@Data @Builder`), not a Quarkus `@ConfigMapping` interface; there is no `@ConfigMapping` usage anywhere in the SDK.
 
 | Property | Environment Variable | Required | Description |
 |----------|---------------------|----------|-------------|
@@ -50,20 +50,40 @@ These properties identify your edge adapter instance to the platform. They are m
 
 ### Asset Type Values
 
+Confirmed against the real proto contract (`AssetTypeEnum`, mirrored 1-to-1 by every SDK):
+
 | Value | Description |
 |-------|-------------|
-| `ASSET_TYPE_DOCK` | Docking station |
-| `ASSET_TYPE_DRONE` | Standalone drone |
-| `ASSET_TYPE_VEHICLE` | Ground vehicle |
-| `ASSET_TYPE_RC` | Remote controller |
 | `ASSET_TYPE_UNKNOWN` | Unknown type |
+| `ASSET_TYPE_AIRCRAFT` | Drone/aircraft |
+| `ASSET_TYPE_DOCK` | Docking station |
+| `ASSET_TYPE_SENSOR` | Sensor node |
+| `ASSET_TYPE_CAMERA` | Standalone camera |
+| `ASSET_TYPE_OTHER` | Anything else |
+| `ASSET_TYPE_JAMMER` | RF jammer |
+| `ASSET_TYPE_CYBER_ATTACK` | Cyber-attack asset |
+| `ASSET_TYPE_SAPIENT` | SAPIENT-protocol node |
+| `ASSET_TYPE_RNS` | Reticulum (RNS) node |
+
+`ASSET_TYPE_DRONE`/`ASSET_TYPE_VEHICLE`/`ASSET_TYPE_RC` do not exist — use `ASSET_TYPE_AIRCRAFT` for
+a drone.
 
 ### Asset Vendor Values
 
 | Value | Description |
 |-------|-------------|
-| `DJI` | DJI |
-| `VENDOR_UNKNOWN` | Unknown vendor |
+| `ASSET_VENDOR_DJI` | DJI |
+| `ASSET_VENDOR_AUTEL` | Autel |
+| `ASSET_VENDOR_ROS` | ROS-based |
+| `ASSET_VENDOR_MAVLINK` | MAVLink/MAVSDK (PX4, ArduPilot) |
+| `ASSET_VENDOR_RTMP_RTSP` | Generic RTMP/RTSP video source |
+| `ASSET_VENDOR_SAPIENT` | SAPIENT-protocol node |
+| `ASSET_VENDOR_BETAFLIGHT` | Betaflight flight controller |
+| `ASSET_VENDOR_RNS` | Reticulum (RNS) node |
+
+There is no `VENDOR_UNKNOWN`/`ASSET_VENDOR_UNKNOWN` value — every vendor must be one of the above.
+Every value requires the full `ASSET_TYPE_`/`ASSET_VENDOR_` prefix, not the bare enum member name —
+a bare value fails lookup and is rejected.
 
 ### Profile-specific Endpoint
 
@@ -85,7 +105,7 @@ The `zequent.edge.endpoint` property is typically set per profile to reflect the
 ```properties
 zequent.edge.sn=YOUR_DEVICE_SN
 zequent.edge.asset-type=ASSET_TYPE_DOCK
-zequent.edge.asset-vendor=DJI
+zequent.edge.asset-vendor=ASSET_VENDOR_DJI
 ```
 
 ---
@@ -149,19 +169,22 @@ Some adapters use MQTT to communicate with the physical device — the DJI adapt
 
 ### Broker Configuration
 
+Confirmed against the real DJI adapter's own `application.properties` — every one of these carries a
+`ZQNT_` prefix, not a bare `MQTT_`/`ZEQUENT_MQTT_` one:
+
 | Property | Environment Variable | Description |
 |----------|---------------------|-------------|
-| `zequent.mqtt.broker.host` | `MQTT_BROKER_HOST` | MQTT broker hostname |
-| `zequent.mqtt.broker.username` | `MQTT_DOCK_USERNAME` | MQTT username for dock communication |
-| `zequent.mqtt.broker.password` | `MQTT_DOCK_PASSWORD` | MQTT password for dock communication |
+| `zequent.mqtt.broker.host` | `ZQNT_MQTT_BROKER_HOST` | MQTT broker hostname |
+| `zequent.mqtt.broker.username` | `ZQNT_MQTT_DOCK_USERNAME` | MQTT username for direct dock communication |
+| `zequent.mqtt.broker.password` | `ZQNT_MQTT_DOCK_PASSWORD` | MQTT password for direct dock communication |
 
 The reactive messaging channels use separate credentials for the cloud backend connection:
 
 | Environment Variable | Description |
 |---------------------|-------------|
-| `MQTT_USERNAME` | Username for cloud messaging channels |
-| `MQTT_PASSWORD` | Password for cloud messaging channels |
-| `MQTT_BROKER_PORT` | MQTT broker port (default: `8883`) |
+| `ZQNT_MQTT_USERNAME` | Username for cloud messaging channels |
+| `ZQNT_MQTT_PASSWORD` | Password for cloud messaging channels |
+| `ZQNT_MQTT_BROKER_PORT` | MQTT broker port (default: `8883`) |
 
 ### Channel Configuration Pattern
 
@@ -320,7 +343,7 @@ Telemetry response received for device XXXXX
 **Check 1:** Verify MQTT broker connection:
 
 ```bash
-echo $ZEQUENT_MQTT_BROKER_HOST
+echo $ZQNT_MQTT_BROKER_HOST
 ```
 
 **Check 2:** Check that MQTT topics match the device model's expected patterns.

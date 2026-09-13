@@ -1,18 +1,21 @@
 # Edge SDK -- Connector Service
 
-The `ConnectorService` interface gives an edge adapter access to the platform's asset registry over gRPC. It covers what an adapter itself needs — registering and updating its own asset(s), looking up schedulers and organization info, and reporting which commands it supports — not general mission/task management (that belongs to the **Client SDK**, used by customer applications).
+The `ConnectorService` interface gives an edge adapter access to the platform's asset registry over gRPC. It covers what an adapter itself needs — registering and updating its own asset(s), resolving and updating the task it's currently executing, looking up schedulers and organization info, and reporting which commands it supports. **Creating** mission/task records, and managing missions at all, stays a **Client SDK** (customer application) concern — see [Tasks](#tasks) below for the precise, code-verified boundary.
+
+Full method-by-method reference: [Connector API Reference](../api-reference/edge-sdk-connector-reference.md).
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Asset Management](#asset-management)
 - [Asset Payloads](#asset-payloads)
+- [Tasks](#tasks)
 - [Schedulers](#schedulers)
 - [Organization](#organization)
+- [Capabilities](#capabilities)
 - [Error Handling](#error-handling)
 - [Configuration](#configuration)
 - [Usage Examples](#usage-examples)
-- [API Summary](#api-summary)
 
 ---
 
@@ -22,6 +25,7 @@ From the edge adapter, you use `ConnectorService` to:
 
 - Register your asset when the adapter starts, and deregister it on shutdown.
 - Update asset state as it changes.
+- Resolve a task the platform handed you, and write adapter-computed fields or a status change back onto it.
 - Fetch a scheduler's definition and the organization it belongs to.
 - Store and retrieve asset payloads (arbitrary versioned metadata blobs, e.g. calibration data).
 - Report which commands your adapter currently supports, by implementing `getCapabilities` on `EdgeAdapterService` — this is what lets the Admin Console show only the controls an asset actually implements.
@@ -103,6 +107,44 @@ connectorService.upsertAssetPayload("YOUR_DEVICE_SN", null, payloadDTO)
 
 ---
 
+## Tasks
+
+`EdgeAdapterService`'s `prepareTask`/`startTask` receive only a task ID (see
+[Edge Adapter Reference — Task Execution](../api-reference/edge-sdk-adapter-reference.md#task-execution)) — resolve it with
+`getTaskById`, then write back onto that same record with `updateTask` as your adapter learns more
+(e.g. a generated flight-plan file's URL) or as the task's status changes:
+
+```java
+connectorService.getTaskById(taskId)
+    .thenCompose(taskDTO -> {
+        // ... generate and upload your flight plan from taskDTO.getConfig() ...
+
+        WaypointTaskConfig config = (WaypointTaskConfig) taskDTO.getConfig();
+        config.setFileUrl(uploadedFileUrl);
+        config.setFileMd5(uploadedFileMd5);
+
+        // Persist it — the platform's response to updateTask does not echo these fields back,
+        // so re-fetching afterward would lose them. Keep using this same in-memory taskDTO.
+        return connectorService.updateTask(taskDTO.getId().toString(), taskDTO);
+    })
+    .thenAccept(updated -> log.info("Task prepared: {}", updated.getId()));
+```
+
+```java
+taskDTO.setStatus(TaskStatus.TASK_RUNNING);
+connectorService.updateTask(taskDTO.getId().toString(), taskDTO)
+    .thenAccept(updated -> {
+        // Now actually trigger the flight on your hardware.
+    });
+```
+
+**`createTask`/`deleteTask` exist on the interface but have no confirmed real-adapter usage** —
+creating and deleting task records is a Client SDK (customer application) responsibility. The same
+holds for every Mission method (`getMissionById`/`createMission`/`updateMission`/`deleteMission`) —
+mission management stays client-side entirely.
+
+---
+
 ## Schedulers
 
 Schedulers define when and how often a task or command runs.
@@ -156,6 +198,15 @@ public CompletableFuture<CurrentCapabilities> getCapabilities(String sn) {
 
 Return `CurrentCapabilities.empty(sn)` for an asset you do not recognise. See
 [Edge Adapter](edge-sdk-adapter.md) for the full `EdgeAdapterService` surface.
+
+> **Beta preview — 2.0.x, not yet released.** An unmerged branch adds four Skill Registry methods
+> to `ConnectorService` (`observeSkillContract`, `listSkillContracts`, `setSkillContractStatus`,
+> `setSkillContractPermissions`) that let an adapter push its own command contracts into a
+> persisted registry directly, instead of only ever being polled indirectly through
+> `getCapabilities` above. It also removes every Mission/Task method from this interface outright.
+> None of this is on `main`/the current 1.3.x release yet — see the
+> [2.0.x Beta Connector reference](../api-reference/edge-sdk-connector-reference-2.0.md) if you
+> want to see where this is headed.
 
 ## Error Handling
 
@@ -246,21 +297,7 @@ public class AssetRegistration {
 
 ---
 
-## API Summary
+## See also
 
-| Method | Return Type | Description |
-|--------|-------------|-------------|
-| `getAssetBySn(sn)` | `CompletableFuture<AssetDTO>` | Get asset by serial number |
-| `getAssetById(id)` | `CompletableFuture<AssetDTO>` | Get asset by ID |
-| `getSubAssetBySn(sn)` | `CompletableFuture<SubAssetDTO>` | Get sub-asset by serial number |
-| `registerAsset(dto)` | `CompletableFuture<AssetDTO>` | Register a new asset |
-| `updateAsset(id, dto)` | `CompletableFuture<AssetDTO>` | Update an existing asset |
-| `deRegisterAsset(id)` | `CompletableFuture<Boolean>` | Deregister an asset |
-| `upsertAssetPayload(assetSn, subAssetSn, payload)` | `CompletableFuture<AssetPayloadDTO>` | Create or update an asset payload |
-| `getSchedulerById(id)` | `CompletableFuture<SchedulerDTO>` | Get scheduler by ID |
-| `createScheduler(dto)` | `CompletableFuture<SchedulerDTO>` | Create a new scheduler |
-| `updateScheduler(id, dto)` | `CompletableFuture<SchedulerDTO>` | Update an existing scheduler |
-| `deleteScheduler(id)` | `CompletableFuture<Boolean>` | Delete a scheduler |
-| `getOrganizationById(id)` | `CompletableFuture<OrganizationDTO>` | Get organization by ID |
-
-Creating and managing missions and tasks is not part of the Edge SDK's `ConnectorService` — that belongs to the **Client SDK**, used by customer applications. An adapter *receives* task lifecycle calls (`prepareTask`/`startTask`/`stopTask`) from the platform through `EdgeAdapterService` (see [Edge Adapter](edge-sdk-adapter.md)), and can resolve the task it was handed with `getTaskById`.
+- [Connector API Reference](../api-reference/edge-sdk-connector-reference.md) — every method, including which ones have confirmed real-adapter usage and which don't
+- [Edge Adapter Reference — Task Execution](../api-reference/edge-sdk-adapter-reference.md#task-execution) — how `prepareTask`/`startTask`/`stopTask` reach your adapter in the first place

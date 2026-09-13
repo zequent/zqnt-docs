@@ -88,7 +88,7 @@ remote-control/admin-console fleet flows without real hardware. Optional, enable
 
 ## Deployment Configuration
 
-Container deployments use one deployment-local `.env` file referenced by [docker-compose.customer.yml](docker-compose.customer.yml). Start from [.env.customer](.env.customer) — copy it to `.env` next to the compose file and fill in every `<PLACEHOLDER>` (database/Redis passwords, your Ed25519 signing key, your license key, public dashboard URLs) before starting the stack. It contains no Zequent-internal credentials — every value is either a safe structural default or a placeholder only you can fill in.
+Container deployments use one deployment-local `.env` file referenced by [docker-compose.customer.yml](docker-compose.customer.yml). Start from [.env.customer.example](.env.customer.example) — copy it to `.env` next to the compose file and fill in every `<PLACEHOLDER>` (database/Redis passwords, your Ed25519 signing key, your license key, public dashboard URLs) before starting the stack. It contains no Zequent-internal credentials — every value is either a safe structural default or a placeholder only you can fill in.
 
 ```yaml
 services:

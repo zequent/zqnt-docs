@@ -33,8 +33,8 @@ Everything else defaults to "not supported."
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `BETAFLIGHT_CONNECTION` | _required_ | Serial port of the FC, e.g. `/dev/ttyACM0` |
-| `BETAFLIGHT_PRECONNECT_SN` | _unset_ | Pre-connect a specific serial number without a running platform — useful for local testing |
+| `BETAFLIGHT_CONNECTION` | `/dev/ttyACM0` | Serial port of the FC |
+| `BETAFLIGHT_PRECONNECT_SN` | _unset_ | Serial number to connect to immediately on startup. Not just a local-testing convenience — leaving it unset logs a warning and the board only connects once the platform pushes an asset registration, so set it for a normal single-board deployment too |
 | `BETAFLIGHT_ARM_CHANNEL` | `5` | AUX channel (5-8 = AUX1-AUX4) the arm switch is bound to — must match your Betaflight modes configuration |
 | `BETAFLIGHT_ARM_VALUE` | `1800` | PWM µs value (1000-2000) sent on the arm channel to arm |
 | `BETAFLIGHT_DISARM_VALUE` | `1000` | PWM µs value sent to disarm |
@@ -46,11 +46,13 @@ Everything else defaults to "not supported."
 | `CONNECTOR_PORT` | `50053` | Connector Service port — override to `8010` for a real deployment |
 | `TELEMETRY_HOST` | `localhost` | Live Data Service host |
 | `TELEMETRY_PORT` | `50052` | Live Data Service port — override to `8003` for a real deployment |
-| `ADAPTER_SN` | _unset_ | Identifier used in logs |
+| `ADAPTER_SN` | _empty_ | Default serial number attached to outgoing telemetry frames, and logged at startup |
 | `REDIS_URL` | _unset_ | Optional — Redis for vendor/asset caching |
-| `EDGE_ENDPOINT` | _unset_ | Optional service-discovery registration endpoint |
+| `EDGE_ENDPOINT` | _unset_ | Optional service-discovery registration endpoint — also requires `ASSET_TYPE` and `ASSET_VENDOR` to actually register; missing either silently skips registration (logged as a warning only) |
+| `ASSET_TYPE` | _unset_ | Full proto-style name, **not** the bare enum member — `ASSET_TYPE_AIRCRAFT`, not `AIRCRAFT` |
+| `ASSET_VENDOR` | _unset_ | Same requirement — `ASSET_VENDOR_BETAFLIGHT`, not `BETAFLIGHT` |
 | `LOG_LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
-| `LOG_FORMAT` | `text` | `json` or `text` |
+| `LOG_FORMAT` | `json` | `json` or `text` |
 
 The library's own built-in `CONNECTOR_PORT`/`TELEMETRY_PORT` defaults (`50053`/`50052`) do not match the platform's real service ports (`8010`/`8003`) — set them explicitly for your deployment.
 
@@ -70,7 +72,7 @@ uv run --env-file .env edge-betaflight
 ## Safety notes
 
 - **Verify `BETAFLIGHT_ARM_CHANNEL`/`BETAFLIGHT_ARM_VALUE` match your FC's actual Betaflight modes configuration before running.** A mismatch can leave the arm switch unresponsive, or worse, arm unexpectedly.
-- `TakeOff` is an open-loop ramp — it does not hold altitude. Treat it as "spin up to a rough hover throttle," not an autonomous takeoff, and be ready to take over manually.
+- `TakeOff` is an open-loop ramp — it does not hold altitude. Treat it as "spin up to a rough hover throttle," not an autonomous takeoff. Confirmed in source: after the ramp, the FC stays armed at hover throttle and the caller **must** immediately follow up with `ManualControlInput` — if nothing takes over, Betaflight's own RC failsafe will trigger.
 - Test with props off first when validating a new configuration.
 
 ---

@@ -227,7 +227,7 @@ class PayloadTelemetry:
 
 ## Tasks and missions
 
-Most edge adapters never construct these directly — the platform drives task execution by passing your adapter a `task_id: str`, and you fetch whatever detail you need through `ConnectorClient` (see [Mission Autonomy](edge-sdk-python-mission-autonomy.md)). These dataclasses exist if you need the richer, vendor-specific task shape (e.g. mirroring a DJI wayline mission).
+Most edge adapters never construct these directly — the platform drives task execution by passing your adapter a `task_id: str`, and you fetch whatever detail you need through `ConnectorClient` (see [Mission Autonomy](../edge-sdk/edge-sdk-python-mission-autonomy.md)). These dataclasses exist if you need the richer, vendor-specific task shape (e.g. mirroring a DJI wayline mission).
 
 ### `Task`
 
@@ -367,7 +367,7 @@ class TaskEvent:
     external_task_type: str | None = None
 ```
 
-See [Live Data — Notifications](edge-sdk-python-live-data.md#notifications).
+See [Live Data — Notifications](../edge-sdk/edge-sdk-python-live-data.md#notifications).
 
 ---
 

@@ -46,7 +46,11 @@ Manages a persistent gRPC connection to the Live Data service. Lets you push ass
 
 ### `ConnectorClient`
 
-Talks to the platform's Connector Service over gRPC for asset registration and lookup. Mission/task management is not part of this client; the platform drives task execution by calling into your `EdgeAdapter` instead (see [Mission Autonomy](edge-sdk-python-mission-autonomy.md)).
+Talks to the platform's Connector Service over gRPC for asset registration and lookup. It has a
+handful of task-resolution methods too, but no real adapter actually uses them — the platform
+drives task execution by calling into your `EdgeAdapter` instead (see
+[Connector](edge-sdk-python-connector.md) for the details, and
+[Mission Autonomy](edge-sdk-python-mission-autonomy.md)).
 
 ### `EdgeAdapterConfig` / `EdgeAdapterRuntime`
 
@@ -62,7 +66,7 @@ Talks to the platform's Connector Service over gRPC for asset registration and l
 | [Live Data](edge-sdk-python-live-data.md)                                 | Producing telemetry data streams from your adapter                   |
 | [Connector](edge-sdk-python-connector.md)                                 | Asset and resource management via the Connector Service              |
 | [Mission Autonomy](edge-sdk-python-mission-autonomy.md)                   | Scheduler lookup, task lifecycle, and custom commands                |
-| [Models Reference](edge-sdk-python-models.md)                             | Request, response, and telemetry data model reference                |
+| [Models Reference](../api-reference/edge-sdk-python-models.md)            | Request, response, and telemetry data model reference                |
 
 Ready-made adapters built on this SDK, and their deployment guides:
 
