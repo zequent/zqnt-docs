@@ -113,12 +113,10 @@ client.connector().getTaskByFlightId(request)
 
 `getTaskByFlightId` looks up a task by the external flight ID an edge adapter assigned it (`TaskDTO.externalTaskId`) — useful for correlating a vendor-side flight record back to its Zequent task without knowing the platform's task ID up front.
 
-> **Beta preview — 2.0.x, not yet released.** An unmerged branch keeps every Mission/Task method
-> above on the interface, but only as `@Deprecated` stubs that fail immediately with
-> `UnsupportedOperationException` — none of them reach the backend at all. None of this is on
-> `main`/the current 1.3.x release yet. See
-> [Applications & Skills](../concepts/applications-and-skills-2.0.md) for the
-> Application → Skill → SkillExecution model that replaces Mission/Task on that branch.
+> **Beta preview — 2.0.x, not yet released.** Every Mission/Task method above becomes a
+> `@Deprecated` stub that fails immediately on an unmerged branch. See the
+> [2.0.x migration guide](../concepts/migration-guide-2.0.md#per-sdk-impact) for what replaces
+> them.
 
 ## Checking what an asset supports
 

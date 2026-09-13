@@ -9,14 +9,9 @@ Full method-by-method reference: [Mission Autonomy API Reference](../api-referen
 For Java, see [CONNECTOR.md](CONNECTOR.md#missions-and-tasks-are-records-not-flights) /
 [the Mission Autonomy reference](../api-reference/client-sdk-mission-autonomy.md).
 
-> **Beta preview — 2.0.x, not yet released.** An unmerged branch replaces everything on this page
-> with an Application → Skill → SkillExecution model — every method below raises
-> `LegacyOperationRemovedError` on that branch, since there's no backend RPC left for any of them.
-> None of this is on `main`/the current 1.3.x release yet. See
-> [Applications & Skills](../concepts/applications-and-skills-2.0.md) for the model that replaces
-> this page, and the
-> [2.0.x Beta reference](../api-reference/client-sdk-mission-autonomy-python-2.0.md) for the exact
-> method-by-method reference.
+> **Beta preview — 2.0.x, not yet released.** Every method below raises
+> `LegacyOperationRemovedError` on an unmerged branch that replaces this whole page's model. See the
+> [2.0.x migration guide](../concepts/migration-guide-2.0.md#per-sdk-impact) for what replaces it.
 
 ## Creating a mission
 

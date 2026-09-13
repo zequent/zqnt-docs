@@ -21,12 +21,10 @@ finally:
 
 > **Beta preview — 2.0.x, not yet released.** This client's surface itself doesn't change on the
 > unmerged branch (it's already just scheduler lookup today) — but the `SchedulerDTO` it returns
-> does: `mission_id`/`task_id` are retired on the wire, replaced with a direct capability-execution
-> target (`asset_sn` + `command_id`, or `asset_sn` + `application_id` + `skill_id`). This SDK's
-> `edge_sdk.models.scheduler.SchedulerDTO` is its own plain-Python model, separate from (but
-> field-equivalent to) the client SDK's own `SchedulerDTO` — both mirror the same
+> does. This SDK's `edge_sdk.models.scheduler.SchedulerDTO` is its own plain-Python model, separate
+> from (but field-equivalent to) the client SDK's own `SchedulerDTO` — both mirror the same
 > `SchedulerProtoDTO` wire message. See the
-> [Client SDK 2.0.x reference](../api-reference/client-sdk-mission-autonomy-python-2.0.md#schedulers--same-methods-different-schedulerdto-shape)
+> [2.0.x migration guide](../concepts/migration-guide-2.0.md#scheduler-shape-change-affects-every-sdk)
 > for the full field breakdown.
 
 ---

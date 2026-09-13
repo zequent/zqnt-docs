@@ -199,14 +199,12 @@ public CompletableFuture<CurrentCapabilities> getCapabilities(String sn) {
 Return `CurrentCapabilities.empty(sn)` for an asset you do not recognise. See
 [Edge Adapter](edge-sdk-adapter.md) for the full `EdgeAdapterService` surface.
 
-> **Beta preview — 2.0.x, not yet released.** An unmerged branch adds four Skill Registry methods
-> to `ConnectorService` (`observeSkillContract`, `listSkillContracts`, `setSkillContractStatus`,
-> `setSkillContractPermissions`) that let an adapter push its own command contracts into a
-> persisted registry directly, instead of only ever being polled indirectly through
-> `getCapabilities` above. It also removes every Mission/Task method from this interface outright.
-> None of this is on `main`/the current 1.3.x release yet — see the
-> [2.0.x Beta Connector reference](../api-reference/edge-sdk-connector-reference-2.0.md) if you
-> want to see where this is headed.
+> **Beta preview — 2.0.x, not yet released.** An unmerged branch adds Skill Registry
+> self-reporting to this interface (beyond the live `getCapabilities` snapshot above) and removes
+> every Mission/Task method outright. See the
+> [2.0.x migration guide](../concepts/migration-guide-2.0.md#per-sdk-impact) for what replaces
+> them, or the [2.0.x reference](../api-reference/edge-sdk-connector-reference-2.0.md) for the exact
+> methods.
 
 ## Error Handling
 

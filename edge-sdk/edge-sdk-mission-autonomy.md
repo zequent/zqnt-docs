@@ -72,7 +72,8 @@ create/update/delete is available only through `ConnectorService` — see
 > `getScheduler` alone — every Mission/Task method above is gone outright, not deprecated. Given
 > [no confirmed real-adapter usage](#overview) of any of them today, this is unlikely to affect a
 > real adapter migrating forward. See the
-> [2.0.x Beta reference](../api-reference/edge-sdk-mission-autonomy-reference-2.0.md).
+> [2.0.x migration guide](../concepts/migration-guide-2.0.md#per-sdk-impact) or the
+> [2.0.x reference](../api-reference/edge-sdk-mission-autonomy-reference-2.0.md) directly.
 
 ---
 

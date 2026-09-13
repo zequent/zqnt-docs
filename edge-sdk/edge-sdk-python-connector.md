@@ -72,15 +72,12 @@ rather than failing at execution time.
 Return an empty set for an asset you do not recognise. See
 [Edge Adapter](edge-sdk-python-adapter.md) for the full `EdgeAdapter` surface.
 
-> **Beta preview — 2.0.x, not yet released.** An unmerged branch adds four Skill Registry methods
-> to `ConnectorClient` (`observe_skill_contract`, `list_skill_contracts`,
-> `set_skill_contract_status`, `set_skill_contract_permissions`) that let an adapter push its own
-> command contracts into a persisted registry directly, instead of only ever being polled
-> indirectly through `get_capabilities` above. It also removes `get_mission`/`get_task`/
-> `get_task_by_flight_id` from this client outright. None of this is on `main`/the current 1.3.x
-> release yet — see the
-> [2.0.x Beta Connector reference](../api-reference/edge-sdk-python-connector-reference-2.0.md) if
-> you want to see where this is headed.
+> **Beta preview — 2.0.x, not yet released.** An unmerged branch adds Skill Registry
+> self-reporting to this client (beyond the live `get_capabilities` snapshot above) and removes
+> `get_mission`/`get_task`/`get_task_by_flight_id` outright. See the
+> [2.0.x migration guide](../concepts/migration-guide-2.0.md#per-sdk-impact) for what replaces
+> them, or the [2.0.x reference](../api-reference/edge-sdk-python-connector-reference-2.0.md) for
+> the exact methods.
 
 ## Error handling
 
