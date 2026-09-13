@@ -22,7 +22,10 @@ Exhaustive method reference for `ConnectorClient` on this branch.
 - **New: Skill Registry self-reporting** — four methods, working with the raw generated
   `SkillContractProtoDTO` rather than a plain-Python model (the contract shape is already large and
   typed; wrapping it a second time buys little for what's normally a write-once-per-command call).
-- Assets and lifecycle methods are unchanged.
+- Assets and lifecycle methods are unchanged. `ConnectorClient` has no Scheduler methods on this
+  branch or on 1.3.x — that's `MissionAutonomyClient`'s job, and it *is* affected by a
+  cross-cutting `SchedulerDTO` reshape; see
+  [Mission Autonomy — Scheduler lookup](../edge-sdk/edge-sdk-python-mission-autonomy.md#scheduler-lookup).
 
 ## Assets, lifecycle (unchanged from 1.3.x)
 

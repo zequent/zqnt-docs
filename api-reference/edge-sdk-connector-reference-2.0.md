@@ -21,12 +21,23 @@ Exhaustive method reference for `ConnectorService` on this branch.
 - **New: Skill Registry self-reporting.** Four methods let an adapter push its own command
   contracts into the platform's persisted Skill Registry directly, instead of only ever being
   polled indirectly through `EdgeAdapterService#getCapabilities`.
-- Assets, Asset payloads, Schedulers, and Organization are all unchanged.
+- Assets, Asset payloads, and Organization are unchanged. Scheduler *methods* are too, but not
+  `SchedulerDTO` itself — see below.
 
-## Assets, asset payloads, schedulers, organization (unchanged from 1.3.x)
+## Assets, asset payloads, organization (unchanged from 1.3.x)
 
 See the [1.3.x reference](edge-sdk-connector-reference.md#assets) for these — same methods, same
 behavior on this branch.
+
+## Schedulers — same methods, different `SchedulerDTO` shape
+
+`getSchedulerById`/`createScheduler`/`updateScheduler`/`deleteScheduler` keep the same signatures
+as 1.3.x, and use the same shared `com.zqnt.utils.missionautonomy.domains.SchedulerDTO` class the
+Client SDK does — which means they're subject to the exact same reshape:
+`missionId`/`taskId` are retired (`reserved` on the wire, not merely deprecated), replaced with a
+direct capability-execution target. See the
+[Client SDK 2.0.x reference — Schedulers](client-sdk-mission-autonomy-2.0.md#schedulers--same-methods-different-schedulerdto-shape)
+for the full field-by-field breakdown.
 
 ## Skill Registry — new in 2.0.x
 

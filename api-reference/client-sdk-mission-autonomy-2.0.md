@@ -10,7 +10,8 @@
 
 Exhaustive method reference for `client.missionAutonomy()` on this branch. Mission/Task CRUD is
 **gone** — replaced by capability package (`Application`) administration and capability execution
-(`SkillExecution`). Scheduler CRUD is unchanged from 1.3.x.
+(`SkillExecution`). Scheduler CRUD *methods* keep the same shapes, but `SchedulerDTO` itself
+doesn't — see [Schedulers](#schedulers--same-methods-different-schedulerdto-shape) below.
 
 ## What actually changed vs. 1.3.x
 
@@ -21,7 +22,9 @@ Exhaustive method reference for `client.missionAutonomy()` on this branch. Missi
   reach the backend at all; there is no RPC left to call. Route optimization, NFZ expansion, and
   the whole task execution lifecycle described in the 1.3.x reference are gone along with them.
 - `deleteAllSchedulersByTaskId` was **removed outright** — it isn't on this branch's interface at
-  all (not even as a deprecated stub). Everything else under Schedulers is unchanged.
+  all (not even as a deprecated stub). The remaining Scheduler methods keep the same signatures,
+  but what a schedule points at changes — see [Schedulers](#schedulers--same-methods-different-schedulerdto-shape)
+  below.
 - Two new families replace what Mission/Task did: **Application** (capability package admin) and
   **SkillExecution** (capability execution — create, start, pause, resume, cancel, signal, query).
 
