@@ -26,7 +26,7 @@ Skills are authored in the Admin Console's graph editor. A Skill graph is built 
 
 | Node type | Purpose |
 | --- | --- |
-| **Command** | Executes a single device command (e.g. `TakeOff`, `GoTo`, `OpenCover`) against the target asset. |
+| **Command** | Executes a single device command (e.g. `flight.takeoff`, `navigation.go_to`, `dock.open_cover`) against the target asset. |
 | **Skill** | Calls another Skill as a sub-step, so common sequences can be reused across Applications. |
 | **Condition** | Branches the graph based on a boolean expression (e.g. battery level, telemetry value). |
 | **Parallel Gateway / Join Gateway** | Fans work out into concurrent branches and joins them back together. |
@@ -50,7 +50,7 @@ import com.zqnt.sdk.client.missionautonomy.capabilities.SkillExecutionCommand;
 // on top of a plain RemoteControl call):
 var adHoc = SkillExecutionCommand.simple(
         "YOUR_DEVICE_SN",
-        "TakeOff",
+        "flight.takeoff",
         target,          // CapabilityTarget — which asset/sub-asset/payload this targets
         parameters,       // google.protobuf.Struct — command parameters
         null);            // idempotency key — auto-generated if null
@@ -82,7 +82,7 @@ execution = await client.mission_autonomy.execute_application(
 # Run a single ad-hoc command through the execution engine:
 execution = await client.mission_autonomy.execute_simple(
     asset_sn="YOUR_DEVICE_SN",
-    command_id="TakeOff",
+    command_id="flight.takeoff",
     parameters={"altitude": 60},
 )
 ```
