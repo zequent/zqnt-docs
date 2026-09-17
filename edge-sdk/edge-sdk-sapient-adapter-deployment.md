@@ -35,6 +35,7 @@ The Sapient Edge Adapter bridges TCP SAPIENT-protocol edge nodes to the Zequent 
 | `SAPIENT_HOST` | `0.0.0.0` | Bind address for the TCP SAPIENT listener |
 | `SAPIENT_PORT` | `14000` | TCP port SAPIENT edge nodes connect to |
 | `GRPC_PORT` | `50051` | gRPC port the platform reaches this adapter on |
+| `ZQNT_CLAIM_CODE` | _unset_ | A one-time pairing code from the console's **Pair device** dialog. Used only when the platform does not already know a serial number this adapter is bringing up: the code decides which organization the resulting asset belongs to, and that cannot be changed afterwards. Leave it unset once the assets exist — an already-paired device does not need it, and the code is single-use. Without it, an unknown serial simply has no asset, and the adapter creates nothing. |
 | `CONNECTOR_HOST` | `localhost` | Connector Service host |
 | `CONNECTOR_PORT` | `8010` | Connector Service port |
 | `TELEMETRY_HOST` | `localhost` | Live Data Service host |

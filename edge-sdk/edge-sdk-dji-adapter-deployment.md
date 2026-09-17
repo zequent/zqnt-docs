@@ -41,6 +41,29 @@ A dock or drone not matching either profile still works for standard flight/dock
 
 ---
 
+## Pairing a Dock
+
+A dock is bound to an organization by a code typed into its touchscreen. The dock asks the platform
+what that code belongs to, shows the operator the organization name to confirm, and the bind that
+follows creates the dock's asset in that organization.
+
+Create the code in the console: **Assets → Pair device**. It is shown once, expires (15 minutes by
+default), can be revoked, and is single-use — the drone under a dock becomes a sub-asset of it and
+inherits its organization, so one bind spends one code regardless of how many devices the dock
+reports.
+
+> **Deprecated:** the adapter still accepts an organization's own id as a binding code, so docks
+> already in the field keep binding across an upgrade. Every use is logged as a warning and the
+> path is removed in the next release. Prefer a pairing code: an organization id is permanent, is
+> never rotated, and appears in API responses, logs and URLs, so anyone who has ever seen one can
+> bind devices into that tenant indefinitely.
+
+An asset's organization cannot be changed after it exists, which is why this decision is made at
+pairing time and why a dock presenting an unusable code is refused rather than registered without
+one.
+
+---
+
 ## Environment Variables
 
 ### Required
