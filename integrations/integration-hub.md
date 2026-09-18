@@ -217,10 +217,6 @@ this doc is speculating about.
   unreachable at boot — there's no background retry loop yet.
 - No theft/collision handling beyond what Connector Service's own SkillContract versioning already
   does.
-- `zqnt-utils-python`'s `CachingService` writes the equivalent Redis keys without the `zqnt:`
-  namespace prefix every Java service expects — a real, separate, platform-wide gap affecting every
-  Python-based edge adapter's own endpoint registration, found the same session as the above but
-  deliberately not fixed here (bigger blast radius, needs its own dedicated pass).
 
 ---
 
