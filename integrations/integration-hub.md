@@ -199,6 +199,10 @@ Integration Hub also has a fourth, purpose-built connector type for the opposite
   writing to a `zqnt-skill` sink with `executionId = "{skillExecutionId}"` — every sensor reading
   advances whichever Skill execution the payload identifies.
 
+### Starting an Application from a bridge
+
+A bridge can also start an Application through an **Event Trigger** of type `INTEGRATION`. The trigger names the bridge (`bridgeId`), a condition over the bridge's mapped payload (`telemetry_field`, `comparison_operator`, `comparison_value`), the target Application and Skill, and a cooldown. Wiring it this way keeps the target, condition and cooldown in one place that can be edited, instead of an `applicationId`/`skillId` inside the bridge's connector JSON. The trigger does not need to name an asset: when it fires with none, the platform picks one by policy (see [Which asset an execution runs on](../concepts/applications-and-skills-2.0.md#which-asset-an-execution-runs-on)), so a fire panel can report a zone and the nearest capable drone answers. See [Event triggers](../concepts/applications-and-skills-2.0.md#event-triggers).
+
 ### How a Skill actually reaches this backend
 
 `SendCustomCommand` dispatch (Skill execution → this backend's inbound gRPC server) goes through
