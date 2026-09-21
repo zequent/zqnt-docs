@@ -35,6 +35,8 @@ Skills are authored in the Admin Console's graph editor. A Skill graph is built 
 | **Human Approval** | Pauses until a human operator approves continuation from the Admin Console. |
 | **End** | Terminates the graph. |
 
+The graph starts at the first node with no incoming edge unless you choose a different **start node** in the editor. A node that no path reaches is never scheduled: it is marked skipped, and the execution can still succeed without it. A parameter value that arrives as text (from an Integration Hub bridge, an MQTT payload, a CSV column) is converted to the type the command expects, for example `"41.01"` to a number, instead of being refused. For a published Application, the editor marks nodes that have gone stale: a command that was retired, a provider that stopped publishing, a contract that drifted incompatibly, or a node reading an output field its upstream command no longer produces.
+
 Each node can also set a **failure strategy** (`STOP`, `RETRY`, `CONTINUE` or `COMPENSATE`) and a **timeout** in seconds, from the node's settings in the editor.
 
 You don't need to write any of this by hand — the graph editor validates each Command node's parameters against the target asset's live Skill Contract, so you find out about an unsupported command while authoring, not at execution time.
@@ -46,6 +48,8 @@ An explicit asset serial number on the request always wins. When the request nam
 1. **Asset scope** — an `ASSET` scope entry pins the Application to one known asset.
 2. **Theatre scope** — a `THEATRE` scope entry picks among that theatre's assigned assets (online, highest battery).
 3. **Policy** — with nothing pinned, the platform selects from every registered asset using your policies, in priority order. The Skill's required asset capabilities filter the candidates, and a location in the execution parameters lets a `NEAREST` strategy rank them. If a policy cannot choose (for example `NEAREST` with no location), the next policy is tried.
+
+Selection prefers a free asset and falls back to a busy one rather than refusing to answer an alarm. When an execution that commands an asset reaches dispatch, it takes that asset over and cancels the execution that held it. Two executions that only wait on events from the same asset never conflict.
 
 An Application that pins no asset, declares no theatre and matches no policy fails with an error that says so. A Skill that needs a specific drone can still declare its scope in the editor.
 
@@ -132,6 +136,23 @@ Every execution has a lifecycle: created → running → (paused) → completed 
 
 Progress updates (node started/completed/failed, pause/resume, completion) are also streamed through the Live Data service, so a long-running Skill's progress can be shown live in your own UI the same way telemetry is.
 
+### Watching executions in the Admin Console
+
+The Admin Console receives every execution event as it happens over a WebSocket (`/ws/admin-console/executions`) instead of polling a list. Executions started by a schedule or an event trigger produce the same events as ones started by hand.
+
+| Event | Notification |
+| --- | --- |
+| Execution failed, step failed, approval needed | Bell entry and a toast |
+| Execution started, completed, cancelled | Bell entry |
+
+Starting an execution from the console no longer navigates anywhere: a toast says it started and opens the execution in a new tab when clicked. Under **Alerting & Rules** you can switch toasts on or off separately from the bell, switch each event type, enable an alert sound (off by default), and mute an asset or an application.
+
+On an execution's page, **Live View** shows the asset on a map and marks the steps as they start: takeoff and home, go-to, look-at, and the numbered points of a waypoint mission joined by a line. Finished steps stay, dimmed; a failed step is red. Takeoff and home are placed where the aircraft was when the takeoff was first seen, so they are missing if the page is opened long after takeoff.
+
+### Approvals
+
+A Human Approval node parks the execution. The status stays `RUNNING`, and the platform publishes a `BLOCKED` event. Any signed-in user can approve or reject from the toast (it stays until someone decides), the header's "Approval needed" indicator, or the execution page, and the toast closes everywhere once one person has decided. If the node has a timeout and nobody answers, it follows its `TIMEOUT` edges, or its failure edges when it has none. A failed node whose failure branch ran to completion no longer marks the whole execution failed.
+
 ## Managing Applications
 
 Applications themselves — creating, versioning, and promoting them between environments (`DEVELOPMENT` / `STAGING` / `PRODUCTION`) — are managed from the Admin Console, and are also available programmatically for CI/CD-style deployment pipelines:
@@ -143,6 +164,8 @@ client.missionAutonomy().getApplication(applicationId, version);
 ```
 
 In the Admin Console, Applications and Skills can also be deleted, and the Executions list shows which Application each run belongs to and where it stopped. Selecting a node on an execution shows what it received and returned.
+
+Deleting an Application without naming a version deletes its latest version.
 
 Most integrations only need the read/execute side (running Skills, checking their status) shown above — authoring and promoting Applications is normally a one-time or occasional workflow done visually in the Admin Console.
 
