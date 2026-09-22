@@ -17,6 +17,7 @@ This public documentation is for external developers and integration teams. It f
 | Understand Assets vs SubAssets, and how telemetry identifies its source | [Assets & Sub-Assets](concepts/assets-and-sub-assets.md) |
 | Use Zequent from a Java application | [Java Client SDK Quickstart](client-sdk/QUICKSTART.md) |
 | Fly a waypoint mission from your own application | [Waypoint Missions](client-sdk/WAYPOINT_MISSIONS.md) |
+| Start, stop and play back live video from an asset's camera | [Live Video Streams](client-sdk/LIVE_VIDEO.md) |
 | Use Zequent from a Python application | [Python Client SDK Quickstart](client-sdk/QUICKSTART_PYTHON.md) |
 | Use Zequent from a Go application | [Go Client SDK Quickstart](client-sdk/QUICKSTART_GO.md) |
 | Configure a customer application / deployment | [Client SDK Configuration](client-sdk/CONFIGURATION.md) |
@@ -33,7 +34,7 @@ This public documentation is for external developers and integration teams. It f
 - **Direct control** — takeoff, go-to, return-to-home, dock open/close, camera and gimbal control, and live joystick-style manual control, called directly from your application via the Client SDK.
 - **Missions & Tasks** — define a mission, attach waypoint tasks to it, and start, pause, resume or stop them from your own code. See [Waypoint Missions](client-sdk/WAYPOINT_MISSIONS.md).
 - **Live telemetry & detections** — subscribe to real-time position, battery, and sensor telemetry, and AI detection results, streamed from every connected asset.
-- **Live video** — start/stop live video streams from a connected asset's camera and view them in the Admin Console or your own player.
+- **Live video** — start/stop live video streams from a connected asset's camera and view them in the Admin Console or your own player. See [Live Video Streams](client-sdk/LIVE_VIDEO.md).
 - **Custom hardware integrations** — build a new edge adapter with the Edge SDK for any device that isn't already supported, using the same command/telemetry contract every built-in adapter uses.
 
 ## Customer Applications
