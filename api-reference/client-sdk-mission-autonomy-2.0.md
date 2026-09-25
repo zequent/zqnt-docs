@@ -55,6 +55,16 @@ this is a real, confirmed gap between the two languages' Beta surfaces, not a do
 
 Both take the same `SkillExecutionCommand` record
 (`assetSn`, `spec`, `options`, `idempotencyKey`, `organizationId`, `locationId`, `theatreId`).
+
+`organizationId` is enforced, not just recorded, once the call carries a verified auth token: omit
+it and it's filled in from the caller's own organization; assert a *different* organization than
+the caller's own and the RPC fails with `PERMISSION_DENIED` instead of being honoured.
+`system_admin` callers are exempt and may assert any organization. This only applies once the
+gRPC port itself requires a token — every current service-to-service caller on it has none yet, so
+nothing changes for them today. Same rule filters `listSkillExecutions` below: a non-admin caller
+asking for everything is answered with only their own organization's executions, regardless of
+what `organizationId` they pass.
+
 Build `spec` with one of its two static factories rather than by hand — both set
 `options.autoStart = true` by default:
 

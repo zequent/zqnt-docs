@@ -58,6 +58,16 @@ via its `.simple()`/`.packaged()` static factories. There's no `idempotency_key`
 here the way Java's factories default to a random UUID — pass one explicitly if you need
 retry-safety.
 
+`create_skill_execution`/`execute_skill`'s elided params include `organization_id`, which is
+enforced, not just recorded, once the call carries a verified auth token: omit it and it's filled
+in from the caller's own organization; assert a *different* organization than the caller's own and
+the RPC fails with `PERMISSION_DENIED` instead of being honoured. `system_admin` callers are
+exempt and may assert any organization. This only applies once the gRPC port itself requires a
+token — every current service-to-service caller on it has none yet, so nothing changes for them
+today. Same rule filters `list_skill_executions` below: a non-admin caller asking for everything is
+answered with only their own organization's executions, regardless of what `organization_id` they
+pass.
+
 ## SkillExecution — query and lifecycle
 
 | Method | Returns | Purpose |
