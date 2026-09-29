@@ -49,9 +49,19 @@ An explicit asset serial number on the request always wins. When the request nam
 2. **Theatre scope** — a `THEATRE` scope entry picks among that theatre's assigned assets (online, highest battery).
 3. **Policy** — with nothing pinned, the platform selects from every registered asset using your policies, in priority order. The Skill's required asset capabilities filter the candidates, and a location in the execution parameters lets a `NEAREST` strategy rank them. If a policy cannot choose (for example `NEAREST` with no location), the next policy is tried.
 
-Selection prefers a free asset and falls back to a busy one rather than refusing to answer an alarm. When an execution that commands an asset reaches dispatch, it takes that asset over and cancels the execution that held it. Two executions that only wait on events from the same asset never conflict.
+Every execution has a priority: a manual run from the Admin Console or the SDK is 0, a scheduled run is 50, and an event trigger is 75 unless it sets its own. Selection prefers a free asset. A busy asset is only offered to a run that is more important than the work it is doing, and then the one doing the least important work. When every available asset is busy with work at least as important, the run is refused as busy. When an execution that commands an asset reaches dispatch, it takes that asset over and cancels the execution that held it. Two executions that only wait on events from the same asset never conflict.
 
-An Application that pins no asset, declares no theatre and matches no policy fails with an error that says so. A Skill that needs a specific drone can still declare its scope in the editor.
+An Application that pins no asset, declares no theatre and gets no asset from any policy fails with an error that names each asset and why it was not used (for example "busy with priority-75 work (this run: 50)", "offline (no telemetry in the last minute)" or "Battery 15% below minimum 20%"). When no policy matches at all, the error says how many policies are active and what kept them out. The platform seeds an **Any Available Asset Fallback** policy (global, most battery, available and at least 20% battery, priority 10) so a run is not left without a policy. A Skill that needs a specific drone can still declare its scope in the editor.
+
+## Scheduled triggers
+
+A **scheduled trigger** starts an Application's Skill at set times. Schedules are managed in the Admin Console (the Triggers tab of the Application or Skill editor, and the Operate → Scheduler calendar).
+
+- **One-time or recurring.** A one-time trigger fires once at a date and time. A recurring trigger fires hourly, daily, on chosen weekdays, or on a day of the month, between a start and an end date, both inclusive. Times are in the trigger's own time zone. Trigger names are unique per Application.
+- **Asset.** Pick an asset, or leave it to the platform: the run then follows [Which asset an execution runs on](#which-asset-an-execution-runs-on) at firing time. A single raw command still needs an asset.
+- **Organization.** A trigger belongs to an organization and only that organization sees it. An organization admin's trigger is always their own organization's; a system admin may choose one.
+- **Inputs.** A trigger must supply every input its Skill needs. Saving one that does not is refused, naming the missing inputs.
+- **Every firing is recorded** on the trigger: `STARTED` with the execution it created, `SKIPPED` (no asset could take the run, or the Application is paused) or `FAILED`, each with the reason. A firing missed while the platform was not running is recorded as skipped, and it is never run late.
 
 ## Event triggers
 

@@ -140,10 +140,17 @@ a direct capability-execution target —
 | `capabilityPackageId` / `capabilityId` | `String` | Set together (with `assetSn`) to schedule a named Skill from a deployed Application instead — the SDK's own field names for what the wire protocol calls `application_id`/`skill_id` |
 | `executionParametersJson` | `String` | Execution parameters as a JSON string, not a `Struct` |
 | `autoStart` | `Boolean` | Whether the resulting execution starts immediately |
+| `organizationId` | `String` | The organization the schedule belongs to; `null` = system-wide. This SDK does not send it yet, so a schedule created here is system-wide |
 
 `SchedulerDTO.validate()` enforces the mutual exclusivity: exactly one of (`commandId`) or
 (`capabilityPackageId` + `capabilityId`) must be set alongside `assetSn`, or it throws
 `IllegalArgumentException` before any RPC is made.
+
+The platform itself accepts an Application schedule without an asset and picks one at firing time
+(see [Scheduled triggers](../concepts/applications-and-skills-2.0.md#scheduled-triggers)), but
+`validate()` still requires `assetSn`, so from this SDK every schedule names its asset. Scheduled
+runs have priority 50, and every firing's outcome is recorded on the schedule (visible in the Admin
+Console); `SchedulerDTO` does not carry those firing fields.
 
 ## See also
 

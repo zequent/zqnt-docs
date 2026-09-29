@@ -115,15 +115,19 @@ capability-execution target —
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `asset_sn` | `str \| None` | Which asset the schedule fires against |
+| `asset_sn` | `str \| None` | Which asset the schedule fires against. Required for `command_id`; optional for an Application schedule, which then picks an asset at firing time (see [Scheduled triggers](../concepts/applications-and-skills-2.0.md#scheduled-triggers)) |
 | `command_id` | `str \| None` | Set together with `asset_sn` alone for a single ad-hoc command — exactly one of this or `application_id`+`skill_id` is expected |
-| `application_id` / `skill_id` | `str \| None` | Set together (with `asset_sn`) to schedule a named Skill from a deployed Application instead |
+| `application_id` / `skill_id` | `str \| None` | Set together (optionally with `asset_sn`) to schedule a named Skill from a deployed Application instead |
 | `execution_parameters` | `dict \| None` | Unlike Java's `SchedulerDTO` (a JSON string field), this is a plain dict |
 | `auto_start` | `bool \| None` | Whether the resulting execution starts immediately |
 
 Unlike the Java client SDK's `SchedulerDTO.validate()`, nothing in this model enforces the
 `command_id` vs. `application_id`+`skill_id` exclusivity client-side — an invalid combination is
 only caught server-side.
+
+This model has no organization field, so a schedule created from this SDK is system-wide. Scheduled
+runs have priority 50, and every firing's outcome is recorded on the schedule (visible in the Admin
+Console); `SchedulerDTO` does not carry those firing fields.
 
 ## See also
 
