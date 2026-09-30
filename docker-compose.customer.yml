@@ -9,8 +9,10 @@
 # keep both in sync if you change one.
 #
 # Start it with the env file used for interpolation as well, so the required
-# secrets below (POSTGRES_PASSWORD, REDIS_PASSWORD) are checked before anything
-# starts:
+# secrets below (POSTGRES_PASSWORD, REDIS_PASSWORD, SERVICE_AUTH_PRIVATE_KEY,
+# SERVICE_AUTH_PUBLIC_KEY) are checked before anything starts. Each edge
+# adapter / the simulator also needs its own edge credential
+# (<NAME>_EDGE_TOKEN in .env.customer), issued once the platform is up:
 #
 #   docker compose --env-file .env.customer -f docker-compose.customer.yml up -d
 #
@@ -38,6 +40,31 @@ x-zequent-env: &zequent-env
     # Read by every Quarkus image, including 1.3.x ones that predate the
     # REDIS_PASSWORD property.
     QUARKUS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.customer and start with --env-file .env.customer}
+    # Service identity: every internal gRPC call carries a service token signed
+    # with this Ed25519 pair (one per installation, separate from AUTH_*). A
+    # 2.0 service refuses to start without it, and refuses a committed dev key.
+    # Checked here so a missing key fails before anything starts.
+    SERVICE_AUTH_PRIVATE_KEY: ${SERVICE_AUTH_PRIVATE_KEY:?set SERVICE_AUTH_PRIVATE_KEY in .env.customer and start with --env-file .env.customer}
+    SERVICE_AUTH_PUBLIC_KEY: ${SERVICE_AUTH_PUBLIC_KEY:?set SERVICE_AUTH_PUBLIC_KEY in .env.customer and start with --env-file .env.customer}
+
+# Everything that is not a platform service (the dashboard, edge adapters, the
+# simulator) reads the same .env.customer, which also holds the platform's own
+# secrets. Those are blanked here: an adapter gets the service PUBLIC key to
+# verify the platform's commands, never the private key it could mint tokens
+# with, nor the database password or the signing keys.
+x-public-env: &public-env
+  env_file:
+    - .env.customer
+  environment: &public-environment
+    SERVICE_AUTH_PRIVATE_KEY: ""
+    AUTH_PRIVATE_KEY: ""
+    EXPORT_SIGNING_PRIVATE_KEY: ""
+    EXPORT_PLATFORM_KEK: ""
+    DATABASE_PASSWORD: ""
+    POSTGRES_PASSWORD: ""
+    LIVE_STREAM_AUTH_HOOK_SECRET: ""
+    LIVE_STREAM_KEYS_PEPPER: ""
+    ZQNT_PLATFORM_PUBLIC_KEY: ${SERVICE_AUTH_PUBLIC_KEY:?set SERVICE_AUTH_PUBLIC_KEY in .env.customer and start with --env-file .env.customer}
 
 services:
   # --- Infrastructure --------------------------------------------------
@@ -137,7 +164,7 @@ services:
     # LICENSING_ACTIVATION_API_ENABLED=false only to lock licensing changes down.
 
   admin-console-ui:
-    <<: *zequent-env
+    <<: *public-env
     # Package is zqnt-platform-console (not zqnt-admin-console-dashboard, which is
     # not a real published package — pulling it fails). It has its own version
     # line, separate from the core services' 1.3.x line.
@@ -164,33 +191,49 @@ services:
   # adapter's deployment guide under edge-sdk/.
 
   edge-dji:
-    <<: *zequent-env
+    <<: *public-env
     # Package is zqnt-edge-adapter-dji (not dji-adapter, which is a stale,
     # abandoned package with no versioned releases).
     image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
     pull_policy: always
     profiles: ["edge-dji"]
+    environment:
+      <<: *public-environment
+      # This adapter's edge credential (scope edge) -- a 2.0 platform refuses its
+      # calls without one. Issue it in the console (Edge credentials) or with
+      # core/scripts/mint-edge-credential.py; see DJI_EDGE_TOKEN in .env.customer.
+      ZQNT_EDGE_TOKEN: ${DJI_EDGE_TOKEN:-}
     # gRPC for remote-control only -- not published. The docks reach the adapter
     # through the MQTT broker, not through this container.
     restart: unless-stopped
 
   edge-mavlink:
-    <<: *zequent-env
+    <<: *public-env
     image: ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0
     pull_policy: always
     profiles: ["edge-mavlink"]
     environment:
+      <<: *public-environment
+      # This adapter's edge credential (scope edge) -- a 2.0 platform refuses its
+      # calls without one. Issue it in the console (Edge credentials) or with
+      # core/scripts/mint-edge-credential.py; see MAVLINK_EDGE_TOKEN in .env.customer.
+      ZQNT_EDGE_TOKEN: ${MAVLINK_EDGE_TOKEN:-}
       # The Python edge SDK takes the Redis password inside the URL.
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.customer}@redis:6379
     # gRPC (50051) for remote-control only -- not published.
     restart: unless-stopped
 
   edge-sapient:
-    <<: *zequent-env
+    <<: *public-env
     image: ghcr.io/zequent/zqnt-adapter-sapient:1.3.0
     pull_policy: always
     profiles: ["edge-sapient"]
     environment:
+      <<: *public-environment
+      # This adapter's edge credential (scope edge) -- a 2.0 platform refuses its
+      # calls without one. Issue it in the console (Edge credentials) or with
+      # core/scripts/mint-edge-credential.py; see SAPIENT_EDGE_TOKEN in .env.customer.
+      ZQNT_EDGE_TOKEN: ${SAPIENT_EDGE_TOKEN:-}
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.customer}@redis:6379
     # SAPIENT has no authentication and no TLS: whoever reaches this port can
     # report detections as a node, and detections can start Applications. It is
@@ -208,10 +251,16 @@ services:
   # simulator/README.md for the full env var reference.
 
   simulator:
-    <<: *zequent-env
+    <<: *public-env
     image: ghcr.io/zequent/zqnt-simulator:1.3.3
     pull_policy: always
     profiles: ["simulator"]
+    environment:
+      <<: *public-environment
+      # This adapter's edge credential (scope edge) -- a 2.0 platform refuses its
+      # calls without one. Issue it in the console (Edge credentials) or with
+      # core/scripts/mint-edge-credential.py; see SIMULATOR_EDGE_TOKEN in .env.customer.
+      ZQNT_EDGE_TOKEN: ${SIMULATOR_EDGE_TOKEN:-}
     depends_on:
       - redis
       - connector-service

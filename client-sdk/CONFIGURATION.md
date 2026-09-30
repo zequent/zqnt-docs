@@ -78,7 +78,8 @@ Every platform service verifies a license lease before performing protected oper
 | Variable | Applies to | Notes |
 | --- | --- | --- |
 | `LICENSING_INSTALLATION_ID` | All services | This installation's own id. Generate it once (e.g. `uuidgen`) and never change it: every organization's license activation is bound to it. The Helm chart generates and keeps it for you |
-| `LICENSING_PUBLIC_KEY` | All services | Public key used to verify the license lease signature; from the installation bundle |
+| `LICENSING_PUBLIC_KEY` | 1.3.x images only | 2.0 services trust only the Zequent license hub's key compiled into them and ignore this variable (with a warning). Set it from the installation bundle only while you run 1.3.x images |
+| `LICENSING_MANUAL_REFRESH_INTERVAL` | Admin Console only | Optional. How often one organization may refresh its license by hand (default `30s`) |
 | `LICENSE_SERVER_URL` | Admin Console only | Defaults to `https://api.zequent.com`; override only for a self-hosted/offline license server |
 | `EXPORT_PLATFORM_KEK` | Admin Console only | 32 random bytes, base64 (`openssl rand -base64 32`). Seals every organization's license activation before it is stored; without it activations are lost on restart |
 | `LICENSING_LICENSE_KEY` | Admin Console only | Optional. Only a bootstrap for the default organization; leave unset and license organizations in the console |
@@ -101,6 +102,25 @@ identity provider (SSO) instead is an opt-in step performed after the deployment
 | `AUTH_EXPECTED_ISSUER` | All services | Issuer claim every service requires on a token it verifies — normally the same value as `AUTH_ISSUER` |
 | `AUTH_SYSTEM_ADMIN_EMAIL` | Connector Service | Email for the one `system_admin` user seeded automatically on first boot against an empty database |
 | `OIDC_REDIRECT_URI` | Admin Console only | Only needed if any organization uses SSO — your Admin Console UI's own callback URL, registered as the allowed redirect URI on every configured identity provider |
+
+### Service identity
+
+Every call between the platform services carries a short-lived service token. It is signed with a
+second Ed25519 key pair, separate from `AUTH_*`, one per installation. A 2.0 service refuses to start
+without it, and refuses a key committed to Zequent's repositories.
+
+| Variable | Applies to | Notes |
+| --- | --- | --- |
+| `SERVICE_AUTH_PRIVATE_KEY` | All five platform services | Ed25519 private key (PKCS8 DER, base64, or PEM). `openssl genpkey -algorithm ed25519 -out service.pem`, then `openssl pkey -in service.pem -outform DER \| base64 -w0`. Never give it to an adapter |
+| `SERVICE_AUTH_PUBLIC_KEY` | All five platform services | The matching public key (`openssl pkey -in service.pem -pubout -outform DER \| base64 -w0`). Adapters get it as `ZQNT_PLATFORM_PUBLIC_KEY` |
+| `SERVICE_AUTH_TOKEN_TTL` | All five platform services | Optional, ISO-8601 lifetime of the service tokens (default `PT5M`) |
+
+### Live video
+
+| Variable | Applies to | Notes |
+| --- | --- | --- |
+| `LIVE_STREAM_AUTH_HOOK_SECRET` | Admin Console only | Shared secret the media server presents to the stream-auth hook (MediaMTX: `?secret=<value>` on its `authHTTPAddress`). Unset, the hook answers anyone. URL-safe, e.g. `openssl rand -hex 32` |
+| `LIVE_STREAM_KEYS_PEPPER` | Admin Console only | Optional pepper for operator-issued stream keys. Set once: changing or removing it invalidates every key issued under it |
 
 ## Client SDK Service Endpoints
 
@@ -153,6 +173,9 @@ Ready-made adapter images and custom Edge SDK adapters need a reachable adapter 
 | Variable | Purpose |
 | --- | --- |
 | `EDGE_ADAPTER_TARGET_ENDPOINTS` | Host and port where the platform can reach the adapter |
+| `ZQNT_EDGE_TOKEN` | The adapter's edge credential. A 2.0 platform refuses its calls without one. Issued in the Admin Console (Edge credentials) or offline with `core/scripts/mint-edge-credential.py` from `SERVICE_AUTH_PRIVATE_KEY`; the Integration Hub needs one with the integration scope |
+| `ZQNT_PLATFORM_PUBLIC_KEY` | The platform's `SERVICE_AUTH_PUBLIC_KEY`. The adapter refuses every command not signed with it |
+| `ZQNT_EDGE_AUTH_DISABLED` | `true` accepts unsigned commands. Local test stacks only, never a deployment |
 | Device/broker credentials | Credentials required by the selected adapter integration |
 | Storage credentials | Optional credentials when the adapter uploads or downloads mission files/media |
 
