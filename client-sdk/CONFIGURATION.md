@@ -141,6 +141,26 @@ When the customer application runs inside the same Compose or Kubernetes network
 
 When the customer application runs on the host and connects to exposed local ports, use `localhost` for the host values.
 
+### Client credential (`ZQNT_CLIENT_TOKEN`)
+
+The platform refuses every gRPC call that carries no credential. An organization administrator issues a
+**client credential** in the Admin Console under **Deploy → Access & Integrations → Credentials** (kind
+*Client application*); the token is shown once. Every client SDK sends it as `authorization: Bearer <token>`:
+
+| SDK | How to pass it |
+| --- | --- |
+| Java | `ZequentClient.builder().clientToken(token)`, `zequent.client-token` (Quarkus), or `ZQNT_CLIENT_TOKEN` |
+| Python | `ZequentClient(..., client_token=token)` or `ZQNT_CLIENT_TOKEN` (also for `from_env()`) |
+| Go | `grpc.NewClient(target, append(auth.DialOptions(token), ...)...)`; `""` reads `ZQNT_CLIENT_TOKEN` |
+| client-sapient | `ZQNT_CLIENT_TOKEN` |
+
+A client credential belongs to exactly one organization and reaches only that organization's assets, Applications
+and runs: asset lookups and payloads, the Skill list, Applications and executions, telemetry/detection/notification
+subscriptions (a `*` subscription carries only the organization's assets) and asset commands. Users, organizations,
+identity providers, licenses, triggers, schedules, policies, technical configuration and asset registration are
+never reachable with it. `UNAUTHENTICATED` means no, an expired or a revoked credential; `PERMISSION_DENIED` means
+the call is outside that scope. Revoking it in the console takes effect on every service within seconds.
+
 ## Admin Console
 
 The Admin Console has two images:
@@ -173,7 +193,7 @@ Ready-made adapter images and custom Edge SDK adapters need a reachable adapter 
 | Variable | Purpose |
 | --- | --- |
 | `EDGE_ADAPTER_TARGET_ENDPOINTS` | Host and port where the platform can reach the adapter |
-| `ZQNT_EDGE_TOKEN` | The adapter's edge credential. A 2.0 platform refuses its calls without one. Issued in the Admin Console (Edge credentials) or offline with `core/scripts/mint-edge-credential.py` from `SERVICE_AUTH_PRIVATE_KEY`; the Integration Hub needs one with the integration scope |
+| `ZQNT_EDGE_TOKEN` | The adapter's edge credential. A 2.0 platform refuses its calls without one. Issued in the Admin Console (Access & Integrations → Credentials, kind *Edge adapter*) or offline with `core/scripts/mint-edge-credential.py` from `SERVICE_AUTH_PRIVATE_KEY`; the Integration Hub needs one of kind *Integration Hub* |
 | `ZQNT_PLATFORM_PUBLIC_KEY` | The platform's `SERVICE_AUTH_PUBLIC_KEY`. The adapter refuses every command not signed with it |
 | `ZQNT_EDGE_AUTH_DISABLED` | `true` accepts unsigned commands. Local test stacks only, never a deployment |
 | Device/broker credentials | Credentials required by the selected adapter integration |

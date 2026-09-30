@@ -92,6 +92,12 @@ zequent.edge.asset-vendor=DJI
 
 ## gRPC Client Configuration
 
+Every call to the platform carries the adapter's edge credential, `ZQNT_EDGE_TOKEN` — issued in the Admin
+Console under **Deploy → Access & Integrations → Credentials** (kind *Edge adapter*, or *Integration Hub* for the
+hub), or offline with `core/scripts/mint-edge-credential.py`. It reaches only the device-facing calls. The adapter
+verifies the platform's calls into it with `ZQNT_PLATFORM_PUBLIC_KEY`. A customer application uses a *client*
+credential instead (`ZQNT_CLIENT_TOKEN`, see the client SDK configuration).
+
 The edge adapter connects to platform services (Live Data, Connector) via gRPC. Each client is configured using the standard Quarkus gRPC client properties.
 
 The adapter connects to three platform services. In local dev, set host and port directly. In Docker/Kubernetes, service discovery is handled via Stork (see below).
