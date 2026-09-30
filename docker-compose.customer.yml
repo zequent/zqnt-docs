@@ -89,9 +89,12 @@ services:
     # Set ADMIN_CONSOLE_CORS_ORIGINS in your .env.customer to this deployment's real public dashboard
     # URL(s) (comma-separated) — the built-in default only covers localhost, which a real
     # customer domain never matches.
-    # License activation (the console's "Activate" screen, where the customer enters the license
-    # key we send them) is reachable by default. Set LICENSING_ACTIVATION_API_ENABLED=false in
-    # your .env.customer only if you want to lock it down after the initial activation.
+    # Licensing is configured once for the installation (.env: the installation bundle's public
+    # key, a LICENSING_INSTALLATION_ID generated once, EXPORT_PLATFORM_KEK). Organizations are
+    # licensed afterwards in the console, as system_admin: Organizations -> Create from license
+    # (paste the key or drop the organization's .zqnt file) -- no restart. The platform may start
+    # with no licensed organization; the system_admin can still sign in. Set
+    # LICENSING_ACTIVATION_API_ENABLED=false only to lock licensing changes down.
 
   admin-console-ui:
     <<: *zequent-env

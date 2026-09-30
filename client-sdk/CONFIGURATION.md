@@ -77,12 +77,13 @@ Every platform service verifies a license lease before performing protected oper
 
 | Variable | Applies to | Notes |
 | --- | --- | --- |
-| `LICENSING_INSTALLATION_ID` | All services | A stable identifier for this deployment |
-| `LICENSING_PUBLIC_KEY` | All services | Public key used to verify the license lease signature; provided with your license |
-| `LICENSING_LICENSE_KEY` | Admin Console only | The license key issued to your organization |
+| `LICENSING_INSTALLATION_ID` | All services | This installation's own id. Generate it once (e.g. `uuidgen`) and never change it: every organization's license activation is bound to it. The Helm chart generates and keeps it for you |
+| `LICENSING_PUBLIC_KEY` | All services | Public key used to verify the license lease signature; from the installation bundle |
 | `LICENSE_SERVER_URL` | Admin Console only | Defaults to `https://api.zequent.com`; override only for a self-hosted/offline license server |
+| `EXPORT_PLATFORM_KEK` | Admin Console only | 32 random bytes, base64 (`openssl rand -base64 32`). Seals every organization's license activation before it is stored; without it activations are lost on restart |
+| `LICENSING_LICENSE_KEY` | Admin Console only | Optional. Only a bootstrap for the default organization; leave unset and license organizations in the console |
 
-Activation is a one-time step performed from the Admin Console once it's running — see [Licensing](../README.md#licensing).
+These are configured once per installation. Organizations are licensed afterwards, from the Admin Console, with no restart — see [Licensing](../README.md#licensing).
 
 ### Authentication & SSO
 

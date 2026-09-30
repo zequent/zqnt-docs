@@ -96,7 +96,7 @@ remote-control/admin-console fleet flows without real hardware. Optional, enable
 
 ## Deployment Configuration
 
-Container deployments use one deployment-local `.env` file referenced by [docker-compose.customer.yml](docker-compose.customer.yml). Start from [.env.customer](.env.customer) — copy it to `.env` next to the compose file and fill in every `<PLACEHOLDER>` (database/Redis passwords, your Ed25519 signing key, your license key, public dashboard URLs) before starting the stack. It contains no Zequent-internal credentials — every value is either a safe structural default or a placeholder only you can fill in.
+Container deployments use one deployment-local `.env` file referenced by [docker-compose.customer.yml](docker-compose.customer.yml). Start from [.env.customer](.env.customer) — copy it to `.env` next to the compose file and fill in every `<PLACEHOLDER>` (database/Redis passwords, your Ed25519 signing key, the licensing installation settings, public dashboard URLs) before starting the stack. It contains no Zequent-internal credentials — every value is either a safe structural default or a placeholder only you can fill in.
 
 ```yaml
 services:
@@ -128,9 +128,11 @@ See [Client SDK Configuration](client-sdk/CONFIGURATION.md) for the full `.env` 
 
 Every platform service enforces an activated license before it will perform protected operations — a fresh deployment with no license activated will reject most requests. Licenses are organization- and seat-based: one license covers one organization, and each platform user you create consumes one of that organization's seats.
 
-1. Zequent issues you a license key when you purchase a subscription.
-2. Activate it once, from the Admin Console, against `https://api.zequent.com` (the default `LICENSE_SERVER_URL` in production deployments).
-3. Services automatically refresh their license lease afterward — no further manual steps.
+1. Configure the installation once: the public key and license server from the installation bundle Zequent provides, a `LICENSING_INSTALLATION_ID` generated once, and `EXPORT_PLATFORM_KEK` (see [Client SDK Configuration](client-sdk/CONFIGURATION.md)). The platform may start with no licensed organization; the `system_admin` can still sign in.
+2. Zequent issues a license for each of your organizations, by name. In the Admin Console, as `system_admin`: **Organizations → Create from license**, then paste the license key or drop the organization's `.zqnt` file. The organization is created with the id and name the license names, and its license is active immediately — no restart. For an organization that already exists, use **Activate license** on it (an organization admin can do this for their own organization on the License screen).
+3. Services automatically refresh every organization's license lease afterward, across restarts — no further manual steps.
+
+The license names the organization only once, when it is created; afterwards the organization's name is yours to change in the console.
 
 See [Client SDK Configuration](client-sdk/CONFIGURATION.md) for the `LICENSING_*` environment variables.
 
