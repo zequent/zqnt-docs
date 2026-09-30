@@ -61,6 +61,7 @@ Starting, stopping, and toggling tracking is done through `SendCustomCommand` wi
 | `AI_CAMERA_HFOV_DEG` | `82.0` | Camera horizontal field of view (degrees) — tune to your actual camera |
 | `AI_CAMERA_VFOV_DEG` | `52.0` | Camera vertical field of view (degrees) |
 | `AI_MIN_CONFIDENCE` | `0.6` | Minimum detection confidence to report |
+| `ZQNT_CLAIM_CODE` | _unset_ | A one-time pairing code from the console's **Pair device** dialog. Used only when the platform does not already know this service's serial number: the code decides which organization the resulting asset belongs to, and that cannot be changed afterwards. Leave it unset once the asset exists — the code is single-use. Without it, an unknown serial simply has no asset, and this service creates nothing. |
 | `REMOTE_CONTROL_HOST` | `localhost` | Remote Control Service host — only used for gimbal re-aim |
 | `REMOTE_CONTROL_PORT` | `8002` | Remote Control Service port |
 

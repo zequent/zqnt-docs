@@ -77,13 +77,15 @@ Every platform service verifies a license lease before performing protected oper
 
 | Variable | Applies to | Notes |
 | --- | --- | --- |
-| `LICENSING_INSTALLATION_ID` | All services | A stable identifier for this deployment |
-| `LICENSING_PUBLIC_KEY` | All services | Public key used to verify the license lease signature; provided with your license |
-| `LICENSING_SIGNING_KEY_ID` | All services | Key ID provided with your license, alongside `LICENSING_PUBLIC_KEY` |
-| `LICENSING_LICENSE_KEY` | Admin Console only | The license key issued to your organization |
+| `LICENSING_INSTALLATION_ID` | All services | This installation's own id. Generate it once (e.g. `uuidgen`) and never change it: every organization's license activation is bound to it. The Helm chart generates and keeps it for you |
+| `LICENSING_PUBLIC_KEY` | 1.3.x images only | 2.0 services trust only the Zequent license hub's key compiled into them and ignore this variable (with a warning). Set it from the installation bundle only while you run 1.3.x images |
+| `LICENSING_SIGNING_KEY_ID` | 1.3.x images only | Key ID from the installation bundle, alongside `LICENSING_PUBLIC_KEY` |
+| `LICENSING_MANUAL_REFRESH_INTERVAL` | Admin Console only | Optional. How often one organization may refresh its license by hand (default `30s`) |
 | `LICENSE_SERVER_URL` | Admin Console only | Defaults to `https://api.zequent.com`; override only for a self-hosted/offline license server |
+| `EXPORT_PLATFORM_KEK` | Admin Console only | 32 random bytes, base64 (`openssl rand -base64 32`). Seals every organization's license activation before it is stored; without it activations are lost on restart |
+| `LICENSING_LICENSE_KEY` | Admin Console only | Optional. Only a bootstrap for the default organization; leave unset and license organizations in the console |
 
-Activation is a one-time step performed from the Admin Console once it's running — see [Licensing](../README.md#licensing).
+These are configured once per installation. Organizations are licensed afterwards, from the Admin Console, with no restart — see [Licensing](../README.md#licensing).
 
 ### Authentication
 
@@ -106,6 +108,25 @@ openssl pkey -in auth-private.pem -pubout -out auth-public.pem
 | `AUTH_SYSTEM_ADMIN_EMAIL` | Email for the initial system admin account |
 | `OIDC_REDIRECT_URI` | Only needed if an organization connects its own SSO/OIDC identity provider |
 
+### Service identity
+
+Every call between the platform services carries a short-lived service token. It is signed with a
+second Ed25519 key pair, separate from `AUTH_*`, one per installation. A 2.0 service refuses to start
+without it, and refuses a key committed to Zequent's repositories.
+
+| Variable | Applies to | Notes |
+| --- | --- | --- |
+| `SERVICE_AUTH_PRIVATE_KEY` | All five platform services | Ed25519 private key (PKCS8 DER, base64, or PEM). `openssl genpkey -algorithm ed25519 -out service.pem`, then `openssl pkey -in service.pem -outform DER \| base64 -w0`. Never give it to an adapter |
+| `SERVICE_AUTH_PUBLIC_KEY` | All five platform services | The matching public key (`openssl pkey -in service.pem -pubout -outform DER \| base64 -w0`). Adapters get it as `ZQNT_PLATFORM_PUBLIC_KEY` |
+| `SERVICE_AUTH_TOKEN_TTL` | All five platform services | Optional, ISO-8601 lifetime of the service tokens (default `PT5M`) |
+
+### Live video
+
+| Variable | Applies to | Notes |
+| --- | --- | --- |
+| `LIVE_STREAM_AUTH_HOOK_SECRET` | Admin Console only | Shared secret the media server presents to the stream-auth hook (MediaMTX: `?secret=<value>` on its `authHTTPAddress`). Unset, the hook answers anyone. URL-safe, e.g. `openssl rand -hex 32` |
+| `LIVE_STREAM_KEYS_PEPPER` | Admin Console only | Optional pepper for operator-issued stream keys. Set once: changing or removing it invalidates every key issued under it |
+
 ## Client SDK Service Endpoints
 
 Customer applications need the platform service hostnames and ports.
@@ -124,6 +145,26 @@ When the customer application runs inside the same Compose or Kubernetes network
 | `CONNECTOR_SERVICE_PORT` | `8010` |
 
 When the customer application runs on the host and connects to exposed local ports, use `localhost` for the host values.
+
+### Client credential (`ZQNT_CLIENT_TOKEN`)
+
+The platform refuses every gRPC call that carries no credential. An organization administrator issues a
+**client credential** in the Admin Console under **Deploy → Access & Integrations → Credentials** (kind
+*Client application*); the token is shown once. Every client SDK sends it as `authorization: Bearer <token>`:
+
+| SDK | How to pass it |
+| --- | --- |
+| Java | `ZequentClient.builder().clientToken(token)`, `zequent.client-token` (Quarkus), or `ZQNT_CLIENT_TOKEN` |
+| Python | `ZequentClient(..., client_token=token)` or `ZQNT_CLIENT_TOKEN` (also for `from_env()`) |
+| Go | `grpc.NewClient(target, append(auth.DialOptions(token), ...)...)`; `""` reads `ZQNT_CLIENT_TOKEN` |
+| client-sapient | `ZQNT_CLIENT_TOKEN` |
+
+A client credential belongs to exactly one organization and reaches only that organization's assets, Applications
+and runs: asset lookups and payloads, the Skill list, Applications and executions, telemetry/detection/notification
+subscriptions (a `*` subscription carries only the organization's assets) and asset commands. Users, organizations,
+identity providers, licenses, triggers, schedules, policies, technical configuration and asset registration are
+never reachable with it. `UNAUTHENTICATED` means no, an expired or a revoked credential; `PERMISSION_DENIED` means
+the call is outside that scope. Revoking it in the console takes effect on every service within seconds.
 
 ## Admin Console
 
@@ -160,6 +201,9 @@ Ready-made adapter images and custom Edge SDK adapters need a reachable adapter 
 | Variable | Purpose |
 | --- | --- |
 | `EDGE_ADAPTER_TARGET_ENDPOINTS` | Host and port where the platform can reach the adapter |
+| `ZQNT_EDGE_TOKEN` | The adapter's edge credential. A 2.0 platform refuses its calls without one. Issued in the Admin Console (Access & Integrations → Credentials, kind *Edge adapter*) or offline with `core/scripts/mint-edge-credential.py` from `SERVICE_AUTH_PRIVATE_KEY`; the Integration Hub needs one of kind *Integration Hub* |
+| `ZQNT_PLATFORM_PUBLIC_KEY` | The platform's `SERVICE_AUTH_PUBLIC_KEY`. The adapter refuses every command not signed with it |
+| `ZQNT_EDGE_AUTH_DISABLED` | `true` accepts unsigned commands. Local test stacks only, never a deployment |
 | Device/broker credentials | Credentials required by the selected adapter integration |
 | Storage credentials | Optional credentials when the adapter uploads or downloads mission files/media |
 

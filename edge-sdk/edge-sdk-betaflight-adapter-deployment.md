@@ -42,6 +42,7 @@ Everything else defaults to "not supported."
 | `BETAFLIGHT_TAKEOFF_RAMP_S` | `3.0` | Duration of the takeoff throttle ramp, in seconds |
 | `GRPC_HOST` | `0.0.0.0` | gRPC server bind host |
 | `GRPC_PORT` | `50051` | gRPC server bind port |
+| `ZQNT_CLAIM_CODE` | _unset_ | A one-time pairing code from the console's **Pair device** dialog. Used only when the platform does not already know a serial number this adapter is bringing up: the code decides which organization the resulting asset belongs to, and that cannot be changed afterwards. Leave it unset once the assets exist — an already-paired device does not need it, and the code is single-use. Without it, an unknown serial simply has no asset, and the adapter creates nothing. |
 | `CONNECTOR_HOST` | `localhost` | Connector Service host |
 | `CONNECTOR_PORT` | `50053` | Connector Service port — override to `8010` for a real deployment |
 | `TELEMETRY_HOST` | `localhost` | Live Data Service host |

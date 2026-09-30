@@ -1,0 +1,7 @@
+# Local secrets and environment files (templates stay tracked)
+.env*
+!.env.example
+!.env.customer.example
+*.zqnt
+kubeconfig*
+*.pem

@@ -1,8 +1,70 @@
+# =======================================
+# CUSTOMER / PRODUCTION DEPLOYMENT MODE
+# All platform services run from published container images (no local build).
+# Edge adapters are optional and enabled per-adapter via --profile.
+# License activation happens against the real Zequent license server
+# (https://api.zequent.com by default) — no local zqnt-hub-api here.
+#
+# This is the customer-facing docs copy of core/docker-compose.customer.yml —
+# keep both in sync if you change one.
+#
+# Start it with the env file used for interpolation as well, so the required
+# secrets below (POSTGRES_PASSWORD, REDIS_PASSWORD, SERVICE_AUTH_PRIVATE_KEY,
+# SERVICE_AUTH_PUBLIC_KEY) are checked before anything starts. Each edge
+# adapter / the simulator also needs its own edge credential
+# (<NAME>_EDGE_TOKEN in .env.customer), issued once the platform is up:
+#
+#   docker compose --env-file .env.customer -f docker-compose.customer.yml up -d
+#
+# Only the dashboard (3001) and the admin-console API (8005) are published
+# (plus, opt-in, the SAPIENT sensor port -- see edge-sapient). Every other
+# service -- the four internal gRPC services, Postgres, Redis, the edge
+# adapters' gRPC ports, the simulator -- is reachable only inside this Compose
+# network. Put a TLS
+# reverse proxy in front of the two published ports for anything but a
+# single-machine demo.
+#
+# The Java services run the `prod` profile with `docker` layered on top
+# (QUARKUS_PROFILE=prod,docker): `docker` supplies the Compose-network wiring
+# (static gRPC discovery, datasource, Flyway), `prod` the HTTP security headers.
+# No development default (%dev signing keys, KEKs, passwords) is ever loaded.
+# =======================================
+
 name: zqnt-platform-customer
 
 x-zequent-env: &zequent-env
   env_file:
     - .env.customer
+  environment:
+    QUARKUS_PROFILE: prod,docker
+    # Read by every Quarkus image, including 1.3.x ones that predate the
+    # REDIS_PASSWORD property.
+    QUARKUS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.customer and start with --env-file .env.customer}
+    # Service identity: every internal gRPC call carries a service token signed
+    # with this Ed25519 pair (one per installation, separate from AUTH_*). A
+    # 2.0 service refuses to start without it, and refuses a committed dev key.
+    # Checked here so a missing key fails before anything starts.
+    SERVICE_AUTH_PRIVATE_KEY: ${SERVICE_AUTH_PRIVATE_KEY:?set SERVICE_AUTH_PRIVATE_KEY in .env.customer and start with --env-file .env.customer}
+    SERVICE_AUTH_PUBLIC_KEY: ${SERVICE_AUTH_PUBLIC_KEY:?set SERVICE_AUTH_PUBLIC_KEY in .env.customer and start with --env-file .env.customer}
+
+# Everything that is not a platform service (the dashboard, edge adapters, the
+# simulator) reads the same .env.customer, which also holds the platform's own
+# secrets. Those are blanked here: an adapter gets the service PUBLIC key to
+# verify the platform's commands, never the private key it could mint tokens
+# with, nor the database password or the signing keys.
+x-public-env: &public-env
+  env_file:
+    - .env.customer
+  environment: &public-environment
+    SERVICE_AUTH_PRIVATE_KEY: ""
+    AUTH_PRIVATE_KEY: ""
+    EXPORT_SIGNING_PRIVATE_KEY: ""
+    EXPORT_PLATFORM_KEK: ""
+    DATABASE_PASSWORD: ""
+    POSTGRES_PASSWORD: ""
+    LIVE_STREAM_AUTH_HOOK_SECRET: ""
+    LIVE_STREAM_KEYS_PEPPER: ""
+    ZQNT_PLATFORM_PUBLIC_KEY: ${SERVICE_AUTH_PUBLIC_KEY:?set SERVICE_AUTH_PUBLIC_KEY in .env.customer and start with --env-file .env.customer}
 
 services:
   # --- Infrastructure --------------------------------------------------
@@ -10,23 +72,32 @@ services:
   # Point services at your own managed Postgres/Redis instead for production.
 
   postgres:
-    image: docker.io/timescale/timescaledb:latest-pg16
+    image: docker.io/timescale/timescaledb:2.30.2-pg16
     environment:
       POSTGRES_DB: zequent_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # No default: choose one in .env.customer (and the same value as DATABASE_PASSWORD).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.customer and start with --env-file .env.customer}
     volumes:
       - zequent_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Not published: only the platform services on this network talk to it.
     restart: unless-stopped
 
+  # Password-protected: Redis holds refresh tokens, revocation stamps, stream keys
+  # and license leases. Every service reads the same REDIS_PASSWORD from .env.customer.
   redis:
-    image: docker.io/library/redis:latest
+    image: docker.io/library/redis:7.4.11-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.customer and start with --env-file .env.customer}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.customer}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    # Not published.
     restart: unless-stopped
 
   # --- Platform services -------------------------------------------------
@@ -38,8 +109,7 @@ services:
     depends_on:
       - postgres
       - redis
-    ports:
-      - "8010:8010"
+    # Internal gRPC only -- not published (reachable inside this network).
     restart: unless-stopped
 
   live-data-service:
@@ -48,8 +118,7 @@ services:
     pull_policy: always
     depends_on:
       - connector-service
-    ports:
-      - "8003:8003"
+    # Internal gRPC only -- not published (reachable inside this network).
     restart: unless-stopped
 
   remote-control-service:
@@ -59,8 +128,7 @@ services:
     depends_on:
       - connector-service
       - live-data-service
-    ports:
-      - "8002:8002"
+    # Internal gRPC only -- not published (reachable inside this network).
     restart: unless-stopped
 
   mission-autonomy-service:
@@ -70,8 +138,7 @@ services:
     depends_on:
       - connector-service
       - remote-control-service
-    ports:
-      - "8004:8004"
+    # Internal gRPC only -- not published (reachable inside this network).
     restart: unless-stopped
 
   admin-console-service:
@@ -89,12 +156,15 @@ services:
     # Set ADMIN_CONSOLE_CORS_ORIGINS in your .env.customer to this deployment's real public dashboard
     # URL(s) (comma-separated) — the built-in default only covers localhost, which a real
     # customer domain never matches.
-    # License activation (the console's "Activate" screen, where the customer enters the license
-    # key we send them) is reachable by default. Set LICENSING_ACTIVATION_API_ENABLED=false in
-    # your .env.customer only if you want to lock it down after the initial activation.
+    # Licensing is configured once for the installation (.env: the installation bundle's public
+    # key, a LICENSING_INSTALLATION_ID generated once, EXPORT_PLATFORM_KEK). Organizations are
+    # licensed afterwards in the console, as system_admin: Organizations -> Create from license
+    # (paste the key or drop the organization's .zqnt file) -- no restart. The platform may start
+    # with no licensed organization; the system_admin can still sign in. Set
+    # LICENSING_ACTIVATION_API_ENABLED=false only to lock licensing changes down.
 
   admin-console-ui:
-    <<: *zequent-env
+    <<: *public-env
     # Package is zqnt-platform-console (not zqnt-admin-console-dashboard, which is
     # not a real published package — pulling it fails). It has its own version
     # line, separate from the core services' 1.3.x line.
@@ -121,33 +191,57 @@ services:
   # adapter's deployment guide under edge-sdk/.
 
   edge-dji:
-    <<: *zequent-env
+    <<: *public-env
     # Package is zqnt-edge-adapter-dji (not dji-adapter, which is a stale,
     # abandoned package with no versioned releases).
     image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
     pull_policy: always
     profiles: ["edge-dji"]
-    ports:
-      - "9001:9001"
+    environment:
+      <<: *public-environment
+      # This adapter's edge credential (scope edge) -- a 2.0 platform refuses its
+      # calls without one. Issue it in the console (Edge credentials) or with
+      # core/scripts/mint-edge-credential.py; see DJI_EDGE_TOKEN in .env.customer.
+      ZQNT_EDGE_TOKEN: ${DJI_EDGE_TOKEN:-}
+    # gRPC for remote-control only -- not published. The docks reach the adapter
+    # through the MQTT broker, not through this container.
     restart: unless-stopped
 
   edge-mavlink:
-    <<: *zequent-env
+    <<: *public-env
     image: ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0
     pull_policy: always
     profiles: ["edge-mavlink"]
-    ports:
-      - "9003:50051"
+    environment:
+      <<: *public-environment
+      # This adapter's edge credential (scope edge) -- a 2.0 platform refuses its
+      # calls without one. Issue it in the console (Edge credentials) or with
+      # core/scripts/mint-edge-credential.py; see MAVLINK_EDGE_TOKEN in .env.customer.
+      ZQNT_EDGE_TOKEN: ${MAVLINK_EDGE_TOKEN:-}
+      # The Python edge SDK takes the Redis password inside the URL.
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.customer}@redis:6379
+    # gRPC (50051) for remote-control only -- not published.
     restart: unless-stopped
 
   edge-sapient:
-    <<: *zequent-env
+    <<: *public-env
     image: ghcr.io/zequent/zqnt-adapter-sapient:1.3.0
     pull_policy: always
     profiles: ["edge-sapient"]
+    environment:
+      <<: *public-environment
+      # This adapter's edge credential (scope edge) -- a 2.0 platform refuses its
+      # calls without one. Issue it in the console (Edge credentials) or with
+      # core/scripts/mint-edge-credential.py; see SAPIENT_EDGE_TOKEN in .env.customer.
+      ZQNT_EDGE_TOKEN: ${SAPIENT_EDGE_TOKEN:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.customer}@redis:6379
+    # SAPIENT has no authentication and no TLS: whoever reaches this port can
+    # report detections as a node, and detections can start Applications. It is
+    # bound to 127.0.0.1 unless you set SAPIENT_BIND_ADDR (e.g. to the LAN
+    # interface the sensors are on) -- never expose it to the internet. The gRPC
+    # port (50051) is for remote-control only and not published.
     ports:
-      - "9002:14000"   # SAPIENT_PORT — TCP port edge nodes connect to
-      - "9004:50051"   # GRPC_PORT — platform command interface
+      - "${SAPIENT_BIND_ADDR:-127.0.0.1}:9002:14000"
     restart: unless-stopped
 
   # --- Optional load-test / fleet simulator (enable with --profile) ------
@@ -157,22 +251,28 @@ services:
   # simulator/README.md for the full env var reference.
 
   simulator:
-    <<: *zequent-env
+    <<: *public-env
     image: ghcr.io/zequent/zqnt-simulator:1.3.3
     pull_policy: always
     profiles: ["simulator"]
+    environment:
+      <<: *public-environment
+      # This adapter's edge credential (scope edge) -- a 2.0 platform refuses its
+      # calls without one. Issue it in the console (Edge credentials) or with
+      # core/scripts/mint-edge-credential.py; see SIMULATOR_EDGE_TOKEN in .env.customer.
+      ZQNT_EDGE_TOKEN: ${SIMULATOR_EDGE_TOKEN:-}
     depends_on:
       - redis
       - connector-service
       - live-data-service
       - mission-autonomy-service
       - remote-control-service
-    ports:
-      - "9190:9190"   # EdgeAdapterService — what remote-control dials (unauthenticated)
-      - "9191:9191"   # SimulatorControlService — admin-console's fleet add/remove/list (authenticated)
+    # Not published: remote-control (9190) and admin-console (9191) reach it inside
+    # this network.
     restart: unless-stopped
     # Set in your .env.customer: CONNECTOR_ADDR=connector-service:8010, LIVE_DATA_ADDR=live-data-service:8003,
-    # MISSION_AUTONOMY_ADDR=mission-autonomy-service:8004, REDIS_ADDR=redis:6379, and
+    # MISSION_AUTONOMY_ADDR=mission-autonomy-service:8004, REDIS_ADDR=redis:6379 (it reads
+    # REDIS_PASSWORD from the same file), and
     # ADVERTISE_ADDR=simulator:9190 (must resolve from inside remote-control-service's own
     # container, not just from here — its "localhost" fallback would resolve to the wrong
     # container). DEVICE_SN defaults to SIM-DRONE-001. Set ZQNT_AUTH_ENABLED=true with

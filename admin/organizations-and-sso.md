@@ -35,22 +35,25 @@ Tokens are valid for **1 hour**; log in again once one expires. Use it as `Autho
 
 ## 2. Creating an organization
 
-Organizations are currently created directly against the **Connector Service's** own REST API —
-there is no Admin Console endpoint for this step yet.
+An organization is created from its license. Zequent issues each license for one organization,
+by name, and the license carries that organization's id. In the Admin Console, as `system_admin`:
 
-```bash
-curl -s -X POST http://localhost:8010/api/organization \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Acme Robotics","description":"Acme'\''s drone fleet"}'
-```
+1. **Organizations → Create from license**.
+2. Paste the license key, or drop the organization's `.zqnt` license file onto the field.
 
-The response includes the generated `id` (a UUID) — this is the `organizationId` every step below
-needs.
+The organization is created with exactly the id and name the license names, and its license is
+active immediately — no redeploy, no restart. If that organization already exists on this
+installation, nothing is created and its license is activated instead. The license names the
+organization only once: afterwards the name is yours to change in the console.
 
-> **Security note:** the Connector Service's REST API is not currently gated behind the platform's
-> authentication filter the way the Admin Console API is. Do not expose the Connector Service's
-> port (`8010` by default) on a public network — reach it only from trusted operator tooling on a
-> private/internal network, the same way you'd treat direct database access.
+To license an organization that already exists (for example the default organization, or one
+created with **Add Organization**), ask Zequent for a license issued for that organization's id,
+then use **Activate license** on the organization. An organization admin can activate their own
+organization's license on the **License** screen. A license issued for another organization is
+refused, and the message names the organization it belongs to.
+
+The organization's `id` (a UUID) is the `organizationId` every step below needs; the
+Organizations screen shows it.
 
 ## 3. Deciding local auth vs. SSO for the organization
 

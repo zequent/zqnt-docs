@@ -89,7 +89,7 @@ remote-control/admin-console fleet flows without real hardware. Optional, enable
 
 ## Deployment Configuration
 
-Container deployments use one deployment-local `.env` file referenced by [docker-compose.customer.yml](docker-compose.customer.yml). Start from [.env.customer.example](.env.customer.example) — copy it to `.env` next to the compose file and fill in every `<PLACEHOLDER>` (database/Redis passwords, your Ed25519 signing key, your license key, public dashboard URLs) before starting the stack. It contains no Zequent-internal credentials — every value is either a safe structural default or a placeholder only you can fill in.
+Container deployments use one deployment-local `.env` file referenced by [docker-compose.customer.yml](docker-compose.customer.yml). Start from [.env.customer.example](.env.customer.example) — copy it to `.env` next to the compose file and fill in every `<PLACEHOLDER>` (database/Redis passwords, your Ed25519 signing key, the licensing installation settings, public dashboard URLs) before starting the stack. It contains no Zequent-internal credentials — every value is either a safe structural default or a placeholder only you can fill in.
 
 ```yaml
 services:
@@ -117,13 +117,26 @@ docker compose -f docker-compose.customer.yml --profile edge-dji up -d
 
 See [Client SDK Configuration](client-sdk/CONFIGURATION.md) for the full `.env` reference, including the required Postgres/Redis and licensing variables.
 
+### Keys and credentials to create before the first start (and before upgrading to 2.0)
+
+1. **Database and Redis passwords** — `POSTGRES_PASSWORD`/`DATABASE_PASSWORD` (an existing volume keeps the password it was created with) and `REDIS_PASSWORD`.
+2. **User-token key pair** — `AUTH_PRIVATE_KEY`/`AUTH_PUBLIC_KEY`, plus `EXPORT_SIGNING_*` and `EXPORT_PLATFORM_KEK`.
+3. **Service key pair** — `SERVICE_AUTH_PRIVATE_KEY`/`SERVICE_AUTH_PUBLIC_KEY`, a second Ed25519 pair. The compose file refuses to start without it. Keep the private key in your secret manager: edge credentials are minted from it.
+4. **Edge credentials** — one per adapter and for the simulator (`<NAME>_EDGE_TOKEN` in `.env.customer`), issued after the platform is up in the Admin Console (Edge credentials) or offline with `core/scripts/mint-edge-credential.py`. The compose file passes the service public key to every adapter as `ZQNT_PLATFORM_PUBLIC_KEY` and keeps the platform's private keys and passwords away from them.
+5. **Stream-auth hook secret** — `LIVE_STREAM_AUTH_HOOK_SECRET`, the same value in your media server's `authHTTPAddress` (only with a media server that authenticates).
+6. **Stream-key pepper** — `LIVE_STREAM_KEYS_PEPPER`, optional, set once and never changed.
+
+`LICENSING_PUBLIC_KEY` is no longer needed on 2.0: the services trust the Zequent license hub's key compiled into them.
+
 ## Licensing
 
 Every platform service enforces an activated license before it will perform protected operations — a fresh deployment with no license activated will reject most requests. Licenses are organization- and seat-based: one license covers one organization, and each platform user you create consumes one of that organization's seats.
 
-1. Zequent issues you a license key when you purchase a subscription.
-2. Activate it once, from the Admin Console, against `https://api.zequent.com` (the default `LICENSE_SERVER_URL` in production deployments).
-3. Services automatically refresh their license lease afterward — no further manual steps.
+1. Configure the installation once: a `LICENSING_INSTALLATION_ID` generated once and `EXPORT_PLATFORM_KEK` (the license hub's public key is compiled into the 2.0 services; 1.3.x images still take it from the installation bundle as `LICENSING_PUBLIC_KEY`) (see [Client SDK Configuration](client-sdk/CONFIGURATION.md)). The platform may start with no licensed organization; the `system_admin` can still sign in.
+2. Zequent issues a license for each of your organizations, by name. In the Admin Console, as `system_admin`: **Organizations → Create from license**, then paste the license key or drop the organization's `.zqnt` file. The organization is created with the id and name the license names, and its license is active immediately — no restart. For an organization that already exists, use **Activate license** on it (an organization admin can do this for their own organization on the License screen).
+3. Services automatically refresh every organization's license lease afterward, across restarts — no further manual steps.
+
+The license names the organization only once, when it is created; afterwards the organization's name is yours to change in the console.
 
 See [Client SDK Configuration](client-sdk/CONFIGURATION.md) for the `LICENSING_*` environment variables.
 
