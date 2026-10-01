@@ -181,6 +181,10 @@ Most integrations only need the read/execute side (running Skills, checking thei
 
 ## See also
 
+- [No-fly zones and safe returns](airspace-safety-2.0.md) — how every flight is checked against your
+  no-fly zones, and the platform's low-battery return
+- [Technical configuration and dispatch rules](configuration-2.0.md) — run settings per organization or
+  site, and the rules that choose an asset for a run that names none
 - [Java Client SDK Quickstart](/docs/sdk/client/quickstart)
 - [Python Client SDK Quickstart](/docs/sdk/client/quickstart-python)
 - [Client SDK — Mission Autonomy Reference (Java, Beta)](../api-reference/client-sdk-mission-autonomy-2.0.md)
