@@ -21,6 +21,10 @@ how to change them for one organization or one site.
 This applies wherever the command comes from: a Skill node, a node of a composed Skill, a scheduled or
 triggered run, or a command sent directly from Remote Control.
 
+With preflight switched on (`preflight.enabled`), a run is also checked before it starts: it fails its
+preflight step when the takeoff point or a known target lies inside an active `HARD_BLOCK` zone. See
+[Flight preparation](configuration-2.0.md#flight-preparation).
+
 If the zones cannot be loaded (for example while the Connector service is unreachable), every movement
 command is refused, except a return home. A return home is sent unchecked, with a warning on the step,
 because refusing it would leave the aircraft where it is.
@@ -31,12 +35,12 @@ because refusing it would leave the aircraft where it is.
 | --- | --- |
 | Shape | A polygon of at least three points. |
 | Enforcement | `HARD_BLOCK`, `REQUIRE_APPROVAL` or `ADVISORY`. The console shows them as **Block**, **Approval** and **Advisory**. A new zone is `HARD_BLOCK`. |
-| Active | Inactive zones are ignored, by the platform and by the console's proximity alarm. A new zone is active. |
-| Altitude band | Optional lower and upper edge in metres above the takeoff point. Empty means unbounded in that direction. |
+| Active | Inactive zones are kept but ignored, by the platform and by the console's proximity alarm. The map draws them grey, marked **(not enforced)**. A new zone is active. |
+| Altitude band | Optional lower and upper edge in metres above the takeoff point (**From height (m)** and **Up to height (m)** in the console). Blank means from the ground, or no ceiling. |
 
-The console sets the shape, the name and the enforcement. The altitude band and the active flag are set
-through the Admin Console API (`PUT /api/admin-console/no-fly-zones/{id}` with `minAltitudeMeters`,
-`maxAltitudeMeters` and `active`); the console keeps them when you rename or reshape a zone.
+All of these are set in the console, in the zone list under **Plan** in Remote Control. Through the Admin
+Console API they are `PUT /api/admin-console/no-fly-zones/{id}` with `enforcement`, `active`,
+`minAltitudeMeters` and `maxAltitudeMeters`.
 
 A zone's altitude band only exempts a flight whose heights are all known to lie outside the band. When
 a height is unknown, the zone applies.
@@ -231,8 +235,8 @@ cannot be started at all, the alert says so and the platform tries again on its 
 | `route.safety_return.firmware_margin_percent` | 5 | 0 – 100 |
 
 A value outside its range is ignored and the default is used. These keys are looked up for the
-aircraft on every check: the site (theatre) the asset is stationed at, then the asset's organization,
-then GLOBAL. A change applies to aircraft already in the air.
+aircraft on every check: an entry for the asset itself, then the site (theatre) it is stationed at,
+then its organization, then GLOBAL. A change applies to aircraft already in the air.
 
 The check itself can be switched off for a whole installation with the Mission Autonomy environment
 variable `ZQNT_SAFETY_RETURN_ENABLED=false`; how often it runs is `ZQNT_SAFETY_RETURN_EVERY` (default
