@@ -15,6 +15,8 @@ This public documentation is for external developers and integration teams. It f
 | Goal | Documentation |
 | --- | --- |
 | Understand Assets vs SubAssets, and how telemetry identifies its source | [Assets & Sub-Assets](concepts/assets-and-sub-assets.md) |
+| Keep aircraft out of no-fly zones and bring them home safely on low battery (2.0) | [No-fly zones and safe returns](concepts/airspace-safety-2.0.md) |
+| Tune platform settings per organization or site, and decide which asset responds (2.0) | [Technical configuration and dispatch rules](concepts/configuration-2.0.md) |
 | Use Zequent from a Java application | [Java Client SDK Quickstart](client-sdk/QUICKSTART.md) |
 | Fly a waypoint mission from your own application | [Waypoint Missions](client-sdk/WAYPOINT_MISSIONS.md) |
 | Start, stop and play back live video from an asset's camera | [Live Video Streams](client-sdk/LIVE_VIDEO.md) |
