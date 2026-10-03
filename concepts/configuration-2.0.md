@@ -279,7 +279,7 @@ available aircraft with at least 30 % battery within 5 km.* Its parts:
   | Battery at least | `BATTERY_MIN` | Assets below this battery % are skipped. |
   | At most this far from the target | `DISTANCE_MAX` | In metres. Needs a target position; a run without one cannot be judged, and the next rule is asked. |
   | Only this kind of asset | `ASSET_TYPE_REQUIRED` | Aircraft or dock. |
-  | Only assets stationed at site | `ASSET_IN_SITE` | Assets assigned to that site under **Deploy › Theatres**. |
+  | Only assets stationed at site | `ASSET_IN_SITE` | Assets assigned to that site under **Manage › Theatres**. |
   | Available | `AVAILABILITY` | Found in older rules. Every rule already skips unavailable assets. |
 
 - **Which one is chosen** (strategy):
@@ -386,4 +386,4 @@ Do not do this on a real aircraft in flight: it will be sent home.
 
 - [No-fly zones and safe returns](airspace-safety-2.0.md)
 - [Applications & Skills](applications-and-skills-2.0.md)
-- [Deploy and automate](/docs/2.0/console/deploy-and-automate)
+- [Manage and automate](/docs/2.0/console/manage-and-automate)

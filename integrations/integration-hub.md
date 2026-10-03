@@ -12,7 +12,7 @@ instance, own schema, for a console-embedded one. Either way its tables never mi
 
 Repository: `zqnt-integration-hub` (Go backend + Next.js frontend). The **backend** is still its
 own container image — see below. The **frontend** is natively embedded into the Admin Console
-dashboard's own build now (`zqnt-console-dashboard/src/app/deploy/integrations`,
+dashboard's own build now (`zqnt-console-dashboard/src/app/manage/integrations`,
 `src/features/integrations`) rather than deployed as a separate reverse-proxied container — see
 [Console integration](#console-integration). Its source under `zqnt-integration-hub/frontend`
 still exists and still builds standalone (its own Dockerfile, its own image) for a deployment that
@@ -227,7 +227,7 @@ this doc is speculating about.
 ## Console Integration
 
 Integration Hub's UI is natively embedded in the Admin Console dashboard's own Next.js app —
-`zqnt-console-dashboard/src/app/deploy/integrations/*` (pages) and
+`zqnt-console-dashboard/src/app/manage/integrations/*` (pages) and
 `src/features/integrations/*` (components, copied from `zqnt-integration-hub/frontend` and restyled
 to import through the console's own generated API client — see `orval.config.ts`'s `integrationHub`
 entry and `src/api/integrations-axios.ts`). It is **not** a separate reverse-proxied app anymore —
@@ -235,7 +235,7 @@ only its API is: `next.config.js` rewrites `/integrations/api/:path*` to
 `INTEGRATION_HUB_BACKEND_ORIGIN` (default `http://localhost:8080`; `docker-compose.local.yml`
 points it at `integration-hub-backend:8080`), same-origin from the browser.
 
-Because the pages live under `/deploy/integrations/*`, they render inside the console's existing
+Because the pages live under `/manage/integrations/*`, they render inside the console's existing
 `/deploy` shell and automatically inherit its `RequireAuth` session gate — no separate Integration
 Hub login exists or is needed. The browser's existing console access token also rides along on
 every `/integrations/api/*` call automatically (same shared axios instance/interceptor every other

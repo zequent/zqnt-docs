@@ -149,7 +149,7 @@ When the customer application runs on the host and connects to exposed local por
 ### Client credential (`ZQNT_CLIENT_TOKEN`)
 
 The platform refuses every gRPC call that carries no credential. An organization administrator issues a
-**client credential** in the Admin Console under **Deploy → Access & Integrations → Credentials** (kind
+**client credential** in the Admin Console under **Manage → Access & Integrations → Credentials** (kind
 *Client application*); the token is shown once. Every client SDK sends it as `authorization: Bearer <token>`:
 
 | SDK | How to pass it |

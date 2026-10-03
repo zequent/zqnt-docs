@@ -113,7 +113,7 @@ zequent.edge.asset-vendor=ASSET_VENDOR_DJI
 ## gRPC Client Configuration
 
 Every call to the platform carries the adapter's edge credential, `ZQNT_EDGE_TOKEN` — issued in the Admin
-Console under **Deploy → Access & Integrations → Credentials** (kind *Edge adapter*, or *Integration Hub* for the
+Console under **Manage → Access & Integrations → Credentials** (kind *Edge adapter*, or *Integration Hub* for the
 hub), or offline with `core/scripts/mint-edge-credential.py`. It reaches only the device-facing calls. The adapter
 verifies the platform's calls into it with `ZQNT_PLATFORM_PUBLIC_KEY`. A customer application uses a *client*
 credential instead (`ZQNT_CLIENT_TOKEN`, see the client SDK configuration).
