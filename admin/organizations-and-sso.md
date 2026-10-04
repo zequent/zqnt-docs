@@ -15,11 +15,17 @@ The first time the Connector Service starts against an empty database, it seeds 
 
 | Variable | Applies to | Default | Notes |
 | --- | --- | --- | --- |
-| `AUTH_SYSTEM_ADMIN_EMAIL` | Connector Service | `system-admin@zequent.local` | Only read on that first boot |
+| `AUTH_SYSTEM_ADMIN_EMAIL` | Connector Service | `system-admin@zequent.local` | Read on first boot and whenever no enabled `system_admin` is left |
 
 The generated password is printed once, to the Connector Service's own startup log, and nowhere
-else — it is not recoverable after that. Capture it from your deployment's log aggregator on first
-boot.
+else. Capture it from your deployment's log aggregator on first boot.
+
+The platform also makes sure an **enabled** `system_admin` always exists. At start and every hour, the
+Connector Service checks for one. If there is none, it recovers the account at
+`AUTH_SYSTEM_ADMIN_EMAIL`: it creates that user if nobody has the address, or enables it again with a
+new password if it is a disabled `system_admin`. The new password is logged once, like on first boot.
+If the address belongs to a user without the `system_admin` role, nothing is changed and an error in
+the log says what to do.
 
 Log in as this user against the Admin Console API to get a bearer token for every step below:
 
@@ -80,6 +86,18 @@ This consumes one seat on the organization's active license and returns a one-ti
 password in the response — it is not shown again, so hand it to the user immediately. Valid roles
 are `org-admin`, `operator`, `approver`, `viewer` (`system_admin` is granted by direct database
 action only, not through this endpoint).
+
+In the Admin Console, the same is done under **Manage › Access Control** with **Invite user**. An
+org-admin or system_admin can also, per user:
+
+- **Edit roles** — replaces the user's roles and signs them out, so the new roles apply on their next
+  login. Not available for SSO users, whose roles come from the identity provider.
+- **Disable** / **Enable** — a disabled user is signed out and cannot log in. The user keeps their
+  license seat.
+- **Delete** — removes the account and frees its license seat.
+
+Nobody can change or delete their own account, and an org-admin only manages users of their own
+organization.
 
 For an **SSO** organization, you don't create users this way at all — see below.
 

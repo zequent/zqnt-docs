@@ -206,9 +206,12 @@ The default floor of 30 % lies above PX4's default low and critical battery leve
   approval steps or start-time safety checks, because the low battery is the reason it runs.
 - **Once per flight.** It does not trigger again until the aircraft has been back on the ground. It never
   triggers for an aircraft that is already returning or landing.
-- **Alerts.** An alert appears in the console's notifications (as a failed step named, for example,
-  **Low-battery return home**), with the battery, the threshold it acted at and the length of the way
-  home. Keep **Step failed** notifications switched on under **Alerting & Rules**.
+- **Alerts.** A **safety alert** appears in the console's notifications and Live feed, with the battery,
+  the threshold it acted at and the length of the way home. It links to the return run, or to the asset
+  when no run was started. When an operator has to act (manual control, no way home, no route around a
+  zone, a return that did not start), it also plays a sound and stays on screen until dismissed. Keep
+  **Safety alert** switched on under **Alerting & Rules**. Past alerts of an asset are listed on its
+  **Safety** tab.
 
 It only alerts, and does not move the aircraft, when:
 

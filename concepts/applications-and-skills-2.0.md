@@ -161,7 +161,7 @@ On an execution's page, **Live View** shows the asset on a map and marks the ste
 
 ### Approvals
 
-A Human Approval node parks the execution. The status stays `RUNNING`, and the platform publishes a `BLOCKED` event. Any signed-in user can approve or reject from the toast (it stays until someone decides), the header's "Approval needed" indicator, or the execution page, and the toast closes everywhere once one person has decided. If the node has a timeout and nobody answers, it follows its `TIMEOUT` edges, or its failure edges when it has none. A failed node whose failure branch ran to completion no longer marks the whole execution failed.
+A Human Approval node parks the execution. The status stays `RUNNING`, and the platform publishes a `BLOCKED` event. Who may decide depends on the node's **approval group**. Without a group, any signed-in user can approve or reject. With a group, only users who hold a role of that exact name, or a system admin, can decide; the platform refuses anyone else, and the console shows them **Waiting for approval by <group>** instead of the buttons. The group is matched against the platform roles (`org-admin`, `operator`, `approver`, `viewer`), exactly and without the usual role ladder: a group of `approver` lets approvers decide, not org-admins. Any other name means only a system admin can decide. Decide from the toast (it stays until someone decides), the header's "Approval needed" indicator, or the execution page; the toast closes everywhere once one person has decided. If the node has a timeout and nobody answers, it follows its `TIMEOUT` edges, or its failure edges when it has none. A failed node whose failure branch ran to completion no longer marks the whole execution failed.
 
 ## Managing Applications
 
@@ -176,6 +176,8 @@ client.missionAutonomy().getApplication(applicationId, version);
 In the Admin Console, Applications and Skills can also be deleted, and the Executions list shows which Application each run belongs to and where it stopped. Selecting a node on an execution shows what it received and returned.
 
 Deleting an Application without naming a version deletes its latest version.
+
+Schedules and event triggers point at an Application, not at one version, so deleting some versions leaves them running on the newest remaining one. Deleting the **last** version switches them off. They are kept, not deleted: the console marks them **Application deleted** and offers **Delete**.
 
 Most integrations only need the read/execute side (running Skills, checking their status) shown above — authoring and promoting Applications is normally a one-time or occasional workflow done visually in the Admin Console.
 
