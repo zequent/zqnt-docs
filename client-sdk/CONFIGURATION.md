@@ -11,7 +11,7 @@ The public customer Compose template is [docker-compose.customer.yml](../docker-
 ```yaml
 services:
   connector-service:
-    image: ghcr.io/zequent/connector-service:1.3.2
+    image: ghcr.io/zequent/connector-service:2.0.0
     env_file:
       - .env
 ```
@@ -36,26 +36,26 @@ docker compose -f docker-compose.customer.yml --profile edge-dji up -d
 
 | Component | Image | Default port |
 | --- | --- | ---: |
-| Connector Service | `ghcr.io/zequent/connector-service:1.3.2` | `8010` |
-| Remote Control Service | `ghcr.io/zequent/remote-control-service:1.3.2` | `8002` |
-| Live Data Service | `ghcr.io/zequent/live-data-service:1.3.2` | `8003` |
-| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:1.3.2` | `8004` |
-| Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.2` | `8005` |
-| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.3.3` | `3001` |
+| Connector Service | `ghcr.io/zequent/connector-service:2.0.0` | `8010` |
+| Remote Control Service | `ghcr.io/zequent/remote-control-service:2.0.0` | `8002` |
+| Live Data Service | `ghcr.io/zequent/live-data-service:2.0.0` | `8003` |
+| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:2.0.0` | `8004` |
+| Admin Console API | `ghcr.io/zequent/admin-console-service:2.0.0` | `8005` |
+| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v2.0.0` | `3001` |
 
 Use versioned image tags for production deployments (as above — not `:latest`). The Admin Console UI's
-version line is independent of the core services' `1.3.x` line.
+tags carry a `v` prefix (`v2.0.0`), unlike the core service images (`2.0.0`).
 
 ## Adapter Images
 
 | Adapter | Image | Status |
 | --- | --- | --- |
-| DJI | `ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0` | Available |
-| MAVLink | `ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0` | Available |
-| Sapient | `ghcr.io/zequent/zqnt-adapter-sapient:1.3.0` | Available |
-| RNS | `ghcr.io/zequent/zqnt-adapter-rns` — no versioned release yet, `latest` only | Source only |
-| Betaflight | No published image yet | Source only |
-| AI Adapter | No published image yet | Early access |
+| DJI | `ghcr.io/zequent/zqnt-edge-adapter-dji:2.0.0` | Available |
+| MAVLink | `ghcr.io/zequent/zqnt-adapter-mavlink:2.0.0` | Available |
+| Sapient | `ghcr.io/zequent/zqnt-adapter-sapient:2.0.0` | Available |
+| RNS | `ghcr.io/zequent/zqnt-adapter-rns:2.0.0` | Available |
+| Betaflight | `ghcr.io/zequent/zqnt-adapter-betaflight:2.0.0` | Available |
+| AI Adapter | `ghcr.io/zequent/zqnt-adapter-ai:2.0.0` | Available |
 
 ## Required `.env` Variables (Platform Deployment)
 
@@ -78,14 +78,14 @@ Every platform service verifies a license lease before performing protected oper
 | Variable | Applies to | Notes |
 | --- | --- | --- |
 | `LICENSING_INSTALLATION_ID` | All services | This installation's own id. Generate it once (e.g. `uuidgen`) and never change it: every organization's license activation is bound to it. The Helm chart generates and keeps it for you |
-| `LICENSING_PUBLIC_KEY` | 1.3.x images only | 2.0 services trust only the Zequent license hub's key compiled into them and ignore this variable (with a warning). Set it from the installation bundle only while you run 1.3.x images |
-| `LICENSING_SIGNING_KEY_ID` | 1.3.x images only | Key ID from the installation bundle, alongside `LICENSING_PUBLIC_KEY` |
 | `LICENSING_MANUAL_REFRESH_INTERVAL` | Admin Console only | Optional. How often one organization may refresh its license by hand (default `30s`) |
 | `LICENSE_SERVER_URL` | Admin Console only | Defaults to `https://api.zequent.com`; override only for a self-hosted/offline license server |
 | `EXPORT_PLATFORM_KEK` | Admin Console only | 32 random bytes, base64 (`openssl rand -base64 32`). Seals every organization's license activation before it is stored; without it activations are lost on restart |
 | `LICENSING_LICENSE_KEY` | Admin Console only | Optional. Only a bootstrap for the default organization; leave unset and license organizations in the console |
 
 These are configured once per installation. Organizations are licensed afterwards, from the Admin Console, with no restart — see [Licensing](../README.md#licensing).
+
+`LICENSING_PUBLIC_KEY` and `LICENSING_SIGNING_KEY_ID` are not needed: the services trust only the Zequent license hub's key compiled into them, and ignore these 1.3 variables (with a warning).
 
 ### Authentication
 
@@ -172,8 +172,8 @@ The Admin Console has two images:
 
 | Component | Image | Default local URL |
 | --- | --- | --- |
-| Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.2` | `http://localhost:8005` |
-| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.3.3` | `http://localhost:3001` |
+| Admin Console API | `ghcr.io/zequent/admin-console-service:2.0.0` | `http://localhost:8005` |
+| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v2.0.0` | `http://localhost:3001` |
 
 The Admin Console UI needs public API and WebSocket URLs that are reachable from the user's browser.
 

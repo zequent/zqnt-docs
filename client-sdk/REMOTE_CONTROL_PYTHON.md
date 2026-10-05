@@ -24,9 +24,9 @@ else:
     print(f"Takeoff accepted: {response.tid}")
 ```
 
-`mission_id`/`task_id` on `TakeoffRequest`/`GoToRequest`/`ReturnToHomeRequest` are optional — set
-them to correlate the command with a mission/task you already created via
-[Mission Autonomy](MISSION_AUTONOMY_PYTHON-1.3.md).
+`TakeoffRequest`/`GoToRequest`/`ReturnToHomeRequest` still have `mission_id`/`task_id` fields from
+1.3, but they have no effect: the platform no longer has missions or tasks, and the SDK does not
+send them.
 
 ## Manual control
 

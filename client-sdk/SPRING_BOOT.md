@@ -14,7 +14,7 @@ Uses `ZequentClientProducer` internally for consistent bean creation.
 <dependency>
     <groupId>com.zqnt.sdk</groupId>
     <artifactId>client-java-sdk</artifactId>
-    <version>1.3.2</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
@@ -43,6 +43,10 @@ public class ZequentConfig {
     }
 }
 ```
+
+The builder reads the application's client credential from `ZQNT_CLIENT_TOKEN`, or take it from your
+own configuration with `.clientToken(token)`. Without one the platform refuses every call. The
+credential is issued in the Admin Console under **Manage → Access & Integrations → Credentials**.
 
 ### Step 3: Use Constructor Injection
 
@@ -96,7 +100,8 @@ public class ZequentConfig {
             @Value("${zequent.mission-autonomy.host:localhost}") String maHost,
             @Value("${zequent.mission-autonomy.port:8004}") int maPort,
             @Value("${zequent.live-data.host:localhost}") String ldHost,
-            @Value("${zequent.live-data.port:8003}") int ldPort) {
+            @Value("${zequent.live-data.port:8003}") int ldPort,
+            @Value("${zequent.client-token:}") String clientToken) {
 
         return ZequentClient.builder()
                 .remoteControl()
@@ -111,6 +116,7 @@ public class ZequentConfig {
                     .host(ldHost)
                     .port(ldPort)
                     .done()
+                .clientToken(clientToken)   // blank falls back to ZQNT_CLIENT_TOKEN
                 .build();
     }
 }

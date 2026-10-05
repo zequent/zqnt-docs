@@ -26,7 +26,7 @@ client.remoteControl().takeoff(request)
     });
 ```
 
-`missionId`/`taskId` on `TakeoffRequest`/`GoToRequest` are optional — set them to correlate the command with a mission/task you already created via [Connector](CONNECTOR.md#missions-and-tasks-are-records-not-flights).
+`TakeoffRequest`/`GoToRequest` still have `missionId`/`taskId` fields from 1.3, but they have no effect: the platform no longer has missions or tasks, and the SDK does not send them.
 
 ## Manual control
 

@@ -42,6 +42,21 @@ below, including its [Stork service discovery](#stork-service-discovery-kubernet
 | `_STORK_NAME` | `<service-name>-service` | Stork service name to resolve, when `_USE_STORK=true` |
 | `_LOAD_BALANCER` | `ROUND_ROBIN` | Load-balancer strategy when `_USE_STORK=true` |
 
+### Client credential (`ZQNT_CLIENT_TOKEN`)
+
+Every call carries the application's **client credential**, issued in the Admin Console under
+**Manage → Access & Integrations → Credentials** (kind "client"). It is shown once, acts for one
+organization, and reaches only that organization's assets, Applications and runs.
+
+| Variable | Default | Description |
+|---|---|---|
+| `ZQNT_CLIENT_TOKEN` | — | The client credential, sent as `authorization: Bearer <token>` on every call |
+
+Pass it as `ZequentClient(..., client_token=token)` or set `ZQNT_CLIENT_TOKEN` — both
+`ZequentClient.from_env()` and the constructor read it when no token is passed. Without one the SDK
+logs a warning and the platform refuses every call. A refusal raises `ZequentAuthError` (a
+`grpc.aio.AioRpcError`), whose `details()` says what to do about it.
+
 ---
 
 ## Programmatic configuration
@@ -158,7 +173,7 @@ The SDK never logs sensitive request bodies; only operation name + outcome + sta
 
 ## TLS, auth, and custom channels
 
-By default the SDK uses **insecure** gRPC channels for parity with local development. To use TLS or auth, pass a pre-built `grpc.aio.Channel` per service:
+By default the SDK uses **insecure** (plaintext) gRPC channels for parity with local development. TLS is selected per service with `use_plaintext=False`; the SDK builds the channel itself:
 
 ```python
 from client_sdk import ZequentClient
@@ -174,7 +189,7 @@ async with ZequentClient(
     ...
 ```
 
-For per-call metadata (e.g. JWT bearers), pass `metadata=[(...)]` to SDK methods or attach a gRPC interceptor to the channel.
+For a credential that is not one fixed token (forwarding your own caller's token, or rotating a short-lived one), pass your own `grpc.aio` client interceptors as `ZequentClient(..., interceptors=[...])`. They run on every channel, before the SDK's credential interceptor, and an `authorization` header they set wins over `client_token`.
 
 The same switch is available per service as an env var, without touching code —
 `CONNECTOR_SERVICE_USE_PLAINTEXT=false`, `REMOTE_CONTROL_SERVICE_USE_PLAINTEXT=false`, etc., read by

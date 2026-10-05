@@ -54,8 +54,9 @@ Worked example, using `TakeOff`:
 
 ```go
 import (
-    assetpb "github.com/Zequent/zqnt-client-sdk-go/gen/common/asset/proto"
-    livedatapb "github.com/Zequent/zqnt-client-sdk-go/gen/livedata/proto"
+    "github.com/Zequent/zqnt-client-sdk-go/v2/livedata"
+    assetpb "github.com/Zequent/zqnt-client-sdk-go/v2/gen/common/asset/proto"
+    livedatapb "github.com/Zequent/zqnt-client-sdk-go/v2/gen/livedata/proto"
 )
 
 ld := livedata.New(conn)

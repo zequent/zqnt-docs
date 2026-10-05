@@ -76,17 +76,23 @@ Cancelling the calling task cancels the underlying gRPC call. Use it for timeout
 ```python
 try:
     async with asyncio.timeout(2.0):
-        await client.mission_autonomy.get_task("slow-task-id")
+        await client.mission_autonomy.get_skill_execution("execution-id")
 except TimeoutError:
-    log.warning("get_task timed out")
+    log.warning("get_skill_execution timed out")
 ```
 
-For streams, simply `break` out of the iterator or let the surrounding context manager exit:
+Streams run in a background task and call your callback for every frame. `stream_telemetry`
+returns a `StreamHandle`: stop it, or let an `async with` block exit, to cancel the underlying gRPC
+stream:
 
 ```python
-async for frame in client.live_data.stream_telemetry(asset_sn="DOCK-1"):
-    if frame.battery_percentage < 20:
-        break    # cancels the underlying gRPC stream
+from client_sdk import StreamTelemetryRequest
+
+async def on_frame(frame):
+    print(frame)
+
+async with client.live_data.stream_telemetry(StreamTelemetryRequest(sn="DOCK-1"), on_frame):
+    await asyncio.sleep(60)   # leaving the block stops the stream
 ```
 
 ---
@@ -105,12 +111,15 @@ handle: StreamHandle = await client.live_data.stream_telemetry(sn="DOCK-1", on_d
 await handle.close()
 ```
 
-For bi-directional streams (e.g. manual control), use the `manual_control_session` async context:
+For manual control, which streams your inputs to the platform, use the
+`start_manual_control_input` async context:
 
 ```python
-async with client.remote_control.manual_control_session(sn="DOCK-1") as session:
-    await session.send(ManualControlInput(throttle=0.5, yaw=0.1))
-    response = await session.recv()
+from client_sdk import ManualControlInput
+
+async with client.remote_control.start_manual_control_input("DOCK-1") as session:
+    await session.send_input(ManualControlInput(throttle=0.5, yaw=0.1))
+    response = await session.complete()
 ```
 
 ---
@@ -202,11 +211,11 @@ For integration tests, spin up the platform services (compose) and use a real `Z
 | DI                         | CDI (`@Inject ZequentClient`)                   | Pass the client manually (FastAPI / DI of choice)|
 | Configuration              | `application.properties` + env                  | Env (`from_env()`) or explicit `ServiceConfig` |
 | Lifecycle                  | CDI `@PostConstruct` / `@PreDestroy`            | `async with` / lifespan hook                    |
-| Streaming                  | `Multi<T>` (Mutiny)                             | Async iterator (`async for`)                    |
+| Streaming                  | `Multi<T>` (Mutiny)                             | Callback + `StreamHandle`                       |
 | Retries                    | SmallRye fault tolerance                        | Built-in `GrpcResilience`                       |
-| Error type                 | `ErrorInfo` on the response (no exceptions)     | `ZequentClientError`                            |
+| Error type                 | `ErrorInfo` on the response; Application/SkillExecution calls complete exceptionally (`MissionAutonomyClientException`) | `ZequentClientError` and its subclasses (e.g. `MissionAutonomyError`) |
 
-The Python SDK is intentionally lean — there is no DI, no annotations, no codegen step beyond `generate_protos.sh`. If something feels missing, check whether it can be expressed with stdlib `asyncio` + the patterns in this document.
+The Python SDK is intentionally lean — there is no DI, no annotations, and no codegen step: the generated protocol code ships with the `zqnt-utils` package. If something feels missing, check whether it can be expressed with stdlib `asyncio` + the patterns in this document.
 
 ---
 
