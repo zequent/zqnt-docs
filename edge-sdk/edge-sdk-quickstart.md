@@ -79,7 +79,7 @@ quarkus.http.port=9001
 zequent.edge.endpoint=localhost:9001
 zequent.edge.sn=YOUR_DEVICE_SERIAL_NUMBER
 zequent.edge.asset-type=ASSET_TYPE_DOCK
-zequent.edge.asset-vendor=DJI
+zequent.edge.asset-vendor=ASSET_VENDOR_DJI
 
 # Platform services (read by EdgeWiring below)
 grpc.client.live-data.host=${LIVE_DATA_SERVICE_HOST:localhost}
@@ -360,8 +360,8 @@ docker run --env-file .env -p 9001:9001 your-registry/my-edge-adapter:latest
 You should see output similar to:
 
 ```
-Listening on: http://0.0.0.0:9001
-gRPC Server started on 0.0.0.0:9001
+Starting new Quarkus gRPC server (using Vert.x transport)...
+my-edge-adapter 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.x) started in 0.4s. Listening on: http://0.0.0.0:9001
 ```
 
 Your adapter is now running and ready to receive commands from the platform via gRPC.

@@ -70,7 +70,7 @@ Configure your edge in `application.properties`:
 zequent.edge.endpoint=localhost:9001
 zequent.edge.sn=YOUR_DEVICE_SERIAL_NUMBER
 zequent.edge.asset-type=ASSET_TYPE_DOCK
-zequent.edge.asset-vendor=DJI
+zequent.edge.asset-vendor=ASSET_VENDOR_DJI
 ```
 
 Every call to the platform carries the adapter's **edge credential**, `ZQNT_EDGE_TOKEN`, and the

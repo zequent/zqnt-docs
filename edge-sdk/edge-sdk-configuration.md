@@ -31,7 +31,7 @@ Quarkus maps property names to environment variable names by converting to upper
 |----------|---------------------|
 | `zequent.edge.sn` | `ZEQUENT_EDGE_SN` |
 | `zequent.edge.asset-type` | `ZEQUENT_EDGE_ASSET_TYPE` |
-| `quarkus.grpc.clients.live-data-service.host` | `QUARKUS_GRPC_CLIENTS_LIVE_DATA_SERVICE_HOST` |
+| `grpc.client.live-data.host` | `GRPC_CLIENT_LIVE_DATA_HOST` |
 
 ---
 
@@ -118,9 +118,10 @@ it every platform command is refused. `ZQNT_EDGE_AUTH_DISABLED=true` turns that 
 stack only. A customer application uses a *client* credential instead (`ZQNT_CLIENT_TOKEN`, see the client SDK
 configuration).
 
-The edge adapter connects to platform services (Live Data, Connector) via gRPC. Each client is configured using the standard Quarkus gRPC client properties.
-
-The adapter connects to three platform services. In local dev, set host and port directly. In Docker/Kubernetes, service discovery is handled via Stork (see below).
+The SDK does not open connections to the platform itself: your adapter creates a gRPC channel per service,
+with the edge credential on it, and hands it to the SDK service (see
+[Quickstart — Wire the SDK](edge-sdk-quickstart.md#step-3b-wire-the-sdk)). The DJI adapter and the quickstart read
+each address from `grpc.client.<service>.host` / `.port`, which default to these environment variables:
 
 | Service | Environment Variable (Host) | Default Host | Environment Variable (Port) | Default Port |
 |---------|----------------------------|--------------|----------------------------|--------------|
@@ -128,44 +129,19 @@ The adapter connects to three platform services. In local dev, set host and port
 | Connector | `CONNECTOR_SERVICE_HOST` | `localhost` | `CONNECTOR_SERVICE_PORT` | `8010` |
 | Mission Autonomy | `MISSION_AUTONOMY_SERVICE_HOST` | `localhost` | `MISSION_AUTONOMY_SERVICE_PORT` | `8004` |
 
-### Local Development
-
 ```properties
-quarkus.grpc.clients.live-data-service.host=localhost
-quarkus.grpc.clients.live-data-service.port=8003
+grpc.client.live-data.host=${LIVE_DATA_SERVICE_HOST:localhost}
+grpc.client.live-data.port=${LIVE_DATA_SERVICE_PORT:8003}
 
-quarkus.grpc.clients.connector-service.host=localhost
-quarkus.grpc.clients.connector-service.port=8010
+grpc.client.connector.host=${CONNECTOR_SERVICE_HOST:localhost}
+grpc.client.connector.port=${CONNECTOR_SERVICE_PORT:8010}
 
-quarkus.grpc.clients.mission-autonomy-service.host=localhost
-quarkus.grpc.clients.mission-autonomy-service.port=8004
+grpc.client.mission-autonomy.host=${MISSION_AUTONOMY_SERVICE_HOST:localhost}
+grpc.client.mission-autonomy.port=${MISSION_AUTONOMY_SERVICE_PORT:8004}
 ```
 
-### Stork-based Service Discovery (Docker / Kubernetes)
-
-In `%docker` and `%k8s` profiles, gRPC clients use [Stork](https://smallrye.io/smallrye-stork/) for service discovery instead of direct host/port configuration.
-
-**Docker (static list):**
-
-```properties
-%docker.quarkus.grpc.clients.connector-service.name-resolver=stork
-%docker.stork.connector-service.service-discovery.type=static
-%docker.stork.connector-service.service-discovery.address-list=${CONNECTOR_SERVICE_HOST:connector-service}:${CONNECTOR_SERVICE_PORT:8010}
-%docker.stork.connector-service.load-balancer.type=round-robin
-```
-
-**Kubernetes (dynamic discovery):**
-
-```properties
-%k8s.quarkus.grpc.clients.connector-service.name-resolver=stork
-%k8s.stork.connector-service.service-discovery.type=kubernetes
-%k8s.stork.connector-service.service-discovery.k8s-namespace=default
-%k8s.stork.connector-service.service-discovery.application=connector-service
-%k8s.stork.connector-service.service-discovery.refresh-period=5s
-%k8s.stork.connector-service.load-balancer.type=round-robin
-```
-
-The same pattern applies for `live-data-service` and `mission-autonomy-service`.
+In Docker or Kubernetes, set the host variables to the services' DNS names (e.g. `connector-service`). There is
+no Stork service discovery.
 
 ---
 
@@ -271,7 +247,7 @@ services:
       - "9001:9001"
 ```
 
-Set `EDGE_ADAPTER_TARGET_ENDPOINTS`, service host/port values, device identity, and device-specific broker credentials in `.env`.
+Set `EDGE_ADAPTER_TARGET_ENDPOINTS`, `ZQNT_EDGE_TOKEN`, `ZQNT_PLATFORM_PUBLIC_KEY`, service host/port values, device identity, and device-specific broker credentials in `.env`.
 
 ### Kubernetes
 
@@ -296,9 +272,19 @@ spec:
             secretKeyRef:
               name: edge-secrets
               key: device-sn
-        - name: QUARKUS_GRPC_CLIENTS_LIVE_DATA_SERVICE_HOST
+        - name: ZQNT_EDGE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: edge-secrets
+              key: edge-token
+        - name: ZQNT_PLATFORM_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: edge-secrets
+              key: platform-public-key
+        - name: LIVE_DATA_SERVICE_HOST
           value: "live-data-service"
-        - name: QUARKUS_GRPC_CLIENTS_CONNECTOR_SERVICE_HOST
+        - name: CONNECTOR_SERVICE_HOST
           value: "connector-service"
 ```
 
@@ -311,14 +297,14 @@ spec:
 **Check 1:** Verify gRPC client settings:
 
 ```bash
-echo $QUARKUS_GRPC_CLIENTS_LIVE_DATA_SERVICE_HOST
-echo $QUARKUS_GRPC_CLIENTS_LIVE_DATA_SERVICE_PORT
+echo $LIVE_DATA_SERVICE_HOST
+echo $LIVE_DATA_SERVICE_PORT
 ```
 
 **Check 2:** Test network connectivity:
 
 ```bash
-nc -zv $QUARKUS_GRPC_CLIENTS_LIVE_DATA_SERVICE_HOST $QUARKUS_GRPC_CLIENTS_LIVE_DATA_SERVICE_PORT
+nc -zv $LIVE_DATA_SERVICE_HOST $LIVE_DATA_SERVICE_PORT
 ```
 
 **Check 3:** Look for connection errors in the logs:
@@ -326,6 +312,14 @@ nc -zv $QUARKUS_GRPC_CLIENTS_LIVE_DATA_SERVICE_HOST $QUARKUS_GRPC_CLIENTS_LIVE_D
 ```
 gRPC stream failed for device XXXXX: UNAVAILABLE
 ```
+
+### Problem: Calls fail with `UNAUTHENTICATED`
+
+**Calls from the adapter to the platform:** `ZQNT_EDGE_TOKEN` is missing, revoked, or not attached to the
+channel. Issue a new edge credential in the Admin Console.
+
+**Calls from the platform into the adapter:** `ZQNT_PLATFORM_PUBLIC_KEY` is missing or is not the key of the
+platform that is calling. The adapter logs `ZQNT_PLATFORM_PUBLIC_KEY is not set` at startup when it is missing.
 
 ### Problem: Telemetry not arriving at the platform
 
