@@ -34,7 +34,7 @@ Open `pom.xml` and add the Edge SDK and the GitHub Packages repository:
     <dependency>
         <groupId>com.zqnt.sdk</groupId>
         <artifactId>edge-java-sdk</artifactId>
-        <version>1.3.0</version>
+        <version>2.0.0</version>
     </dependency>
 </dependencies>
 
@@ -46,7 +46,8 @@ Open `pom.xml` and add the Edge SDK and the GitHub Packages repository:
 </repositories>
 ```
 
-Check your package registry for the latest published version.
+The examples on this page log with Lombok's `@Slf4j`: add Lombok to your build (on JDK 23+ also as
+an annotation processor in `maven-compiler-plugin`), or use any other logger.
 
 Make sure your `~/.m2/settings.xml` has the GitHub credentials:
 
@@ -80,18 +81,143 @@ zequent.edge.sn=YOUR_DEVICE_SERIAL_NUMBER
 zequent.edge.asset-type=ASSET_TYPE_DOCK
 zequent.edge.asset-vendor=DJI
 
-# Platform Services
-quarkus.grpc.clients.live-data-service.host=localhost
-quarkus.grpc.clients.live-data-service.port=8003
-quarkus.grpc.clients.live-data-service.keep-alive-without-calls=true
-
-quarkus.grpc.clients.connector-service.host=localhost
-quarkus.grpc.clients.connector-service.port=8010
-quarkus.grpc.clients.connector-service.keep-alive-without-calls=true
+# Platform services (read by EdgeWiring below)
+grpc.client.live-data.host=${LIVE_DATA_SERVICE_HOST:localhost}
+grpc.client.live-data.port=${LIVE_DATA_SERVICE_PORT:8003}
+grpc.client.connector.host=${CONNECTOR_SERVICE_HOST:localhost}
+grpc.client.connector.port=${CONNECTOR_SERVICE_PORT:8010}
 
 # gRPC server shares HTTP port
 quarkus.grpc.server.use-separate-server=false
 ```
+
+And the adapter's credentials, as environment variables:
+
+```bash
+# Edge credential: the Admin Console, Manage -> Access & Integrations -> Credentials (kind "Edge adapter")
+ZQNT_EDGE_TOKEN=<your edge credential>
+# The platform's public key, to check the platform's calls into the adapter
+ZQNT_PLATFORM_PUBLIC_KEY=<the platform's service public key>
+```
+
+See [Configuration](edge-sdk-configuration.md#grpc-client-configuration) for both.
+
+---
+
+## Step 3b: Wire the SDK
+
+The SDK registers no beans of its own. Three small classes connect it to Quarkus: one creates the
+services your adapter uses (with the edge credential on every channel), one exposes your adapter to
+the platform over gRPC, and one checks that calls into it come from the platform.
+
+```java
+package com.example.edge;
+
+import com.zqnt.sdk.edge.application.ProtoJsonMapper;
+import com.zqnt.sdk.edge.auth.EdgeAuthConfig;
+import com.zqnt.sdk.edge.auth.EdgeCredentialsClientInterceptor;
+import com.zqnt.sdk.edge.connector.application.ConnectorService;
+import com.zqnt.sdk.edge.connector.application.impl.ConnectorServiceImpl;
+import com.zqnt.sdk.edge.livedata.application.DetectionMapper;
+import com.zqnt.sdk.edge.livedata.application.LiveDataService;
+import com.zqnt.sdk.edge.livedata.application.NotificationMapper;
+import com.zqnt.sdk.edge.livedata.application.TelemetryMapper;
+import com.zqnt.sdk.edge.livedata.application.impl.LiveDataServiceImpl;
+import com.zqnt.utils.connector.proto.ConnectorServiceGrpc;
+import com.zqnt.utils.livedata.proto.LiveDataServiceGrpc;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+// The SDK registers no beans of its own: this class creates what the adapter uses.
+@ApplicationScoped
+public class EdgeWiring {
+
+    @ConfigProperty(name = "grpc.client.live-data.host") String liveDataHost;
+    @ConfigProperty(name = "grpc.client.live-data.port") int liveDataPort;
+    @ConfigProperty(name = "grpc.client.connector.host") String connectorHost;
+    @ConfigProperty(name = "grpc.client.connector.port") int connectorPort;
+
+    // Puts ZQNT_EDGE_TOKEN on every call to the platform
+    private final EdgeCredentialsClientInterceptor credentials =
+            new EdgeCredentialsClientInterceptor(EdgeAuthConfig.fromEnv().edgeToken());
+
+    @Produces
+    @ApplicationScoped
+    ProtoJsonMapper protoJsonMapper() {
+        return new ProtoJsonMapper();
+    }
+
+    @Produces
+    @ApplicationScoped
+    LiveDataService liveDataService() {
+        return new LiveDataServiceImpl(new TelemetryMapper(), new DetectionMapper(), new NotificationMapper(),
+                LiveDataServiceGrpc.newStub(channel(liveDataHost, liveDataPort)));
+    }
+
+    @Produces
+    @ApplicationScoped
+    ConnectorService connectorService(ProtoJsonMapper mapper) {
+        return new ConnectorServiceImpl(mapper, ConnectorServiceGrpc.newStub(channel(connectorHost, connectorPort)));
+    }
+
+    private ManagedChannel channel(String host, int port) {
+        return ManagedChannelBuilder.forAddress(host, port)
+                .usePlaintext()
+                .intercept(credentials)
+                .build();
+    }
+}
+```
+
+```java
+package com.example.edge;
+
+import com.zqnt.sdk.edge.adapter.application.EdgeAdapterService;
+import com.zqnt.sdk.edge.adapter.grpc.EdgeAdapterGrpcServiceImpl;
+import com.zqnt.sdk.edge.application.ProtoJsonMapper;
+import io.quarkus.grpc.GrpcService;
+
+// Exposes your EdgeAdapterService to the platform over gRPC
+@GrpcService
+public class EdgeGrpcService extends EdgeAdapterGrpcServiceImpl {
+    public EdgeGrpcService(EdgeAdapterService adapter, ProtoJsonMapper mapper) {
+        super(adapter, mapper);
+    }
+}
+```
+
+```java
+package com.example.edge;
+
+import com.zqnt.sdk.edge.auth.EdgeAuthConfig;
+import com.zqnt.sdk.edge.auth.PlatformAuthServerInterceptor;
+import io.grpc.Metadata;
+import io.grpc.ServerCall;
+import io.grpc.ServerCallHandler;
+import io.grpc.ServerInterceptor;
+import io.quarkus.grpc.GlobalInterceptor;
+import jakarta.enterprise.context.ApplicationScoped;
+
+// Refuses every call into the adapter that the platform did not sign
+@GlobalInterceptor
+@ApplicationScoped
+public class PlatformAuth implements ServerInterceptor {
+    private final ServerInterceptor delegate = new PlatformAuthServerInterceptor(EdgeAuthConfig.fromEnv());
+
+    @Override
+    public <Q, R> ServerCall.Listener<Q> interceptCall(ServerCall<Q, R> call, Metadata headers,
+                                                       ServerCallHandler<Q, R> next) {
+        return delegate.interceptCall(call, headers, next);
+    }
+}
+```
+
+Health probes stay open. Without `ZQNT_PLATFORM_PUBLIC_KEY` every command is refused;
+`ZQNT_EDGE_AUTH_DISABLED=true` turns the check off, for a local stack only. Add channels for
+Mission Autonomy (`MissionAutonomyServiceImpl`) the same way when you need it.
 
 ---
 
@@ -244,7 +370,10 @@ Your adapter is now running and ready to receive commands from the platform via 
 
 ## Step 8: Test with grpcurl
 
-You can test your adapter endpoint with `grpcurl`:
+You can test your adapter endpoint with `grpcurl`. Your adapter refuses calls the platform did not
+sign, so for this test run it with `ZQNT_EDGE_AUTH_DISABLED=true` — locally only — and with
+`quarkus.grpc.server.enable-reflection-service=true` (on by default only in dev mode), so `grpcurl`
+can discover the services:
 
 ```bash
 # Install grpcurl if needed
@@ -259,9 +388,9 @@ grpcurl -plaintext -d '{
   "base": {
     "sn": "YOUR_DEVICE_SN",
     "tid": "test-123",
-    "timestamp": {"seconds": 1700000000}
+    "timestamp": "2026-01-01T00:00:00Z"
   },
-  "request": {
+  "coordinate": {
     "latitude": 47.3769,
     "longitude": 8.5417,
     "altitude": 100.0
@@ -283,6 +412,9 @@ my-edge-adapter/
       java/
         com/example/edge/
           MyDeviceAdapter.java        # Your EdgeAdapterService implementation
+          EdgeWiring.java             # SDK services, with the edge credential
+          EdgeGrpcService.java        # Exposes the adapter over gRPC
+          PlatformAuth.java           # Checks the platform's calls in
           TelemetryProducer.java      # Optional: telemetry push logic
       resources/
         application.properties        # Configuration
@@ -296,7 +428,7 @@ my-edge-adapter/
 - [Edge Adapter Reference](edge-sdk-adapter.md) -- Full command reference and advanced patterns
 - [Configuration Guide](edge-sdk-configuration.md) -- All configuration properties
 - [Live Data](edge-sdk-live-data.md) -- In-depth telemetry streaming guide
-- [Connector](edge-sdk-connector.md) -- Asset and mission management
+- [Connector](edge-sdk-connector.md) -- Asset pairing and the Skill Registry
 - [Models Reference](../api-reference/edge-sdk-models.md) -- Complete model documentation
 
 For a ready-made DJI deployment, see [DJI Adapter Deployment](edge-sdk-dji-adapter-deployment.md).

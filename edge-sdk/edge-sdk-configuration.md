@@ -9,10 +9,8 @@ The Zequent Edge SDK is configured primarily through Quarkus `application.proper
 - [Configuration Methods](#configuration-methods)
 - [Edge Identity Configuration](#edge-identity-configuration)
 - [gRPC Client Configuration](#grpc-client-configuration)
-- [gRPC Server Configuration](#grpc-server-configuration)
 - [MQTT Configuration](#mqtt-configuration)
 - [Object Storage Configuration](#object-storage-configuration)
-- [Monitoring and Observability](#monitoring-and-observability)
 - [Environment-Specific Examples](#environment-specific-examples)
 - [Troubleshooting](#troubleshooting)
 
@@ -115,8 +113,10 @@ zequent.edge.asset-vendor=ASSET_VENDOR_DJI
 Every call to the platform carries the adapter's edge credential, `ZQNT_EDGE_TOKEN` — issued in the Admin
 Console under **Manage → Access & Integrations → Credentials** (kind *Edge adapter*, or *Integration Hub* for the
 hub), or offline with `core/scripts/mint-edge-credential.py`. It reaches only the device-facing calls. The adapter
-verifies the platform's calls into it with `ZQNT_PLATFORM_PUBLIC_KEY`. A customer application uses a *client*
-credential instead (`ZQNT_CLIENT_TOKEN`, see the client SDK configuration).
+verifies the platform's calls into it with `ZQNT_PLATFORM_PUBLIC_KEY` (alias `SERVICE_AUTH_PUBLIC_KEY`); without
+it every platform command is refused. `ZQNT_EDGE_AUTH_DISABLED=true` turns that check off, for a local simulator
+stack only. A customer application uses a *client* credential instead (`ZQNT_CLIENT_TOKEN`, see the client SDK
+configuration).
 
 The edge adapter connects to platform services (Live Data, Connector) via gRPC. Each client is configured using the standard Quarkus gRPC client properties.
 
@@ -264,7 +264,7 @@ Use the deployment-local `.env` file for adapter configuration:
 ```yaml
 services:
   edge-adapter:
-    image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
+    image: ghcr.io/zequent/zqnt-edge-adapter-dji:2.0.0
     env_file:
       - .env
     ports:
@@ -285,7 +285,7 @@ spec:
     spec:
       containers:
       - name: edge-dji
-        image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
+        image: ghcr.io/zequent/zqnt-edge-adapter-dji:2.0.0
         ports:
         - containerPort: 9001
         env:

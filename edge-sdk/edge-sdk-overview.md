@@ -24,11 +24,11 @@ The central entry point of the SDK. It is a CDI-managed bean that gives you acce
 
 ### EdgeAdapterService
 
-The primary interface that every edge adapter must implement. It declares commands for flight control, dock management, camera operations, manual control, live streaming, task execution, and more. All methods come with a default `NOT_IMPLEMENTED` return so you only need to override what your hardware supports.
+The primary interface that every edge adapter must implement. It declares commands for flight control, dock management, camera operations, manual control, live streaming, custom commands with their capabilities, cancelling a running command, and more. All methods come with a default `NOT_IMPLEMENTED` return so you only need to override what your hardware supports.
 
 ### ConnectorService
 
-Provides access to the platform's Connector Service over gRPC: register and manage your asset(s), and look up missions, tasks, schedulers and organizations.
+Provides access to the platform's Connector Service over gRPC: pair and manage your asset(s), report the commands your adapter supports to the Skill Registry, and look up schedulers and organizations.
 
 ### LiveDataService
 
@@ -36,7 +36,7 @@ Manages persistent gRPC telemetry streams. It lets you push asset and sub-asset 
 
 ### MissionAutonomyService
 
-Communicates with the Mission Autonomy Service over gRPC to look up scheduler definitions. Task execution itself is driven by the platform calling *into* your adapter (see `EdgeAdapterService`), not by the adapter polling this service. Missions and tasks are authored and triggered through the **Client SDK**, not the Edge SDK.
+Communicates with the Mission Autonomy Service over gRPC to look up scheduler definitions. Work reaches your adapter as commands the platform calls *into* it (see `EdgeAdapterService`), not by the adapter polling this service. Applications and Skills are authored in the Admin Console and run through the **Client SDK**, not the Edge SDK.
 
 ## Available Documentation
 
@@ -48,9 +48,9 @@ Communicates with the Mission Autonomy Service over gRPC to look up scheduler de
 | [Edge Adapter](edge-sdk-adapter.md) | Implementing the EdgeAdapterService interface |
 | [Live Data](edge-sdk-live-data.md) | Producing telemetry data streams |
 | [Connector](edge-sdk-connector.md) | Asset and resource management via the Connector Service |
-| [Mission Autonomy](edge-sdk-mission-autonomy.md) | Scheduler lookup, task lifecycle, and custom commands |
+| [Mission Autonomy](edge-sdk-mission-autonomy.md) | Scheduler lookup, and how Skill executions reach your adapter |
 | [Models Reference](../api-reference/edge-sdk-models.md) | Request, response, and telemetry data model reference |
-| [Go Edge SDK](edge-sdk-go-overview.md) | Go equivalent — an older API surface than this one, see its status note |
+| [Go Edge SDK](edge-sdk-go-overview.md) | Go equivalent — a narrower API surface than this one, see its status note |
 
 ## Quick Start
 
@@ -60,11 +60,9 @@ Add the Edge SDK dependency to your project:
 <dependency>
   <groupId>com.zqnt.sdk</groupId>
   <artifactId>edge-java-sdk</artifactId>
-  <version>1.3.0</version>
+  <version>2.0.0</version>
 </dependency>
 ```
-
-Check your package registry for the latest published version.
 
 Configure your edge in `application.properties`:
 
@@ -74,6 +72,10 @@ zequent.edge.sn=YOUR_DEVICE_SERIAL_NUMBER
 zequent.edge.asset-type=ASSET_TYPE_DOCK
 zequent.edge.asset-vendor=DJI
 ```
+
+Every call to the platform carries the adapter's **edge credential**, `ZQNT_EDGE_TOKEN`, and the
+adapter checks the platform's calls into it with `ZQNT_PLATFORM_PUBLIC_KEY` — see
+[Configuration](edge-sdk-configuration.md#grpc-client-configuration).
 
 Implement the adapter interface:
 

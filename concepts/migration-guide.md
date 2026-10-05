@@ -14,7 +14,8 @@ examples. Scheduler CRUD itself doesn't go anywhere, but what a schedule *points
 [Scheduler shape change](#scheduler-shape-change-affects-every-sdk) below, since it's easy to miss
 and affects every SDK, including the one edge client whose method surface doesn't change at all.
 
-The platform no longer runs work through an adapter's task methods — see
+The platform no longer runs work through an adapter's task methods, and uses `stopTask` only to
+cancel a running command — see
 [Task-based execution is gone](#task-based-execution-is-gone).
 
 ## Installing the 2.0 SDKs
@@ -45,7 +46,7 @@ Every call to the platform carries a credential. A 2.0 platform refuses calls wi
 | Client SDK (Go) | Removed outright | Applications (`UpsertApplication`, `ExecuteApplication`, `ExecuteSimple`, ...), the SkillExecution lifecycle, `ListSchedulers`; on the Connector, the Skill Registry methods; on Remote Control, `GoToWithOptions` (`PlayTTSAudio` is removed) | [Applications & Skills — Go](applications-and-skills.md#go) |
 | Edge SDK (Java) `ConnectorService` | Removed outright — not deprecated, not on the interface at all | Skill Registry self-reporting (`observeSkillContract`, `listSkillContracts`, `setSkillContractStatus`, `setSkillContractPermissions`), `ensureAsset`, pairing-code claims (`redeemAssetClaim`, `describeAssetClaim`), `registerMediaFile` | [Connector reference](../api-reference/edge-sdk-connector-reference.md) |
 | Edge SDK (Java) `MissionAutonomyService` | Shrinks to `getScheduler` alone — everything else removed outright | Nothing (unchanged, just smaller) | [Mission Autonomy reference](../api-reference/edge-sdk-mission-autonomy-reference.md) |
-| Edge SDK (Java) `EdgeAdapterService` / Live Data | Task methods stay on the interface but are never called (see below); `TaskEventData` is replaced by `CommandExecutionEventData` | `cancelExecution` | — |
+| Edge SDK (Java) `EdgeAdapterService` / Live Data | Task methods stay on the interface; only the cancel path is still called (see below). `TaskEventData` is replaced by `CommandExecutionEventData` | `cancelExecution` | — |
 | Edge SDK (Python) `ConnectorClient` | `get_mission`/`get_task`/`get_task_by_flight_id` removed outright; `register_asset` is replaced by `ensure_asset` | The same four Skill Registry methods, snake_case, and `redeem_asset_claim` | [Connector reference](../api-reference/edge-sdk-python-connector-reference.md) |
 | Edge SDK (Python) adapter / Live Data | `publish_task_event` and `TaskEvent` are replaced by `publish_command_execution_event` and `CommandExecutionEvent` | A command registration API on the adapter (`register_command`, `registered_commands`, ...) | — |
 | Edge SDK (Python) `MissionAutonomyClient` | No change — this client was already scheduler-lookup-only before 2.0 | Nothing new on this client, but see the Scheduler shape change below | — |
@@ -60,10 +61,16 @@ and the Go Edge SDK has no Skill Registry methods.
 In 1.3, waypoint work could reach a device in two ways: **task-based** (the platform calls your
 adapter's `prepareTask`/`startTask`, and the adapter looks the task up) or **command-based** (the
 platform sends a custom command such as `mission.waypoint.execute` with everything inline). In 2.0
-the platform only uses the **command-based** path: it never calls the task methods, and it no longer
-processes task events. The methods are still on the Java, Python and Go adapter interfaces, so
-existing adapters compile, but an adapter that relied on them must take its work from custom
-commands (capabilities) instead, and report progress with command execution events.
+the platform only uses the **command-based** path: it never calls `prepareTask`, `startTask`,
+`pauseTask` or `resumeTask`, and it no longer processes task events. The methods are still on the
+Java, Python and Go adapter interfaces, so existing adapters compile, but an adapter that relied on
+them must take its work from custom commands (capabilities) instead, and report progress with
+command execution events.
+
+One task RPC is still used: the platform cancels a running command with **`StopTask`**, passing the
+adapter's own execution id (the one it returned when it accepted the command) in place of a task id.
+In Java this arrives at `cancelExecution(sn, externalExecutionId)`, whose default calls `stopTask`;
+in Python and Go it arrives at `stop_task` / `StopTask`.
 
 ## Scheduler shape change (affects every SDK)
 

@@ -5,7 +5,7 @@ inline. This page covers how to send it, the configuration model, pausing and re
 track progress.
 
 > **Upgrading from 1.3?** The task-based path (`createTask` + `startTask`) is gone: the platform no
-> longer calls an adapter's task methods. See
+> longer starts work through an adapter's task methods. See
 > [Upgrading from 1.3](../concepts/migration-guide.md#task-based-execution-is-gone).
 
 ## Which adapters support it
