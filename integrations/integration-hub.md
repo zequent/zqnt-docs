@@ -12,7 +12,7 @@ instance, own schema, for a console-embedded one. Either way its tables never mi
 
 Repository: `zqnt-integration-hub` (Go backend + Next.js frontend). The **backend** is still its
 own container image — see below. The **frontend** is natively embedded into the Admin Console
-dashboard's own build now (`zqnt-console-dashboard/src/app/manage/integrations`,
+dashboard's own build now (`zqnt-platform-console/src/app/manage/integrations`,
 `src/features/integrations`) rather than deployed as a separate reverse-proxied container — see
 [Console integration](#console-integration). Its source under `zqnt-integration-hub/frontend`
 still exists and still builds standalone (its own Dockerfile, its own image) for a deployment that
@@ -30,9 +30,8 @@ platform's own `docker-compose.local.yml` stack.
   never mixed with `zequent_db`'s own asset/telemetry tables
 - Optionally: the platform's Connector Service and Mission Autonomy Service, if you want configured
   connectors to appear as Skill-invocable capabilities (see [Skills & Capabilities
-  integration](#skills--capabilities-integration) below) — **this specific integration depends on
-  the platform's unreleased Skill/capability-execution model (Beta, not on the current 1.3.x
-  release); see that section's own note before enabling `ZQNT_PLATFORM_ENABLED`**
+  integration](#skills--capabilities-integration) below). This needs an integration credential for
+  Integration Hub, see [Zequent Platform Integration](#backend----zequent-platform-integration-optional)
 
 ---
 
@@ -71,13 +70,7 @@ all. It plays no role in a console-embedded one.
 | `PENDING_MESSAGE_STORE` | `memory` | Store-and-forward backend for failed sink writes: `memory` or `rabbitmq` |
 | `RABBITMQ_URL`, `RABBITMQ_QUEUE`, `RABBITMQ_VHOST`, `RABBITMQ_USER`, `RABBITMQ_PASS` | -- | Only used when `PENDING_MESSAGE_STORE=rabbitmq` |
 
-### Backend -- Zequent Platform Integration (optional, Beta)
-
-> **This entire integration depends on the platform's unreleased Skill/capability-execution model**
-> (Application → Skill → SkillExecution → SkillContract), which lives on unmerged `refactoring/*-v2`
-> branches across the platform's services and protocol definitions — not on the current 1.3.x
-> release. See [Skills & Capabilities Integration](#skills--capabilities-integration) below. Leave
-> `ZQNT_PLATFORM_ENABLED` unset/`false` against a 1.3.x deployment.
+### Backend -- Zequent Platform Integration (optional)
 
 Unset or `ZQNT_PLATFORM_ENABLED=false` (the default) runs Integration Hub fully standalone, with no
 dependency on any Zequent platform service. Set `ZQNT_PLATFORM_ENABLED=true` to enable the
@@ -86,6 +79,8 @@ integration described below.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `ZQNT_PLATFORM_ENABLED` | `false` | Master switch for the platform bridge |
+| `ZQNT_EDGE_TOKEN` | -- | Integration Hub's credential for its calls to the platform: an edge credential with the **integration** scope, issued by a `system_admin` in the Admin Console (Credentials) or with `core/scripts/mint-edge-credential.py --integration`. The platform refuses Integration Hub's calls without it. Bound to an organization, Integration Hub can only start runs in that organization |
+| `ZQNT_PLATFORM_PUBLIC_KEY` (alias `SERVICE_AUTH_PUBLIC_KEY`) | -- | The platform's service public key. Integration Hub verifies the platform's calls into it (`SendCustomCommand`, `GetCapabilities`) with it and refuses everything else |
 | `ZQNT_CONNECTOR_HOST` / `ZQNT_CONNECTOR_PORT` | `connector-service` / `8010` | Connector Service gRPC endpoint |
 | `ZQNT_MISSION_AUTONOMY_HOST` / `ZQNT_MISSION_AUTONOMY_PORT` | `mission-autonomy-service` / `8004` | Mission Autonomy Service gRPC endpoint |
 | `ZQNT_PLATFORM_LISTEN_ADDR` | `:9095` | Address this backend's own inbound gRPC server (for `SendCustomCommand`) binds to |
@@ -93,6 +88,7 @@ integration described below.
 | `ZQNT_ASSET_SN` | `integration-hub` | The serial number Integration Hub registers itself under as its own logical asset |
 | `ZQNT_ASSET_NAME` | `Integration Hub` | Display name for that asset |
 | `ZQNT_REDIS_URL` | `redis://localhost:6379` | Same Redis instance the platform's Java services use — required for `SendCustomCommand` dispatch to actually reach this backend (see [Skills & Capabilities integration](#skills--capabilities-integration)'s discovery-registration note) |
+| `ZQNT_REDIS_PASSWORD` | -- | Redis password; when set it replaces any password in `ZQNT_REDIS_URL`, so the secret can be kept out of the URL |
 
 ### Backend -- Auth (optional)
 
@@ -148,15 +144,8 @@ locally, none of which are part of this platform's own compose file).
 
 ## Skills & Capabilities Integration
 
-> **Beta — depends on unreleased platform functionality.** Everything in this section requires the
-> platform's Application → Skill → SkillExecution → SkillContract model, which currently lives only
-> on unmerged `refactoring/*-v2` branches (protocol definitions, Connector/Mission Autonomy
-> services, and the Admin Console's Skill graph editor) — not on `main`/the current 1.3.x release.
-> `ObserveSkillContract` and the rest of the Skill Registry API described below do not exist on the
-> platform you'd deploy today. Leave `ZQNT_PLATFORM_ENABLED=false` against a 1.3.x platform; this
-> section documents the integration for when that model ships. See
-> [Applications & Skills](../concepts/applications-and-skills-2.0.md) for the platform-side model this
-> depends on.
+See [Applications & Skills](../concepts/applications-and-skills.md) for the platform-side model
+this integration plugs into.
 
 When `ZQNT_PLATFORM_ENABLED=true`, Integration Hub's backend does three things on startup (and
 again whenever a sink-role connector is created or updated, so this stays current without a
@@ -201,7 +190,7 @@ Integration Hub also has a fourth, purpose-built connector type for the opposite
 
 ### Starting an Application from a bridge
 
-A bridge can also start an Application through an **Event Trigger** of type `INTEGRATION`. The trigger names the bridge (`bridgeId`), a condition over the bridge's mapped payload (`telemetry_field`, `comparison_operator`, `comparison_value`), the target Application and Skill, and a cooldown. Wiring it this way keeps the target, condition and cooldown in one place that can be edited, instead of an `applicationId`/`skillId` inside the bridge's connector JSON. The trigger does not need to name an asset: when it fires with none, the platform picks one by policy (see [Which asset an execution runs on](../concepts/applications-and-skills-2.0.md#which-asset-an-execution-runs-on)), so a fire panel can report a zone and the nearest capable drone answers. See [Event triggers](../concepts/applications-and-skills-2.0.md#event-triggers).
+A bridge can also start an Application through an **Event Trigger** of type `INTEGRATION`. The trigger names the bridge (`bridgeId`), a condition over the bridge's mapped payload (`telemetry_field`, `comparison_operator`, `comparison_value`), the target Application and Skill, and a cooldown. Wiring it this way keeps the target, condition and cooldown in one place that can be edited, instead of an `applicationId`/`skillId` inside the bridge's connector JSON. The trigger does not need to name an asset: when it fires with none, the platform picks one by policy (see [Which asset an execution runs on](../concepts/applications-and-skills.md#which-asset-an-execution-runs-on)), so a fire panel can report a zone and the nearest capable drone answers. See [Event triggers](../concepts/applications-and-skills.md#event-triggers).
 
 ### How a Skill actually reaches this backend
 
@@ -227,21 +216,22 @@ this doc is speculating about.
 ## Console Integration
 
 Integration Hub's UI is natively embedded in the Admin Console dashboard's own Next.js app —
-`zqnt-console-dashboard/src/app/manage/integrations/*` (pages) and
+`zqnt-platform-console/src/app/manage/integrations/*` (pages) and
 `src/features/integrations/*` (components, copied from `zqnt-integration-hub/frontend` and restyled
 to import through the console's own generated API client — see `orval.config.ts`'s `integrationHub`
 entry and `src/api/integrations-axios.ts`). It is **not** a separate reverse-proxied app anymore —
-only its API is: `next.config.js` rewrites `/integrations/api/:path*` to
+only its API is: the console's `server.js` proxies `/integrations/api/*` to
 `INTEGRATION_HUB_BACKEND_ORIGIN` (default `http://localhost:8080`; `docker-compose.local.yml`
-points it at `integration-hub-backend:8080`), same-origin from the browser.
+points it at `integration-hub-backend:8080`), same-origin from the browser. Under `next dev`, which
+bypasses `server.js`, a rewrite in `next.config.js` does the same.
 
-Because the pages live under `/manage/integrations/*`, they render inside the console's existing
-`/deploy` shell and automatically inherit its `RequireAuth` session gate — no separate Integration
+Because the pages live under `/manage/integrations/*`, they render inside the console's **Manage**
+workspace and automatically inherit its `RequireAuth` session gate — no separate Integration
 Hub login exists or is needed. The browser's existing console access token also rides along on
 every `/integrations/api/*` call automatically (same shared axios instance/interceptor every other
 console API call uses), so enabling this backend's own `ZQNT_AUTH_ENABLED` (see
 [Backend -- Auth](#backend--auth-optional) above) actually protects the API too, not just the page.
 
 To regenerate the API client after a real change to the backend's routes: re-copy
-`zqnt-integration-hub/backend/docs/swagger.json` to `zqnt-console-dashboard/openapi/integration-hub.swagger.json`,
-then run `pnpm orval` in `zqnt-console-dashboard`.
+`zqnt-integration-hub/backend/docs/swagger.json` to `zqnt-platform-console/openapi/integration-hub.swagger.json`,
+then run `pnpm api:generate` in `zqnt-platform-console`.

@@ -24,7 +24,7 @@ finally:
 > does. This SDK's `edge_sdk.models.scheduler.SchedulerDTO` is its own plain-Python model, separate
 > from (but field-equivalent to) the client SDK's own `SchedulerDTO` — both mirror the same
 > `SchedulerProtoDTO` wire message. See the
-> [2.0.x migration guide](../concepts/migration-guide-2.0.md#scheduler-shape-change-affects-every-sdk)
+> [2.0.x migration guide](../concepts/migration-guide.md#scheduler-shape-change-affects-every-sdk)
 > for the full field breakdown.
 
 ---

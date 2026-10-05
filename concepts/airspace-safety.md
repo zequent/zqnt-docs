@@ -3,13 +3,13 @@
 This page explains how Zequent 2.0 keeps aircraft out of your no-fly zones: where zones are stored, what
 happens to each kind of flight command that would cross one, how heights are measured, and how the
 platform brings an aircraft home on low battery before its own firmware does. The settings named here
-are Technical Config keys; see [Technical configuration and dispatch rules](configuration-2.0.md) for
+are Technical Config keys; see [Technical configuration and dispatch rules](configuration.md) for
 how to change them for one organization or one site.
 
 ## Where zones live and who checks them
 
 - **Drawn in the console.** Zones are drawn in **Operate → Remote Control** with the **Zone** draw mode
-  and managed under **Plan**. See [Draw a no-fly zone](/docs/2.0/console/operate#draw-a-no-fly-zone).
+  and managed under **Plan**. See [Draw a no-fly zone](/docs/console/operate#draw-a-no-fly-zone).
 - **Stored per organization.** Every zone belongs to one organization and is stored by the Connector
   service in the platform database. Every flight of that organization respects every active zone of
   that organization. A zone can be filed under a site (theatre); it still applies to every flight of
@@ -23,7 +23,7 @@ triggered run, or a command sent directly from Remote Control.
 
 With preflight switched on (`preflight.enabled`), a run is also checked before it starts: it fails its
 preflight step when the takeoff point or a known target lies inside an active `HARD_BLOCK` zone. See
-[Flight preparation](configuration-2.0.md#flight-preparation).
+[Flight preparation](configuration.md#flight-preparation).
 
 If the zones cannot be loaded (for example while the Connector service is unreachable), every movement
 command is refused, except a return home. A return home is sent unchecked, with a warning on the step,
@@ -257,6 +257,6 @@ variable `ZQNT_SAFETY_RETURN_ENABLED=false`; how often it runs is `ZQNT_SAFETY_R
 
 ## See also
 
-- [Technical configuration and dispatch rules](configuration-2.0.md)
-- [Applications & Skills](applications-and-skills-2.0.md)
-- [Operate your fleet: Remote Control](/docs/2.0/console/operate#remote-control)
+- [Technical configuration and dispatch rules](configuration.md)
+- [Applications & Skills](applications-and-skills.md)
+- [Operate your fleet: Remote Control](/docs/console/operate#remote-control)

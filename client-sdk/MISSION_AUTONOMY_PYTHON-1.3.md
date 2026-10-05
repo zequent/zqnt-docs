@@ -4,14 +4,14 @@
 only interface that can start, stop, pause, or resume a task. Unlike the Java SDK, `client.connector`
 has no Mission/Task methods at all here — there's no "which one should I call" question in Python.
 
-Full method-by-method reference: [Mission Autonomy API Reference](../api-reference/client-sdk-mission-autonomy-python.md).
+Full method-by-method reference: [Mission Autonomy API Reference](../api-reference/client-sdk-mission-autonomy-python-1.3.md).
 
-For Java, see [CONNECTOR.md](CONNECTOR.md#missions-and-tasks-are-records-not-flights) /
-[the Mission Autonomy reference](../api-reference/client-sdk-mission-autonomy.md).
+For Java, see [CONNECTOR.md](CONNECTOR-1.3.md#missions-and-tasks-are-records-not-flights) /
+[the Mission Autonomy reference](../api-reference/client-sdk-mission-autonomy-1.3.md).
 
 > **Beta preview — 2.0.x, not yet released.** Every method below raises
 > `LegacyOperationRemovedError` on an unmerged branch that replaces this whole page's model. See the
-> [2.0.x migration guide](../concepts/migration-guide-2.0.md#per-sdk-impact) for what replaces it.
+> [2.0.x migration guide](../concepts/migration-guide.md#per-sdk-impact) for what replaces it.
 
 ## Creating a mission
 
@@ -53,7 +53,7 @@ await client.mission_autonomy.stop_task(task_id)
 ```
 
 These forward a bare task ID to the adapter — works only where the adapter implements the task
-lifecycle. See [Waypoint Missions](WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use) for the
+lifecycle. See [Waypoint Missions](WAYPOINT_MISSIONS-1.3.md#which-path-does-your-adapter-use) for the
 full per-adapter picture, including the command-based alternative (MAVLink, the simulator) that
 doesn't use this lifecycle at all.
 
@@ -78,7 +78,7 @@ one you call.
 Every method here returns a response object (`MissionResponse`/`TaskResponse`/`SchedulerResponse`)
 with `success: bool` and `error: ErrorInfo | None` — **none of them raise for a business-level
 error**, unlike `client.connector`'s asset/payload/organization/policy methods (which raise
-`ConnectorError`; see [Connector — Error handling](CONNECTOR_PYTHON.md#error-handling)). Only a
+`ConnectorError`; see [Connector — Error handling](CONNECTOR_PYTHON-1.3.md#error-handling)). Only a
 transport failure raises, as `grpc.aio.AioRpcError`:
 
 ```python
@@ -95,10 +95,10 @@ else:
         print(response.error.error_message)
 ```
 
-See [Functional Responses](FUNCTIONAL_RESPONSES_PYTHON.md) for what `success` actually confirms.
+See [Functional Responses](FUNCTIONAL_RESPONSES_PYTHON-1.3.md) for what `success` actually confirms.
 
 ## See also
 
-- [Mission Autonomy API Reference](../api-reference/client-sdk-mission-autonomy-python.md) — every method
-- [Waypoint Missions](WAYPOINT_MISSIONS.md) — which adapter uses which execution path
-- [Connector](CONNECTOR_PYTHON.md) — assets, organizations, technical config
+- [Mission Autonomy API Reference](../api-reference/client-sdk-mission-autonomy-python-1.3.md) — every method
+- [Waypoint Missions](WAYPOINT_MISSIONS-1.3.md) — which adapter uses which execution path
+- [Connector](CONNECTOR_PYTHON-1.3.md) — assets, organizations, technical config

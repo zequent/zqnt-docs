@@ -90,7 +90,7 @@ uses when the key is not set at all. "Scopes" says where setting the key has an 
 
 ### No-fly zones and safe return
 
-See [No-fly zones and safe returns](airspace-safety-2.0.md) for what these do.
+See [No-fly zones and safe returns](airspace-safety.md) for what these do.
 
 | Key | Default | What it does | Scopes |
 | --- | --- | --- | --- |
@@ -223,7 +223,7 @@ Dispatch rules decide **which asset responds when a run doesn't name one**: a de
 trigger set to choose by rule, a schedule without a fixed asset, an Integration Hub alarm, or an
 Application that pins no asset. A run that names its asset never asks them. For the full order in which
 an Application's own asset or site scope is tried first, see
-[Which asset an execution runs on](applications-and-skills-2.0.md#which-asset-an-execution-runs-on).
+[Which asset an execution runs on](applications-and-skills.md#which-asset-an-execution-runs-on).
 
 ### How they are checked
 
@@ -362,7 +362,7 @@ notification, the header's approval indicator or the execution page.
 
 1. Create a simulated aircraft and take it off **through the platform** (a takeoff command from Remote
    Control or a Skill), so the platform knows its home. See
-   [Test with simulators](/docs/2.0/console/simulators).
+   [Test with simulators](/docs/console/simulators).
 2. Draw a `HARD_BLOCK` zone between the aircraft and its home, and fly the aircraft past it.
 3. Add `route.safety_return.floor_percent` with scope `ORGANIZATION` for your organization and a value
    above the simulated aircraft's current battery, for example `95`.
@@ -384,6 +384,6 @@ Do not do this on a real aircraft in flight: it will be sent home.
 
 ## See also
 
-- [No-fly zones and safe returns](airspace-safety-2.0.md)
-- [Applications & Skills](applications-and-skills-2.0.md)
-- [Manage and automate](/docs/2.0/console/manage-and-automate)
+- [No-fly zones and safe returns](airspace-safety.md)
+- [Applications & Skills](applications-and-skills.md)
+- [Manage and automate](/docs/console/manage-and-automate)

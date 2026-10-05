@@ -46,7 +46,7 @@ organization lookup, and scheduler CRUD follow the same request/response shape �
 > confirmed against the backend, its `createMission`/`createTask` route-optimize (and, for a task,
 > expand around the mission's no-fly zones) before writing the exact same record shown below. The
 > example here still works — same record, no optimization — but `missionAutonomy()` is what you
-> want day to day. See the [Mission Autonomy reference](../api-reference/client-sdk-mission-autonomy.md).
+> want day to day. See the [Mission Autonomy reference](../api-reference/client-sdk-mission-autonomy-1.3.md).
 
 ```java
 import com.zqnt.utils.missionautonomy.domains.MissionDTO;
@@ -115,7 +115,7 @@ client.connector().getTaskByFlightId(request)
 
 > **Beta preview — 2.0.x, not yet released.** Every Mission/Task method above becomes a
 > `@Deprecated` stub that fails immediately on an unmerged branch. See the
-> [2.0.x migration guide](../concepts/migration-guide-2.0.md#per-sdk-impact) for what replaces
+> [2.0.x migration guide](../concepts/migration-guide.md#per-sdk-impact) for what replaces
 > them.
 
 ## Checking what an asset supports

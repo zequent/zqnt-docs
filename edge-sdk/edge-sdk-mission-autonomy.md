@@ -3,7 +3,7 @@
 `MissionAutonomyService` gives an edge adapter six methods — mission create/update/get, task get (by ID or flight ID), and scheduler get — reaching the platform's `mission-autonomy-service` directly instead of `connector-service`. **No confirmed real-adapter usage of any of them**: `edge-dji`, the one production Java adapter, wires up a `MissionAutonomyService` bean but calls none of its methods anywhere in its source. Everything related to actually running automated behavior on an asset — receiving task lifecycle calls, receiving commands, reporting progress — happens through other parts of the SDK, described below.
 
 Full method-by-method reference, including which methods are route-optimized and which are plain
-passthroughs: [Mission Autonomy API Reference](../api-reference/edge-sdk-mission-autonomy-reference.md).
+passthroughs: [Mission Autonomy API Reference](../api-reference/edge-sdk-mission-autonomy-reference-1.3.md).
 
 ## Table of Contents
 
@@ -64,7 +64,7 @@ missionAutonomyService.getScheduler(request)
 `createMission`/`updateMission` are route-optimized; every other method here (including this
 `getScheduler` example) is a plain passthrough to `connector-service` — functionally identical to
 calling the equivalent [`ConnectorService`](edge-sdk-connector.md) method directly. See the
-[reference](../api-reference/edge-sdk-mission-autonomy-reference.md) for the full breakdown. Scheduler
+[reference](../api-reference/edge-sdk-mission-autonomy-reference-1.3.md) for the full breakdown. Scheduler
 create/update/delete is available only through `ConnectorService` — see
 [Connector](edge-sdk-connector.md#schedulers).
 
@@ -72,8 +72,8 @@ create/update/delete is available only through `ConnectorService` — see
 > `getScheduler` alone — every Mission/Task method above is gone outright, not deprecated. Given
 > [no confirmed real-adapter usage](#overview) of any of them today, this is unlikely to affect a
 > real adapter migrating forward. See the
-> [2.0.x migration guide](../concepts/migration-guide-2.0.md#per-sdk-impact) or the
-> [2.0.x reference](../api-reference/edge-sdk-mission-autonomy-reference-2.0.md) directly.
+> [2.0.x migration guide](../concepts/migration-guide.md#per-sdk-impact) or the
+> [2.0.x reference](../api-reference/edge-sdk-mission-autonomy-reference.md) directly.
 
 ---
 

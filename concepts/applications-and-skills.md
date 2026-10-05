@@ -1,15 +1,6 @@
 # Applications & Skills
 
-> **Beta — not yet released, Java and Python only.** Everything on this page describes real,
-> working code — confirmed directly against source — but it lives on active, unmerged development
-> branches (`refactoring/*-v2` across the protocol, client SDKs, and platform services), not on
-> `main`/the current 1.3.x release. There is no released version number for this model yet; treat
-> everything below as subject to change before it ships. **The Go Client SDK has not started this
-> migration at all** — its `v2` branch is currently identical to `main`. If you're building against
-> the current 1.3.x platform, see [Waypoint Missions](/docs/sdk/client/waypoint-missions) and the
-> Mission Autonomy docs instead — this page is a preview, not a guide for today's integrations.
-
-Applications and Skills are how you build multi-step, autonomous behavior on Zequent without writing a state machine by hand for every workflow. If direct commands (takeoff, go-to, open cover) are the platform's verbs, Skills are how you compose them into sentences — and Applications are how you package, version, and deploy those sentences. This model replaces the 1.3.x Mission/Task model for defining automated behavior. Scheduler CRUD itself (`createScheduler`/`getScheduler`/etc.) keeps the same method shapes, but confirmed directly against the protocol and both SDKs, what a schedule *points at* changes: `SchedulerDTO`'s `missionId`/`taskId` fields are retired (`reserved` in the 2.0.x proto, not just deprecated) and replaced with a direct capability-execution target — an asset plus either a single command or an Application+Skill pair, along with execution parameters and an auto-start flag. A schedule now fires a Skill execution directly instead of triggering a Mission/Task. The Java and Python client SDKs disagree on field names for this: Java's `SchedulerDTO` uses `assetSn`/`commandId`/`capabilityPackageId`/`capabilityId`/`executionParametersJson` (a JSON string) while Python's uses `asset_sn`/`command_id`/`application_id`/`skill_id`/`execution_parameters` (a dict) — same concept, different names, not yet reconciled between the two branches.
+Applications and Skills are how you build multi-step, autonomous behavior on Zequent without writing a state machine by hand for every workflow. If direct commands (takeoff, go-to, open cover) are the platform's verbs, Skills are how you compose them into sentences — and Applications are how you package, version, and deploy those sentences. This model replaces the 1.3.x Mission/Task model for defining automated behavior. Scheduler CRUD itself (`createScheduler`/`getScheduler`/etc.) keeps the same method shapes, but confirmed directly against the protocol and both SDKs, what a schedule *points at* changes: `SchedulerDTO`'s `missionId`/`taskId` fields are retired (`reserved` in the 2.0.x proto, not just deprecated) and replaced with a direct capability-execution target — an asset plus either a single command or an Application+Skill pair, along with execution parameters and an auto-start flag. A schedule now fires a Skill execution directly instead of triggering a Mission/Task. The Java and Python client SDKs disagree on field names for this: Java's `SchedulerDTO` uses `assetSn`/`commandId`/`capabilityPackageId`/`capabilityId`/`executionParametersJson` (a JSON string) while Python's uses `asset_sn`/`command_id`/`application_id`/`skill_id`/`execution_parameters` (a dict) — same concept, different names, not yet reconciled between the two SDKs.
 
 ## Concepts
 
@@ -79,7 +70,7 @@ Leave the asset blank on a trigger to watch any registered asset. A trigger does
 
 ## Running a Skill from your application
 
-Once an Application is deployed, trigger one of its Skills against an asset from your own code using the Client SDK's Mission Autonomy client. The old Mission/Task methods (`createMission`, `createTask`, `startTask`, ...) still exist on this interface for now, but only as `@Deprecated` stubs that fail immediately — the platform doesn't silently ignore them, and they don't work in either model at this point.
+Once an Application is deployed, trigger one of its Skills against an asset from your own code using the Client SDK's Mission Autonomy client (Java, Python or Go). The 1.3 Mission/Task methods are gone: in Java they remain only as `@Deprecated` stubs that fail immediately (`createMission`, `createTask`, `startTask`, ...), Python raises `LegacyOperationRemovedError` for them, and the Go SDK no longer has them.
 
 ### Java
 
@@ -100,7 +91,7 @@ var skillRun = SkillExecutionCommand.packaged(
         "YOUR_DEVICE_SN",
         "perimeter-patrol-app",  // applicationId
         "patrol-and-report",     // skillId
-        null,                    // applicationVersion — latest deployed if null
+        null,                    // applicationVersion — null runs the version promoted to Production (the newest if none is)
         parameters,
         null);
 
@@ -127,22 +118,41 @@ execution = await client.mission_autonomy.execute_simple(
 )
 ```
 
-Java and Python's Beta surfaces are not perfectly in sync with each other yet — Python currently
-exposes a couple of extra methods (`create_application_execution`, `get_application_environments`,
-`promote_application_version`) that don't have a Java equivalent on the branch yet.
+### Go
+
+```go
+import (
+    "github.com/Zequent/zqnt-client-sdk-go/v2/missionautonomy"
+    "google.golang.org/protobuf/types/known/structpb"
+)
+
+ma := missionautonomy.New(conn)
+params, _ := structpb.NewStruct(map[string]any{"altitude": 60})
+
+// Run a named Skill from a deployed Application ("" as the version runs the version promoted to
+// Production, or the newest if none is; "" as the idempotency key sends none):
+execution, err := ma.ExecuteApplication(ctx, "YOUR_DEVICE_SN", "perimeter-patrol-app", "patrol-and-report", "", params, "")
+
+// Run a single ad-hoc command through the execution engine:
+execution, err = ma.ExecuteSimple(ctx, "YOUR_DEVICE_SN", "flight.takeoff", params, "")
+```
+
+All three SDKs can also create an execution without starting it. Only the Python SDK can read an
+Application's environments and promote a version from code (`get_application_environments`,
+`promote_application_version`); with Java and Go, promote in the Admin Console.
 
 ## Tracking and controlling an execution
 
 Every execution has a lifecycle: created → running → (paused) → completed / failed / cancelled.
 
-| Operation | Java | Python |
-| --- | --- | --- |
-| Get current status | `client.missionAutonomy().getSkillExecution(id)` | `client.mission_autonomy.get_skill_execution(id)` |
-| List executions | `client.missionAutonomy().listSkillExecutions(query)` | `client.mission_autonomy.list_skill_executions(...)` |
-| Pause | `client.missionAutonomy().pauseSkillExecution(...)` | `client.mission_autonomy.pause_skill_execution(id)` |
-| Resume | `client.missionAutonomy().resumeSkillExecution(...)` | `client.mission_autonomy.resume_skill_execution(id)` |
-| Cancel | `client.missionAutonomy().cancelSkillExecution(...)` | `client.mission_autonomy.cancel_skill_execution(id)` |
-| Signal (advance an Event Wait / Human Approval node) | `client.missionAutonomy().signalSkillExecution(...)` | `client.mission_autonomy.signal_skill_execution(...)` |
+| Operation | Java | Python | Go |
+| --- | --- | --- | --- |
+| Get current status | `client.missionAutonomy().getSkillExecution(id)` | `client.mission_autonomy.get_skill_execution(id)` | `ma.GetSkillExecution(ctx, id)` |
+| List executions | `client.missionAutonomy().listSkillExecutions(query)` | `client.mission_autonomy.list_skill_executions(...)` | `ma.ListSkillExecutions(ctx, query)` |
+| Pause | `client.missionAutonomy().pauseSkillExecution(...)` | `client.mission_autonomy.pause_skill_execution(id)` | `ma.PauseSkillExecution(ctx, id)` |
+| Resume | `client.missionAutonomy().resumeSkillExecution(...)` | `client.mission_autonomy.resume_skill_execution(id)` | `ma.ResumeSkillExecution(ctx, id)` |
+| Cancel | `client.missionAutonomy().cancelSkillExecution(...)` | `client.mission_autonomy.cancel_skill_execution(id)` | `ma.CancelSkillExecution(ctx, id)` |
+| Signal (advance an Event Wait / Human Approval node) | `client.missionAutonomy().signalSkillExecution(...)` | `client.mission_autonomy.signal_skill_execution(...)` | `ma.SignalSkillExecution(ctx, id, nodeID, eventType, data, approved)` |
 
 Progress updates (node started/completed/failed, pause/resume, completion) are also streamed through the Live Data service, so a long-running Skill's progress can be shown live in your own UI the same way telemetry is.
 
@@ -183,15 +193,16 @@ Most integrations only need the read/execute side (running Skills, checking thei
 
 ## See also
 
-- [No-fly zones and safe returns](airspace-safety-2.0.md) — how every flight is checked against your
+- [No-fly zones and safe returns](airspace-safety.md) — how every flight is checked against your
   no-fly zones, and the platform's low-battery return
-- [Technical configuration and dispatch rules](configuration-2.0.md) — run settings per organization or
+- [Technical configuration and dispatch rules](configuration.md) — run settings per organization or
   site, and the rules that choose an asset for a run that names none
-- [Java Client SDK Quickstart](/docs/sdk/client/quickstart)
-- [Python Client SDK Quickstart](/docs/sdk/client/quickstart-python)
-- [Client SDK — Mission Autonomy Reference (Java, Beta)](../api-reference/client-sdk-mission-autonomy-2.0.md)
-- [Client SDK — Mission Autonomy Reference (Python, Beta)](../api-reference/client-sdk-mission-autonomy-python-2.0.md)
-- [Edge SDK — Connector Reference (Java, Beta)](../api-reference/edge-sdk-connector-reference-2.0.md) — the
+- [Java Client SDK Quickstart](../client-sdk/QUICKSTART.md)
+- [Python Client SDK Quickstart](../client-sdk/QUICKSTART_PYTHON.md)
+- [Go Client SDK Quickstart](../client-sdk/QUICKSTART_GO.md)
+- [Client SDK — Mission Autonomy Reference (Java)](../api-reference/client-sdk-mission-autonomy.md)
+- [Client SDK — Mission Autonomy Reference (Python)](../api-reference/client-sdk-mission-autonomy-python.md)
+- [Edge SDK — Connector Reference (Java)](../api-reference/edge-sdk-connector-reference.md) — the
   Skill Registry self-reporting API (`observeSkillContract` and friends) an edge adapter uses to push its
   own command contracts, beyond what it already reports live via `getCapabilities`
-- [Edge SDK — Connector Reference (Python, Beta)](../api-reference/edge-sdk-python-connector-reference-2.0.md)
+- [Edge SDK — Connector Reference (Python)](../api-reference/edge-sdk-python-connector-reference.md)

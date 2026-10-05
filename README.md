@@ -5,18 +5,26 @@ Zequent is a platform for connecting, monitoring, and controlling remote assets 
 This public documentation is for external developers and integration teams. It focuses on:
 
 - using the Client SDKs from customer applications
-- creating missions and waypoint tasks and running them on connected assets
+- building Applications and Skills — multi-step automations — and running them on connected assets
 - building custom edge adapters with the Edge SDKs
 - running Zequent platform services from published container images
 - deploying supported edge adapter images
+
+> **Versions.** This documentation covers Zequent **2.0.x**, the current long-term-support (LTS) line.
+> **1.3.x has reached end of life**: it keeps running, but receives no fixes or support. Its
+> documentation is kept unchanged in the files ending in `-1.3.md` (for example the
+> [1.3 Java Client SDK Quickstart](client-sdk/QUICKSTART-1.3.md)). To upgrade, see
+> [Upgrading from 1.3](concepts/migration-guide.md).
 
 ## Start Here
 
 | Goal | Documentation |
 | --- | --- |
 | Understand Assets vs SubAssets, and how telemetry identifies its source | [Assets & Sub-Assets](concepts/assets-and-sub-assets.md) |
-| Keep aircraft out of no-fly zones and bring them home safely on low battery (2.0) | [No-fly zones and safe returns](concepts/airspace-safety-2.0.md) |
-| Tune platform settings per organization or site, and decide which asset responds (2.0) | [Technical configuration and dispatch rules](concepts/configuration-2.0.md) |
+| Build multi-step automations that the platform runs for you | [Applications & Skills](concepts/applications-and-skills.md) |
+| Keep aircraft out of no-fly zones and bring them home safely on low battery | [No-fly zones and safe returns](concepts/airspace-safety.md) |
+| Tune platform settings per organization or site, and decide which asset responds | [Technical configuration and dispatch rules](concepts/configuration.md) |
+| Upgrade an existing 1.3.x installation or integration | [Upgrading from 1.3](concepts/migration-guide.md) |
 | Use Zequent from a Java application | [Java Client SDK Quickstart](client-sdk/QUICKSTART.md) |
 | Fly a waypoint mission from your own application | [Waypoint Missions](client-sdk/WAYPOINT_MISSIONS.md) |
 | Start, stop and play back live video from an asset's camera | [Live Video Streams](client-sdk/LIVE_VIDEO.md) |
@@ -34,14 +42,14 @@ This public documentation is for external developers and integration teams. It f
 ## What You Can Build
 
 - **Direct control** — takeoff, go-to, return-to-home, dock open/close, camera and gimbal control, and live joystick-style manual control, called directly from your application via the Client SDK.
-- **Missions & Tasks** — define a mission, attach waypoint tasks to it, and start, pause, resume or stop them from your own code. See [Waypoint Missions](client-sdk/WAYPOINT_MISSIONS.md).
+- **Applications & Skills** — compose commands, waits, conditions, human approvals and branches into versioned Skills and Applications. The platform runs them, picks the asset that responds and keeps flights out of no-fly zones; start them from your own code, on a schedule or from an event trigger. See [Applications & Skills](concepts/applications-and-skills.md).
 - **Live telemetry & detections** — subscribe to real-time position, battery, and sensor telemetry, and AI detection results, streamed from every connected asset.
 - **Live video** — start/stop live video streams from a connected asset's camera and view them in the Admin Console or your own player. See [Live Video Streams](client-sdk/LIVE_VIDEO.md).
 - **Custom hardware integrations** — build a new edge adapter with the Edge SDK for any device that isn't already supported, using the same command/telemetry contract every built-in adapter uses.
 
 ## Customer Applications
 
-Customer applications normally use the Client SDK and connect to the platform service endpoints exposed by your deployment.
+Customer applications normally use the Client SDK and connect to the platform service endpoints exposed by your deployment. Every call carries a client credential (`ZQNT_CLIENT_TOKEN`), created in the Admin Console under **Manage → Access & Integrations → Credentials** — see [Client SDK Configuration](client-sdk/CONFIGURATION.md).
 
 | SDK | Main docs |
 | --- | --- |
@@ -55,14 +63,14 @@ Zequent platform services are run from published container images. Use versioned
 
 | Component | Image | Default port | Customer-facing purpose |
 | --- | --- | ---: | --- |
-| Connector Service | `ghcr.io/zequent/connector-service:1.3.2` | `8010` | System of record: assets, organizations, missions and tasks, schedulers, technical config, telemetry persistence |
-| Remote Control Service | `ghcr.io/zequent/remote-control-service:1.3.2` | `8002` | Direct asset commands such as takeoff, go-to, return-to-home, dock, camera, and manual-control commands |
-| Live Data Service | `ghcr.io/zequent/live-data-service:1.3.2` | `8003` | Live telemetry, detections, and task-progress notification streams |
-| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:1.3.2` | `8004` | Executes mission tasks and manages schedulers |
-| Admin Console API | `ghcr.io/zequent/admin-console-service:1.3.2` | `8005` | HTTP/WebSocket API for the Admin Console |
-| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v1.3.3` | `3001` | Browser UI: asset monitoring, live streams, manual control, and mission planning |
+| Connector Service | `ghcr.io/zequent/connector-service:2.0.0` | `8010` | System of record: assets, organizations, users, Applications and executions, schedulers, technical config, no-fly zones, telemetry persistence |
+| Remote Control Service | `ghcr.io/zequent/remote-control-service:2.0.0` | `8002` | Direct asset commands such as takeoff, go-to, return-to-home, dock, camera, and manual-control commands |
+| Live Data Service | `ghcr.io/zequent/live-data-service:2.0.0` | `8003` | Live telemetry, detections, and notification streams |
+| Mission Autonomy Service | `ghcr.io/zequent/mission-autonomy-service:2.0.0` | `8004` | Runs Skill and Application executions: picks the asset that responds, plans routes around no-fly zones, returns aircraft home on low battery, handles human approvals; manages schedulers |
+| Admin Console API | `ghcr.io/zequent/admin-console-service:2.0.0` | `8005` | HTTP/WebSocket API for the Admin Console: sign-in (including SSO), licensing, live streams, user management |
+| Admin Console UI | `ghcr.io/zequent/zqnt-platform-console:v2.0.0` | `3001` | Browser UI: monitoring, remote and manual control, live video, the Skill and Application editors, schedules and event triggers |
 
-The Admin Console UI's image is `zqnt-platform-console`, not `zqnt-admin-console-dashboard` — that name is not a real published package, and pulling it fails. Its version line (`vX.Y.Z`) is independent of the core services' `1.3.x` line.
+The Admin Console UI's image is `zqnt-platform-console`, not `zqnt-admin-console-dashboard` — that name is not a real published package, and pulling it fails. Its tags carry a `v` prefix (`v2.0.0`), unlike the core service images (`2.0.0`).
 
 Platform services also require **Postgres (TimescaleDB)** and **Redis** — see [docker-compose.customer.yml](docker-compose.customer.yml). A runnable copy of the same file also lives at `core/docker-compose.customer.yml`, alongside `docker-compose.local.yml`/`docker-compose.env.yml`, for working directly in the monorepo — keep both copies in sync if you edit one.
 
@@ -72,18 +80,18 @@ Use these adapter images when you want a ready-made integration. Use the Edge SD
 
 | Adapter | Image | Status | Notes |
 | --- | --- | --- | --- |
-| DJI | `ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0` | Available | DJI dock/drone integration. [Deployment guide](edge-sdk/edge-sdk-dji-adapter-deployment.md) |
-| MAVLink | `ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0` | Available | PX4/ArduPilot vehicles via MAVSDK. [Deployment guide](edge-sdk/edge-sdk-mavlink-adapter-deployment.md) |
-| Sapient | `ghcr.io/zequent/zqnt-adapter-sapient:1.3.0` | Available | Bridges TCP SAPIENT edge nodes to gRPC. [Deployment guide](edge-sdk/edge-sdk-sapient-adapter-deployment.md) |
-| RNS | No versioned release yet (`latest` only) | Source only | Early-stage — implements asset registration and vendor custom commands only. [Deployment guide](edge-sdk/edge-sdk-rns-adapter-deployment.md) |
-| Betaflight | No published image yet | Source only | Serial/USB flight-controller integration; no container packaging yet. [Deployment guide](edge-sdk/edge-sdk-betaflight-adapter-deployment.md) |
-| AI Adapter | No published image yet | Early access | RTMP/RTSP video → YOLO detection → georeferenced results, with optional gimbal re-aim. Uses the standard Edge SDK adapter pattern. [Deployment guide](edge-sdk/edge-sdk-ai-adapter-deployment.md) |
+| DJI | `ghcr.io/zequent/zqnt-edge-adapter-dji:2.0.0` | Available | DJI dock/drone integration. [Deployment guide](edge-sdk/edge-sdk-dji-adapter-deployment.md) |
+| MAVLink | `ghcr.io/zequent/zqnt-adapter-mavlink:2.0.0` | Available | PX4/ArduPilot vehicles via MAVSDK. [Deployment guide](edge-sdk/edge-sdk-mavlink-adapter-deployment.md) |
+| Sapient | `ghcr.io/zequent/zqnt-adapter-sapient:2.0.0` | Available | Bridges TCP SAPIENT edge nodes to gRPC. [Deployment guide](edge-sdk/edge-sdk-sapient-adapter-deployment.md) |
+| RNS | `ghcr.io/zequent/zqnt-adapter-rns:2.0.0` | Available | Early-stage — implements asset registration and vendor custom commands only. [Deployment guide](edge-sdk/edge-sdk-rns-adapter-deployment.md) |
+| Betaflight | `ghcr.io/zequent/zqnt-adapter-betaflight:2.0.0` | Available | Serial/USB flight-controller integration. [Deployment guide](edge-sdk/edge-sdk-betaflight-adapter-deployment.md) |
+| AI Adapter | `ghcr.io/zequent/zqnt-adapter-ai:2.0.0` | Available | RTMP/RTSP video → YOLO detection → georeferenced results, with optional gimbal re-aim. Uses the standard Edge SDK adapter pattern. [Deployment guide](edge-sdk/edge-sdk-ai-adapter-deployment.md) |
 
-The DJI image is `zqnt-edge-adapter-dji`, not `dji-adapter` — that older package name still exists but is stale/abandoned (only a floating `latest`, no versioned releases). "Source only" / "Early access" adapters are real, working code you can run today with `uv run` — they just don't have a versioned container image yet. Build your own image from the adapter's own `Dockerfile` where one exists, or contact Zequent about early access to a build.
+The DJI image is `zqnt-edge-adapter-dji`, not `dji-adapter` — that older package name still exists but is stale/abandoned (only a floating `latest`, no versioned releases).
 
 ### Load-test / fleet simulator
 
-`ghcr.io/zequent/zqnt-simulator:1.3.3` — a Go tool that simulates a fleet of edge adapters against
+`ghcr.io/zequent/zqnt-simulator:2.0.0` — a Go tool that simulates a fleet of edge adapters against
 the live stack, for load-testing the Live Data gRPC telemetry ingest path and exercising
 remote-control/admin-console fleet flows without real hardware. Optional, enabled via the
 `simulator` Compose profile — not part of a normal customer deployment. See the repo's own
@@ -96,7 +104,7 @@ Container deployments use one deployment-local `.env` file referenced by [docker
 ```yaml
 services:
   connector-service:
-    image: ghcr.io/zequent/connector-service:1.3.2
+    image: ghcr.io/zequent/connector-service:2.0.0
     env_file:
       - .env
 ```
@@ -119,7 +127,7 @@ docker compose -f docker-compose.customer.yml --profile edge-dji up -d
 
 See [Client SDK Configuration](client-sdk/CONFIGURATION.md) for the full `.env` reference, including the required Postgres/Redis and licensing variables.
 
-### Keys and credentials to create before the first start (and before upgrading to 2.0)
+### Keys and credentials to create before the first start (and when upgrading from 1.3)
 
 1. **Database and Redis passwords** — `POSTGRES_PASSWORD`/`DATABASE_PASSWORD` (an existing volume keeps the password it was created with) and `REDIS_PASSWORD`.
 2. **User-token key pair** — `AUTH_PRIVATE_KEY`/`AUTH_PUBLIC_KEY`, plus `EXPORT_SIGNING_*` and `EXPORT_PLATFORM_KEK`.
@@ -128,13 +136,13 @@ See [Client SDK Configuration](client-sdk/CONFIGURATION.md) for the full `.env` 
 5. **Stream-auth hook secret** — `LIVE_STREAM_AUTH_HOOK_SECRET`, the same value in your media server's `authHTTPAddress` (only with a media server that authenticates).
 6. **Stream-key pepper** — `LIVE_STREAM_KEYS_PEPPER`, optional, set once and never changed.
 
-`LICENSING_PUBLIC_KEY` is no longer needed on 2.0: the services trust the Zequent license hub's key compiled into them.
+`LICENSING_PUBLIC_KEY` (needed on 1.3) is no longer needed: the services trust the Zequent license hub's key compiled into them.
 
 ## Licensing
 
 Every platform service enforces an activated license before it will perform protected operations — a fresh deployment with no license activated will reject most requests. Licenses are organization- and seat-based: one license covers one organization, and each platform user you create consumes one of that organization's seats.
 
-1. Configure the installation once: a `LICENSING_INSTALLATION_ID` generated once and `EXPORT_PLATFORM_KEK` (the license hub's public key is compiled into the 2.0 services; 1.3.x images still take it from the installation bundle as `LICENSING_PUBLIC_KEY`) (see [Client SDK Configuration](client-sdk/CONFIGURATION.md)). The platform may start with no licensed organization; the `system_admin` can still sign in.
+1. Configure the installation once: a `LICENSING_INSTALLATION_ID` generated once and `EXPORT_PLATFORM_KEK` (the license hub's public key is compiled into the services) (see [Client SDK Configuration](client-sdk/CONFIGURATION.md)). The platform may start with no licensed organization; the `system_admin` can still sign in.
 2. Zequent issues a license for each of your organizations, by name. In the Admin Console, as `system_admin`: **Organizations → Create from license**, then paste the license key or drop the organization's `.zqnt` file. The organization is created with the id and name the license names, and its license is active immediately — no restart. For an organization that already exists, use **Activate license** on it (an organization admin can do this for their own organization on the License screen).
 3. Services automatically refresh every organization's license lease afterward, across restarts — no further manual steps.
 
@@ -151,7 +159,7 @@ The Admin Console is split into an API image and a UI image.
 | Admin Console UI | `http://localhost:3001` |
 | Admin Console API | `http://localhost:8005` |
 
-The Admin Console provides browser workflows for asset monitoring, telemetry, mission planning, remote control, live streams, adapter management, licensing, and service health.
+The Admin Console provides browser workflows for asset monitoring, telemetry, remote and manual control, live streams, building Skills and Applications, schedules and event triggers, adapter management, users and licensing, and service health.
 
 
 ## SDK Requirements
@@ -160,13 +168,13 @@ The Admin Console provides browser workflows for asset monitoring, telemetry, mi
 | --- | --- |
 | Java Client SDK / Java Edge SDK | Java 25, Maven 3.9+ recommended, Quarkus 3.x for Quarkus applications |
 | Python Client SDK / Python Edge SDK | Python 3.12+, `uv` recommended, `grpc.aio` |
-| Go Client SDK / Go Edge SDK | Go 1.26+ (client) / Go 1.24+ (edge). Both modules are private (`github.com/Zequent/zqnt-client-sdk-go`, `github.com/Zequent/zqnt-edge-sdk-go`) — see each quickstart's `go env -w GONOSUMDB`/`GONOPROXY` step. The Go Edge SDK is on an older API surface than the Java/Python Edge SDKs — see its [overview](edge-sdk/edge-sdk-go-overview.md). |
+| Go Client SDK / Go Edge SDK | Go 1.26+ (client) / Go 1.25+ (edge). Both modules are private and versioned as `/v2` (`github.com/Zequent/zqnt-client-sdk-go/v2`, `github.com/Zequent/zqnt-edge-sdk-go/v2`) — without `/v2` in the path Go installs the 1.3 line. See each quickstart's `go env -w GONOSUMDB`/`GONOPROXY` step. The Go Edge SDK is on an older API surface than the Java/Python Edge SDKs — see its [overview](edge-sdk/edge-sdk-go-overview.md). |
 
 ## Package Access
 
 If you consume private Zequent packages, configure access to the relevant package registry before building your customer application or adapter.
 
-For Maven packages, configure your `~/.m2/settings.xml` with a token that has package read access. For Python packages, configure `uv`/`pip` with a token that has read access to the package index or private Git repository you were given access to.
+For Maven packages, configure your `~/.m2/settings.xml` with a token that has package read access. The Python SDKs are not published on PyPI yet: install them from their private Git repositories at the release tag (`v2.0.0`), with a token that has read access to them.
 
 ## Production Notes
 

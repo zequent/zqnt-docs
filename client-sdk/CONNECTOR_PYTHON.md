@@ -58,7 +58,7 @@ same for every method group:
 - **Scheduler methods** (`get_scheduler`, `create_scheduler`, ...) never raise for a business
   error — they return a `SchedulerResponse` with `.success`/`.error` populated instead, the same
   convention `client.mission_autonomy` uses throughout (see
-  [Mission Autonomy — Error handling](MISSION_AUTONOMY_PYTHON.md#error-handling)). Only a transport
+  [Mission Autonomy — Error handling](MISSION_AUTONOMY_PYTHON-1.3.md#error-handling)). Only a transport
   failure raises, and only as `grpc.aio.AioRpcError`.
 
 ```python

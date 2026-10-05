@@ -276,7 +276,7 @@ the full parameter contract and progress tracking.
 ### Mission Autonomy — missions, tasks & scheduling
 
 `client.missionAutonomy()` creates missions/tasks/schedulers (route-optimized — see the
-[reference](../api-reference/client-sdk-mission-autonomy.md) for why this differs from Connector's
+[reference](../api-reference/client-sdk-mission-autonomy-1.3.md) for why this differs from Connector's
 copies of the same methods) and is the only interface that can start, stop, pause, or resume a task:
 
 ```java

@@ -98,7 +98,7 @@ back to it. See [Live Data — Notifications](../edge-sdk/edge-sdk-python-live-d
 | `reboot_asset(ctx)` | Reboot the main asset (dock) |
 | `boot_up_sub_asset(ctx)` | Power on the sub-asset (drone) — two separate methods, not one `boot_sub_asset(value: bool)` |
 | `boot_down_sub_asset(ctx)` | Power off the sub-asset |
-| `register_asset(ctx, asset: Asset)` | **Not the same as `ConnectorClient.register_asset`.** This is the platform notifying your adapter that registration already happened — see [Connector reference](edge-sdk-python-connector-reference.md#assets) for the outbound call |
+| `register_asset(ctx, asset: Asset)` | **Not the same as `ConnectorClient.register_asset`.** This is the platform notifying your adapter that registration already happened — see [Connector reference](edge-sdk-python-connector-reference-1.3.md#assets) for the outbound call |
 | `deregister_asset(ctx)` | Same distinction — notifies the adapter the asset was removed from the platform |
 
 ## Debug and maintenance
@@ -117,7 +117,7 @@ back to it. See [Live Data — Notifications](../edge-sdk/edge-sdk-python-live-d
 | `stop_task(ctx, task_id: str)` | Bare `task_id` string |
 
 No confirmed real Python adapter resolves `task_id` through `ConnectorClient.get_task` — see
-[Connector reference — Missions and tasks](edge-sdk-python-connector-reference.md#missions-and-tasks) and
+[Connector reference — Missions and tasks](edge-sdk-python-connector-reference-1.3.md#missions-and-tasks) and
 [Mission Autonomy — Best practices](../edge-sdk/edge-sdk-python-mission-autonomy.md#best-practices)
 for what SAPIENT and MAVLink actually do with these.
 

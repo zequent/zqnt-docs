@@ -1,62 +1,56 @@
-# Edge SDK (Python) — Connector API Reference
+# Edge SDK (Python) — Connector API Reference (2.0.x Beta)
 
-> **Beta preview:** an unmerged 2.0.x branch adds Skill Registry self-reporting to this client and
-> removes `get_mission`/`get_task`/`get_task_by_flight_id` outright — see the
-> [2.0.x Beta reference](edge-sdk-python-connector-reference-2.0.md) if you want to see where this
-> is headed. Not on `main`/the current 1.3.x release yet.
+> **Beta — not yet released.** Everything on this page describes real, working code — confirmed
+> directly against source — but it lives on the unmerged `refactoring/refactoring-edge-sdk-v2`
+> branch, not on `main`/the current 1.3.x release. There is no released version number for this
+> model yet; treat everything below as subject to change before it ships. If you're building
+> against the current 1.3.x platform, see the
+> [1.3.x Connector reference](edge-sdk-python-connector-reference-1.3.md) instead. For the conceptual
+> introduction to this model, see [Applications & Skills](../concepts/applications-and-skills.md).
 
-Exhaustive method reference for `ConnectorClient`. For a narrative introduction and worked examples,
-see the [Connector guide](../edge-sdk/edge-sdk-python-connector.md). For Java, see
-[edge-sdk-adapter.md](edge-sdk-adapter-reference.md) / [edge-sdk-connector.md](edge-sdk-connector-reference.md).
+Exhaustive method reference for `ConnectorClient` on this branch.
 
-`ConnectorClient(host, port=50053, call_timeout=30.0, max_retries=3)` — `port` defaults to `50053`,
-which is **not** the Connector Service's real platform port (`8010`, per the
-[image table](../README.md#platform-service-images)); always pass `port` explicitly rather than
-relying on the constructor default.
+## What actually changed vs. 1.3.x
 
-## Lifecycle
+- **`get_mission`/`get_task`/`get_task_by_flight_id` are gone — not deprecated, just removed.**
+  There's no backend RPC left for any of them; the methods don't exist on this branch's
+  `ConnectorClient` at all (this SDK doesn't keep the stub-that-raises pattern the client SDK's
+  Python `MissionAutonomyClient` uses for its own retired Mission/Task methods — it just deletes
+  them outright, matching the Java Edge SDK's clean-removal approach). The 1.3.x reference already
+  found [no confirmed real-adapter usage](edge-sdk-python-connector-reference-1.3.md#missions-and-tasks)
+  of any of the three, so this is unlikely to affect a real adapter migrating forward.
+- **New: Skill Registry self-reporting** — four methods, working with the raw generated
+  `SkillContractProtoDTO` rather than a plain-Python model (the contract shape is already large and
+  typed; wrapping it a second time buys little for what's normally a write-once-per-command call).
+- Assets and lifecycle methods are unchanged. `ConnectorClient` has no Scheduler methods on this
+  branch or on 1.3.x — that's `MissionAutonomyClient`'s job, and it *is* affected by a
+  cross-cutting `SchedulerDTO` reshape; see
+  [Mission Autonomy — Scheduler lookup](../edge-sdk/edge-sdk-python-mission-autonomy.md#scheduler-lookup).
 
-| Method | Returns | Purpose |
-| --- | --- | --- |
-| `connect()` | `None` | Open the gRPC channel and initialize the stub |
-| `close()` | `None` | Close the channel and release resources |
+## Assets, lifecycle (unchanged from 1.3.x)
 
-## Assets
+See the [1.3.x reference](edge-sdk-python-connector-reference-1.3.md#assets) for these.
 
-| Method | Returns | Purpose |
-| --- | --- | --- |
-| `get_asset_by_sn(sn)` | `Asset \| None` | Look up an asset by serial number; `None` if not found |
-| `register_asset(asset)` | `str \| None` | Register a new asset; returns the asset id, or `None` if the platform rejected it |
-| `watch_assets()` | `AsyncIterator[list[Asset]]` | Subscribe to the platform's asset-monitoring stream — yields a snapshot list on every server push; runs until cancelled or the server closes it |
-
-## Missions and tasks
-
-Read-only lookups — there is no `create`/`update`/`delete` on `ConnectorClient` for either. **No
-confirmed real-adapter usage**: checked against all five real Python adapters (MAVLink, Sapient, AI,
-Betaflight, RNS), none call these three methods — every real adapter drives its mission/task work
-through `EdgeAdapter.send_custom_command`/`prepare_task`/`start_task` instead. See the
-[guide](../edge-sdk/edge-sdk-python-connector.md) for the full explanation.
+## Skill Registry — new in 2.0.x
 
 | Method | Returns | Purpose |
 | --- | --- | --- |
-| `get_mission(mission_id, sn="")` | `Mission \| None` | Fetch a mission by ID |
-| `get_task(task_id, sn="")` | `Task \| None` | Fetch a task by ID |
-| `get_task_by_flight_id(flight_id, sn="")` | `Task \| None` | Fetch a task by its external flight ID |
-
-`Mission`/`Task` field reference: [Models Reference — Tasks and missions](edge-sdk-python-models.md#tasks-and-missions).
+| `observe_skill_contract(contract)` | `SkillContractProtoDTO \| None` | Upsert `contract` — new for a never-seen `(command_id, schema_version)` pair, or refreshes content/last-seen for one already known |
+| `list_skill_contracts(status=None, command_id=None)` | `list[SkillContractProtoDTO]` | List the registry, optionally filtered by `status` (a `SkillContractStatus` enum value). When `command_id` is set, returns that one command's full version history instead — `status` is then ignored |
+| `set_skill_contract_status(contract_id, status)` | `SkillContractProtoDTO \| None` | Move a contract through its lifecycle: `ACTIVE` / `DRAFT` / `DEPRECATED` / `RETIRED` |
+| `set_skill_contract_permissions(contract_id, required_permissions)` | `SkillContractProtoDTO \| None` | Full replacement, not a merge. **Declarative only — nothing currently enforces this**, confirmed directly in this method's own docstring: forward-prep for a user-level identity/role system that doesn't exist on the platform yet |
 
 ## Error handling
 
-`get_asset_by_sn` and `register_asset` (and `get_mission`/`get_task`/`get_task_by_flight_id`) return
-`None` on a business-level failure (not found, validation) rather than raising. Transport-level
-failures (`UNAVAILABLE`, timeouts, ...) raise `grpc.aio.AioRpcError`.
+All four Skill Registry methods follow the same convention as the rest of this branch's
+`ConnectorClient`: a business-level failure (`resp.has_errors`) is logged and the method returns
+`None` (or `[]` for `list_skill_contracts`) rather than raising — unlike the client SDK's Beta
+`Application`/`SkillExecution` methods, which raise on failure. Transport-level failures still raise
+`grpc.aio.AioRpcError`, same as everywhere else in this SDK.
 
-## Retry and timeout behavior
+## See also
 
-Every call carries a per-call deadline (`call_timeout`, default 30.0s) and is retried automatically
-on `UNAVAILABLE`/`DEADLINE_EXCEEDED` — every other gRPC error propagates immediately, unretried:
-
-- Up to `max_retries` attempts (default 3, set in the constructor).
-- Exponential backoff starting at 0.5s, doubling each retry, capped at 10s.
-- Each call logs its transaction id (`tid`, a fresh UUID per call) so failures can be correlated
-  across services.
+- [Applications & Skills](../concepts/applications-and-skills.md) — narrative introduction
+- [Java 2.0.x reference](edge-sdk-connector-reference.md)
+- [1.3.x Connector reference](edge-sdk-python-connector-reference-1.3.md) — the current, shipped
+  interface

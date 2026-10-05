@@ -129,7 +129,7 @@ ma.ListSchedulers(ctx, taskID)   // taskID == "" lists every scheduler, unfilter
 
 See [Waypoint Missions](WAYPOINT_MISSIONS.md) for which of these actually flies an asset — the task
 lifecycle reaches the device only on adapters that implement it. Full reference, including which
-methods are route-optimized: [Mission Autonomy API Reference](../api-reference/client-sdk-mission-autonomy-go.md).
+methods are route-optimized: [Mission Autonomy API Reference](../api-reference/client-sdk-mission-autonomy-go-1.3.md).
 
 ### `connector` — assets, schedulers, policies, config
 

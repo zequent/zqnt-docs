@@ -2,7 +2,7 @@
 
 The `ConnectorService` interface gives an edge adapter access to the platform's asset registry over gRPC. It covers what an adapter itself needs — registering and updating its own asset(s), resolving and updating the task it's currently executing, looking up schedulers and organization info, and reporting which commands it supports. **Creating** mission/task records, and managing missions at all, stays a **Client SDK** (customer application) concern — see [Tasks](#tasks) below for the precise, code-verified boundary.
 
-Full method-by-method reference: [Connector API Reference](../api-reference/edge-sdk-connector-reference.md).
+Full method-by-method reference: [Connector API Reference](../api-reference/edge-sdk-connector-reference-1.3.md).
 
 ## Table of Contents
 
@@ -202,8 +202,8 @@ Return `CurrentCapabilities.empty(sn)` for an asset you do not recognise. See
 > **Beta preview — 2.0.x, not yet released.** An unmerged branch adds Skill Registry
 > self-reporting to this interface (beyond the live `getCapabilities` snapshot above) and removes
 > every Mission/Task method outright. See the
-> [2.0.x migration guide](../concepts/migration-guide-2.0.md#per-sdk-impact) for what replaces
-> them, or the [2.0.x reference](../api-reference/edge-sdk-connector-reference-2.0.md) for the exact
+> [2.0.x migration guide](../concepts/migration-guide.md#per-sdk-impact) for what replaces
+> them, or the [2.0.x reference](../api-reference/edge-sdk-connector-reference.md) for the exact
 > methods.
 
 ## Error Handling
@@ -297,5 +297,5 @@ public class AssetRegistration {
 
 ## See also
 
-- [Connector API Reference](../api-reference/edge-sdk-connector-reference.md) — every method, including which ones have confirmed real-adapter usage and which don't
+- [Connector API Reference](../api-reference/edge-sdk-connector-reference-1.3.md) — every method, including which ones have confirmed real-adapter usage and which don't
 - [Edge Adapter Reference — Task Execution](../api-reference/edge-sdk-adapter-reference.md#task-execution) — how `prepareTask`/`startTask`/`stopTask` reach your adapter in the first place

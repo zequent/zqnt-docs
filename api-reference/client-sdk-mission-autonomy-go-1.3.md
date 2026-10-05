@@ -1,14 +1,14 @@
 # Zequent Client SDK (Go) — Mission Autonomy API Reference
 
 Exhaustive method reference for `missionautonomy.New(conn)`. For a narrative introduction, see the
-[Quickstart](../client-sdk/QUICKSTART_GO.md#missionautonomy--missions-tasks--schedulers). For Java,
-see [client-sdk-mission-autonomy.md](client-sdk-mission-autonomy.md).
+[Quickstart](../client-sdk/QUICKSTART_GO-1.3.md#missionautonomy--missions-tasks--schedulers). For Java,
+see [client-sdk-mission-autonomy.md](client-sdk-mission-autonomy-1.3.md).
 
 Every method takes a `context.Context` first; most return `(*Result, error)` with no separate
 `HasErrors` flag — a non-nil `error` already carries the platform-side message.
 
 Unlike the Java/Python SDKs, **Go's `connector.New(conn)` has no Mission/Task methods at all** — see
-[Connector Reference](client-sdk-connector-go.md). There is no "which one should I call" question
+[Connector Reference](client-sdk-connector-go-1.3.md). There is no "which one should I call" question
 here: `missionautonomy` is the only place to create, read, update, or delete missions and tasks, and
 the only place to drive a task's lifecycle.
 
@@ -41,7 +41,7 @@ the only place to drive a task's lifecycle.
 | `ResumeTask(ctx, taskID)` | `*TaskProtoDTO` |
 
 These forward a bare task ID to the adapter — works only where the adapter implements the task
-lifecycle. See [Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use)
+lifecycle. See [Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS-1.3.md#which-path-does-your-adapter-use)
 for the per-adapter picture, including the command-based alternative that doesn't use this lifecycle
 at all.
 
@@ -52,5 +52,5 @@ at all.
 | `ListSchedulers(ctx, taskID string)` | `[]*SchedulerProtoDTO` | `taskID == ""` lists every scheduler, unfiltered; a non-empty `taskID` filters to that task's schedulers. Lives here rather than on `connector.Client` because `ConnectorService` has no `ListSchedulers` RPC at this contract version |
 
 All other scheduler CRUD (`Get`/`Create`/`Update`/`Delete`) lives on
-[`connector.New(conn)`](client-sdk-connector-go.md#schedulers) instead — identical wire messages,
+[`connector.New(conn)`](client-sdk-connector-go-1.3.md#schedulers) instead — identical wire messages,
 no optimization difference, since scheduler operations aren't route-related.

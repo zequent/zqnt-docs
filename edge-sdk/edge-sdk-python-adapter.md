@@ -92,7 +92,7 @@ class MyDroneAdapter(EdgeAdapter):
 
 `prepare_task`/`start_task`/`stop_task` each receive only a bare `task_id: str` — not a `Task`
 object. No confirmed real Python adapter resolves that ID through `ConnectorClient.get_task` (see
-the [Connector reference](../api-reference/edge-sdk-python-connector-reference.md#missions-and-tasks)):
+the [Connector reference](../api-reference/edge-sdk-python-connector-reference-1.3.md#missions-and-tasks)):
 SAPIENT implements all three, but `prepare_task` is a no-op acknowledgment and `start_task`/
 `stop_task` forward `task_id` straight into a SAPIENT protocol control command, with no Connector
 lookup. MAVLink implements none of the three — it accepts `mission.waypoint.execute` through

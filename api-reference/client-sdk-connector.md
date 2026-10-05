@@ -43,7 +43,7 @@ Mission methods create and read mission **records** — creating one does not fl
 How a flight is actually triggered depends on the adapter; see
 [Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use).
 
-> **Prefer [`missionAutonomy()`'s copies](client-sdk-mission-autonomy.md#missions) of `createMission`/`updateMission` for anything real.**
+> **Prefer [`missionAutonomy()`'s copies](client-sdk-mission-autonomy-1.3.md#missions) of `createMission`/`updateMission` for anything real.**
 > Confirmed against the backend: they run the mission through route optimization before writing the
 > exact same record these methods write directly, unoptimized. Use these only if you specifically
 > want the raw write.
@@ -75,7 +75,7 @@ Task methods create and read task **records** — creating a task does not start
 task methods (DJI, SAPIENT) — see
 [Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use).
 
-> **Prefer [`missionAutonomy()`'s copies](client-sdk-mission-autonomy.md#tasks) of `createTask`/`updateTask` for a waypoint task.**
+> **Prefer [`missionAutonomy()`'s copies](client-sdk-mission-autonomy-1.3.md#tasks) of `createTask`/`updateTask` for a waypoint task.**
 > Confirmed against the backend: for a task with a `missionId` and waypoints, they route the task
 > around that mission's no-fly zones before writing the exact same record these methods write
 > directly, unoptimized.

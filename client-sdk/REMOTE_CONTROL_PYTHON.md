@@ -26,7 +26,7 @@ else:
 
 `mission_id`/`task_id` on `TakeoffRequest`/`GoToRequest`/`ReturnToHomeRequest` are optional — set
 them to correlate the command with a mission/task you already created via
-[Mission Autonomy](MISSION_AUTONOMY_PYTHON.md).
+[Mission Autonomy](MISSION_AUTONOMY_PYTHON-1.3.md).
 
 ## Manual control
 
