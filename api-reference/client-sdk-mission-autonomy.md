@@ -1,19 +1,15 @@
-# Zequent Client SDK — Mission Autonomy API Reference (2.0.x Beta)
+# Zequent Client SDK — Mission Autonomy API Reference
 
-> **Beta — not yet released.** Everything on this page describes real, working code — confirmed
-> directly against source — but it lives on the unmerged `refactoring/refactoring-client-sdk-v2`
-> branch, not on `main`/the current 1.3.x release. There is no released version number for this
-> model yet; treat everything below as subject to change before it ships. If you're building
-> against the current 1.3.x platform, see the
-> [1.3.x Mission Autonomy reference](client-sdk-mission-autonomy-1.3.md) instead. For the conceptual
-> introduction to this model, see [Applications & Skills](../concepts/applications-and-skills.md).
+> For the conceptual introduction to this model, see
+> [Applications & Skills](../concepts/applications-and-skills.md). For 1.3.x (end of life), see the
+> [1.3 Mission Autonomy reference](client-sdk-mission-autonomy-1.3.md).
 
-Exhaustive method reference for `client.missionAutonomy()` on this branch. Mission/Task CRUD is
+Exhaustive method reference for `client.missionAutonomy()`. Mission/Task CRUD is
 **gone** — replaced by capability package (`Application`) administration and capability execution
 (`SkillExecution`). Scheduler CRUD *methods* keep the same shapes, but `SchedulerDTO` itself
 doesn't — see [Schedulers](#schedulers--same-methods-different-schedulerdto-shape) below.
 
-## What actually changed vs. 1.3.x
+## What changed from 1.3
 
 - `createMission`/`updateMission`/`getMission`/`deleteMission`/`uploadMissionNfzZones` and every
   Task method (`createTask`, `startTask`, `pauseTask`, ...) **still exist on the interface**, kept
@@ -21,8 +17,8 @@ doesn't — see [Schedulers](#schedulers--same-methods-different-schedulerdto-sh
   `CompletableFuture.failedFuture(new UnsupportedOperationException(...))` immediately. They don't
   reach the backend at all; there is no RPC left to call. Route optimization, NFZ expansion, and
   the whole task execution lifecycle described in the 1.3.x reference are gone along with them.
-- `deleteAllSchedulersByTaskId` was **removed outright** — it isn't on this branch's interface at
-  all (not even as a deprecated stub). The remaining Scheduler methods keep the same signatures,
+- `deleteAllSchedulersByTaskId` was **removed outright** — it isn't on the interface at all (not
+  even as a deprecated stub). The remaining Scheduler methods keep the same signatures,
   but what a schedule points at changes — see [Schedulers](#schedulers--same-methods-different-schedulerdto-shape)
   below.
 - Two new families replace what Mission/Task did: **Application** (capability package admin) and
@@ -41,10 +37,11 @@ doesn't — see [Schedulers](#schedulers--same-methods-different-schedulerdto-sh
 from the start node) — the save still goes through; check the response's warnings so an editor can
 surface what's incomplete without blocking a work-in-progress graph from being saved.
 
-There is **no** `getApplicationEnvironments`/`promoteApplicationVersion` on this branch's Java
-interface — the Python client SDK's branch has both (see the
-[Python 2.0.x reference](client-sdk-mission-autonomy-python.md#applications-capability-package-administration));
-this is a real, confirmed gap between the two languages' Beta surfaces, not a doc omission.
+There is **no** `getApplicationEnvironments`/`promoteApplicationVersion` on the Java interface — the
+Python Client SDK has both (see the
+[Python reference](client-sdk-mission-autonomy-python.md#applications-capability-package-administration));
+from Java, promote a version in the Admin Console. This is a real difference between the SDKs, not
+a doc omission.
 
 ## SkillExecution — create/execute
 
@@ -56,14 +53,12 @@ this is a real, confirmed gap between the two languages' Beta surfaces, not a do
 Both take the same `SkillExecutionCommand` record
 (`assetSn`, `spec`, `options`, `idempotencyKey`, `organizationId`, `locationId`, `theatreId`).
 
-`organizationId` is enforced, not just recorded, once the call carries a verified auth token: omit
-it and it's filled in from the caller's own organization; assert a *different* organization than
-the caller's own and the RPC fails with `PERMISSION_DENIED` instead of being honoured.
-`system_admin` callers are exempt and may assert any organization. This only applies once the
-gRPC port itself requires a token — every current service-to-service caller on it has none yet, so
-nothing changes for them today. Same rule filters `listSkillExecutions` below: a non-admin caller
-asking for everything is answered with only their own organization's executions, regardless of
-what `organizationId` they pass.
+`organizationId` is checked against the caller's credential, not just recorded: omit it and it's
+filled in from the credential's organization; assert a *different* organization and the RPC fails
+with `PERMISSION_DENIED` instead of being honoured. `system_admin` callers and platform services
+without an organization may assert any organization. Same rule filters `listSkillExecutions`
+below: a caller bound to an organization asking for everything is answered with only that
+organization's executions, regardless of what `organizationId` they pass.
 
 Build `spec` with one of its two static factories rather than by hand — both set
 `options.autoStart = true` by default:
@@ -71,8 +66,8 @@ Build `spec` with one of its two static factories rather than by hand — both s
 - `SkillExecutionCommand.simple(assetSn, commandId, CapabilityTarget, Struct parameters, idempotencyKey)`
   — a single ad-hoc command, run through the execution engine.
 - `SkillExecutionCommand.packaged(assetSn, applicationId, skillId, applicationVersion, Struct parameters, idempotencyKey)`
-  — a named Skill from a deployed Application. `applicationVersion` `null` resolves to the
-  environment's current deployed version.
+  — a named Skill from a deployed Application. `applicationVersion` `null` runs the version
+  promoted to Production, or the newest version if none is promoted.
 
 `idempotencyKey` defaults to a random UUID when `null`/blank on either factory — repeated requests
 with the same asset and key are guaranteed to return the original execution, not create a second
@@ -114,8 +109,7 @@ RPCs do not follow that convention.** They return the raw payload DTO
 carry a failure inline, so a failed RPC completes its `CompletableFuture` exceptionally with
 `MissionAutonomyClientException` (carrying `getErrorCode()`/`getTransactionId()`) instead.
 `Scheduler` methods are unaffected — they still return `SchedulerResponse` with the usual
-`isSuccess()`/`getError()` convention, since the CRUD methods themselves didn't change on this
-branch.
+`isSuccess()`/`getError()` convention, since the CRUD methods themselves didn't change.
 
 ## Schedulers — same methods, different `SchedulerDTO` shape
 
@@ -128,9 +122,9 @@ branch.
 | `createSchedulers(List<SchedulerDTO>)` | `SchedulerResponse` | Create several schedulers in one call |
 | `deleteSchedulers(List<String>)` | `SchedulerResponse` | Delete several schedulers in one call |
 
-`deleteAllSchedulersByTaskId` is gone — see [What actually changed](#what-actually-changed-vs-13x)
+`deleteAllSchedulersByTaskId` is gone — see [What changed from 1.3](#what-changed-from-13)
 above. The method signatures are otherwise identical to 1.3.x, but `SchedulerDTO` itself isn't:
-`missionId`/`taskId` are gone (`reserved` in the 2.0.x proto, not merely deprecated), replaced with
+`missionId`/`taskId` are gone (`reserved` in the 2.0 protocol, not merely deprecated), replaced with
 a direct capability-execution target —
 
 | Field | Type | Notes |
@@ -140,7 +134,7 @@ a direct capability-execution target —
 | `capabilityPackageId` / `capabilityId` | `String` | Set together (with `assetSn`) to schedule a named Skill from a deployed Application instead — the SDK's own field names for what the wire protocol calls `application_id`/`skill_id` |
 | `executionParametersJson` | `String` | Execution parameters as a JSON string, not a `Struct` |
 | `autoStart` | `Boolean` | Whether the resulting execution starts immediately |
-| `organizationId` | `String` | The organization the schedule belongs to; `null` = system-wide. This SDK does not send it yet, so a schedule created here is system-wide |
+| `organizationId` | `String` | The organization the schedule belongs to; `null` = system-wide. This SDK does not set it |
 
 `SchedulerDTO.validate()` enforces the mutual exclusivity: exactly one of (`commandId`) or
 (`capabilityPackageId` + `capabilityId`) must be set alongside `assetSn`, or it throws
@@ -156,6 +150,7 @@ Console); `SchedulerDTO` does not carry those firing fields.
 
 - [Applications & Skills](../concepts/applications-and-skills.md) — narrative introduction and
   runnable examples
-- [Python 2.0.x reference](client-sdk-mission-autonomy-python.md)
-- [1.3.x Mission Autonomy reference](client-sdk-mission-autonomy-1.3.md) — the current, shipped
+- [Python reference](client-sdk-mission-autonomy-python.md)
+- [Go — running and controlling executions](../concepts/applications-and-skills.md#go)
+- [1.3 Mission Autonomy reference](client-sdk-mission-autonomy-1.3.md) — the end-of-life 1.3
   Mission/Task/Scheduler interface

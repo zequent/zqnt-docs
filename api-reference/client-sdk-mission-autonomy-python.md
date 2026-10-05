@@ -1,20 +1,15 @@
-# Zequent Client SDK (Python) — Mission Autonomy API Reference (2.0.x Beta)
+# Zequent Client SDK (Python) — Mission Autonomy API Reference
 
-> **Beta — not yet released.** Everything on this page describes real, working code — confirmed
-> directly against source — but it lives on the unmerged `refactoring/refactoring-client-sdk-v2`
-> branch, not on `main`/the current 1.3.x release. There is no released version number for this
-> model yet; treat everything below as subject to change before it ships. If you're building
-> against the current 1.3.x platform, see the
-> [1.3.x Mission Autonomy reference](client-sdk-mission-autonomy-python-1.3.md) instead. For the
-> conceptual introduction to this model, see
-> [Applications & Skills](../concepts/applications-and-skills.md).
+> For the conceptual introduction to this model, see
+> [Applications & Skills](../concepts/applications-and-skills.md). For 1.3.x (end of life), see the
+> [1.3 Mission Autonomy reference](client-sdk-mission-autonomy-python-1.3.md).
 
-Exhaustive method reference for `client.mission_autonomy` on this branch. Every method is a
+Exhaustive method reference for `client.mission_autonomy`. Every method is a
 coroutine. Mission/Task methods (`create_mission`, `create_task`, `start_task`, ...) are kept as
 stubs that immediately `raise LegacyOperationRemovedError` — there's no backend RPC left for any
 of them.
 
-## What actually changed vs. 1.3.x
+## What changed from 1.3
 
 - Every Mission/Task method now raises `LegacyOperationRemovedError` unconditionally, instead of
   making a (now-nonexistent) RPC. Route optimization, NFZ expansion, and the task execution
@@ -23,11 +18,10 @@ of them.
   begin with (unlike Java's 1.3.x interface, which does), so there's nothing to remove here.
 - Two new families replace what Mission/Task did: **Application** (capability package admin) and
   **SkillExecution** (capability execution).
-- **Python's Beta surface is more extensive than Java's** — `get_application_environments` and
-  `promote_application_version` exist here with no Java equivalent on that branch (confirmed by
-  reading both interfaces directly — this is a real, current gap between the two SDKs' Beta work,
-  not a doc omission). Everything else lines up 1:1 with the
-  [Java 2.0.x reference](client-sdk-mission-autonomy.md).
+- **Python's surface is more extensive than Java's** — `get_application_environments` and
+  `promote_application_version` exist here with no Java equivalent (confirmed by reading both
+  interfaces directly — a real difference between the two SDKs, not a doc omission). Everything
+  else lines up 1:1 with the [Java reference](client-sdk-mission-autonomy.md).
 
 ## Applications (capability package administration)
 
@@ -58,15 +52,16 @@ via its `.simple()`/`.packaged()` static factories. There's no `idempotency_key`
 here the way Java's factories default to a random UUID — pass one explicitly if you need
 retry-safety.
 
+`application_version=None` runs the version promoted to Production, or the newest version if none
+is promoted.
+
 `create_skill_execution`/`execute_skill`'s elided params include `organization_id`, which is
-enforced, not just recorded, once the call carries a verified auth token: omit it and it's filled
-in from the caller's own organization; assert a *different* organization than the caller's own and
-the RPC fails with `PERMISSION_DENIED` instead of being honoured. `system_admin` callers are
-exempt and may assert any organization. This only applies once the gRPC port itself requires a
-token — every current service-to-service caller on it has none yet, so nothing changes for them
-today. Same rule filters `list_skill_executions` below: a non-admin caller asking for everything is
-answered with only their own organization's executions, regardless of what `organization_id` they
-pass.
+checked against the caller's credential, not just recorded: omit it and it's filled in from the
+credential's organization; assert a *different* organization and the RPC fails with
+`PERMISSION_DENIED` instead of being honoured. `system_admin` callers and platform services without
+an organization may assert any organization. Same rule filters `list_skill_executions` below: a
+caller bound to an organization asking for everything is answered with only that organization's
+executions, regardless of what `organization_id` they pass.
 
 ## SkillExecution — query and lifecycle
 
@@ -95,7 +90,7 @@ failure — `success`/`error` carry it instead (see
 payload DTO directly on success — there's no wrapper to carry a failure inline — so a failed RPC
 raises `MissionAutonomyError` instead (mirroring Java's `MissionAutonomyClientException`).
 `Scheduler` methods are unaffected — they still return `SchedulerResponse` with the usual
-`success`/`error` convention, since the CRUD methods themselves didn't change on this branch.
+`success`/`error` convention, since the CRUD methods themselves didn't change.
 
 ## Schedulers — same methods, different `SchedulerDTO` shape
 
@@ -107,7 +102,7 @@ raises `MissionAutonomyError` instead (mirroring Java's `MissionAutonomyClientEx
 | `delete_scheduler(scheduler_id)` | `SchedulerResponse` | |
 | `create_schedulers(schedulers)` | `SchedulerResponse` | Create several in one call |
 | `delete_schedulers(scheduler_ids)` | `SchedulerResponse` | Delete several in one call |
-| `list_schedulers()` | `SchedulerResponse` | Result is in `.schedulers` — no filtering parameter on this branch |
+| `list_schedulers()` | `SchedulerResponse` | Result is in `.schedulers` — no filtering parameter |
 
 The method signatures are identical to 1.3.x, but `SchedulerDTO` itself isn't: `mission_id`/
 `task_id` are gone (`reserved` on the wire, not merely deprecated), replaced with a direct
@@ -125,7 +120,7 @@ Unlike the Java client SDK's `SchedulerDTO.validate()`, nothing in this model en
 `command_id` vs. `application_id`+`skill_id` exclusivity client-side — an invalid combination is
 only caught server-side.
 
-This model has no organization field, so a schedule created from this SDK is system-wide. Scheduled
+This model has no organization field. Scheduled
 runs have priority 50, and every firing's outcome is recorded on the schedule (visible in the Admin
 Console); `SchedulerDTO` does not carry those firing fields.
 
@@ -133,6 +128,7 @@ Console); `SchedulerDTO` does not carry those firing fields.
 
 - [Applications & Skills](../concepts/applications-and-skills.md) — narrative introduction and
   runnable examples
-- [Java 2.0.x reference](client-sdk-mission-autonomy.md)
-- [1.3.x Mission Autonomy reference](client-sdk-mission-autonomy-python-1.3.md) — the current, shipped
+- [Java reference](client-sdk-mission-autonomy.md)
+- [Go — running and controlling executions](../concepts/applications-and-skills.md#go)
+- [1.3 Mission Autonomy reference](client-sdk-mission-autonomy-python-1.3.md) — the end-of-life 1.3
   Mission/Task/Scheduler interface

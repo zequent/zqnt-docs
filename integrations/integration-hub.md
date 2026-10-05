@@ -230,7 +230,7 @@ workspace and automatically inherit its `RequireAuth` session gate — no separa
 Hub login exists or is needed. The browser's existing console access token also rides along on
 every `/integrations/api/*` call automatically (same shared axios instance/interceptor every other
 console API call uses), so enabling this backend's own `ZQNT_AUTH_ENABLED` (see
-[Backend -- Auth](#backend--auth-optional) above) actually protects the API too, not just the page.
+[Backend -- Auth](#backend----auth-optional) above) actually protects the API too, not just the page.
 
 To regenerate the API client after a real change to the backend's routes: re-copy
 `zqnt-integration-hub/backend/docs/swagger.json` to `zqnt-platform-console/openapi/integration-hub.swagger.json`,
