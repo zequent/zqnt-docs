@@ -1,46 +1,33 @@
 # Flying a Waypoint Mission
 
-On the 1.3.x line there are **two ways** a waypoint flight reaches a device, and which one applies
-depends on the adapter your asset runs. This page covers both, the shared configuration model, and
-how to track progress.
+A waypoint flight is **one command**, `mission.waypoint.execute`, with the waypoints and settings
+inline. This page covers how to send it, the configuration model, pausing and resuming, and how to
+track progress.
 
-> **Read the table before you write code.** The two paths are not interchangeable. Sending the
-> wrong one gets you either `startTask is not implemented for this asset` or a "command is not
-> registered" error, and neither message points at the real cause.
+> **Upgrading from 1.3?** The task-based path (`createTask` + `startTask`) is gone: the platform no
+> longer calls an adapter's task methods. See
+> [Upgrading from 1.3](../concepts/migration-guide.md#task-based-execution-is-gone).
 
-## Which path does your adapter use?
+## Which adapters support it
 
-| Adapter (released 1.3.x) | Execution path | Pause / resume |
+| Adapter (`2.0.0`) | `mission.waypoint.execute` | Pause / resume |
 | --- | --- | --- |
-| **DJI** `1.3.1` | **Both** — task-based (`createTask` + `startTask`) or command-based (`mission.waypoint.execute`), added alongside each other, not a replacement | `pauseTask`/`resumeTask` (task-based) or `mission.pause`/`mission.resume` (command-based) |
-| **MAVLink** `1.3.0` | **Command-based** — `mission.waypoint.execute` | `stopTask` (pauses the mission) |
-| **Simulator** `1.3.3` | **Command-based** — `mission.waypoint.execute` | `mission.pause` / `mission.resume` commands |
-| **SAPIENT** `1.3.0` | Task-based — its own protocol owns the task | via task methods |
-| **Betaflight**, **RNS** | No waypoint mission support | — |
+| **DJI** | Yes | `mission.pause` / `mission.resume` |
+| **MAVLink** | Yes | `mission.pause` / `mission.resume` |
+| **Simulator** | Yes | `mission.pause` / `mission.resume` |
+| **SAPIENT**, **Betaflight**, **RNS** | No | — |
 
-Both paths are configured with the **same** `WaypointTaskConfig` object (see
-[Configuration](#configuration)). Only the delivery differs: the task-based path persists it on a
-Task record that the adapter fetches, and the command-based path sends it inline with the command.
+Ask an asset before you send it — `getCapabilities(sn)` lists the commands it advertises (see
+[Checking what an asset supports](#checking-what-an-asset-supports)).
 
-> **DJI got command-based execution in `v1.3.1`.** `mission.waypoint.execute` deserializes into the
-> exact same `WaypointTaskConfig` the task-based path uses — confirmed directly against the
-> release's commit — and `mission.pause`/`mission.resume` map onto the same idempotent
-> `FLIGHTTASK_PAUSE`/`FLIGHTTASK_RECOVERY` operations the task-based path's `pauseTask`/`resumeTask`
-> already used. This was added **alongside** the existing task-based path, not as a replacement for
-> it — a DJI dock on `v1.3.1`+ accepts either. Which one to prefer for DJI specifically isn't stated
-> anywhere in the release itself; this page doesn't have a confirmed recommendation either way.
+## Building the configuration
 
-## Path A — command-based (MAVLink, Simulator, DJI `1.3.1`+)
-
-No Mission or Task record is created. The waypoints and configuration travel inside a single
-command:
+The command's parameters are a `WaypointTaskConfig` (see [Configuration](#configuration)):
 
 ```java
-import com.zqnt.sdk.client.remotecontrol.domains.CustomCommandRequest;
 import com.zqnt.utils.JsonUtils;
 import com.zqnt.utils.missionautonomy.domains.WaypointDTO;
 import com.zqnt.utils.missionautonomy.domains.config.WaypointTaskConfig;
-import com.fasterxml.jackson.core.type.TypeReference;
 
 WaypointTaskConfig config = WaypointTaskConfig.builder()
         .waypoints(List.of(
@@ -55,23 +42,7 @@ WaypointTaskConfig config = WaypointTaskConfig.builder()
         .build();
 
 config.validate();   // same rules the adapter applies — fail fast client-side
-
-Map<String, Object> params = JsonUtils.getMapper()
-        .convertValue(config, new TypeReference<Map<String, Object>>() {});
-
-var request = CustomCommandRequest.builder()
-        .sn("SIM-DRONE-001")                      // the Asset SN — see "Which SN" below
-        .commandType("mission.waypoint.execute")
-        .params(params)
-        .build();
-
-var response = client.remoteControl().sendCustomCommand(request).join();
-if (!response.isSuccess()) {
-    log.warn("Rejected: {}", response.getError().getErrorMessage());
-}
 ```
-
-Only `sn` and `commandType` are required on the request; `tid` is generated when omitted.
 
 ### Use `JsonUtils.getMapper()` for the conversion
 
@@ -87,9 +58,66 @@ If you use your own mapper, set `setSerializationInclusion(JsonInclude.Include.N
 Unknown properties are ignored adapter-side, so the extra `configType` / `taskType` properties
 Jackson emits are harmless.
 
-### Pause and resume (Simulator)
+## Sending it
 
-Sent as their own commands, with no params:
+### Recommended — as a Skill execution
+
+Run the command through the execution engine. The platform then tracks it like any other execution:
+it has an id, a status and progress, and it can be cancelled.
+
+```java
+import com.google.protobuf.Struct;
+import com.google.protobuf.util.JsonFormat;
+import com.zqnt.sdk.client.missionautonomy.capabilities.SkillExecutionCommand;
+
+Struct.Builder parameters = Struct.newBuilder();
+JsonFormat.parser().merge(JsonUtils.getMapper().writeValueAsString(config), parameters);
+
+var execution = client.missionAutonomy().executeSkill(
+        SkillExecutionCommand.simple("SIM-DRONE-001",   // the Asset SN — see "Which SN" below
+                "mission.waypoint.execute",
+                null,                                    // target: null = the asset itself
+                parameters.build(),
+                null))                                   // idempotency key
+        .join();
+
+log.info("execution {} is {}", execution.getId(), execution.getStatus());
+```
+
+`getSkillExecution(id)` reads it back, and `cancelSkillExecution(...)` stops it. A waypoint route can
+equally be one step of a Skill in an Application — see
+[Applications & Skills](../concepts/applications-and-skills.md). Python
+(`execute_simple(sn, "mission.waypoint.execute", params)`) and Go (`ma.ExecuteSimple(...)`) have the
+same call.
+
+### Directly — as a custom command
+
+The same command, sent straight to the device. The platform does not track it as an execution:
+
+```java
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.zqnt.sdk.client.remotecontrol.domains.CustomCommandRequest;
+
+Map<String, Object> params = JsonUtils.getMapper()
+        .convertValue(config, new TypeReference<Map<String, Object>>() {});
+
+var response = client.remoteControl().sendCustomCommand(
+        CustomCommandRequest.builder()
+                .sn("SIM-DRONE-001")
+                .commandType("mission.waypoint.execute")
+                .params(params)
+                .build())
+        .join();
+if (!response.isSuccess()) {
+    log.warn("Rejected: {}", response.getError().getErrorMessage());
+}
+```
+
+Only `sn` and `commandType` are required on the request; `tid` is generated when omitted.
+
+## Pause and resume
+
+Sent as their own commands, with no params — directly, or as Skill executions like the route itself:
 
 ```java
 client.remoteControl().sendCustomCommand(
@@ -99,48 +127,14 @@ client.remoteControl().sendCustomCommand(
     CustomCommandRequest.builder().sn(sn).commandType("mission.resume").build());
 ```
 
-Pause freezes the aircraft in place; resume continues the same leg. Both are idempotent — pausing
-an already-paused mission returns success, not an error, so a retried request is safe. Both are
-**rejected when no mission is active**, which includes the window after the final waypoint when the
-aircraft has already begun its automatic return home.
-
-MAVLink does not expose these commands. Use `stopTask` there, which pauses the running mission.
-
-## Path B — task-based (DJI)
-
-The DJI adapter fetches the Task from the Connector, builds the KMZ from its config, uploads it and
-executes it on the dock. Create the Task first, then start it:
-
-```java
-WaypointTaskConfig config = WaypointTaskConfig.builder()
-        .waypoints(List.of(/* ... as above ... */))
-        .globalSpeed(5.0f)
-        .globalHeight(50.0f)
-        .build();
-
-TaskDTO task = TaskDTO.builder()
-        .name("Perimeter sweep")
-        .missionId(missionId)
-        .snNumber("DOCK-SN")
-        .taskType(TaskTypeProto.TASK_TYPE_WAYPOINT)   // required — see below
-        .config(config)
-        .build();
-
-var created = client.missionAutonomy().createTask(task).join();
-client.missionAutonomy().startTask(created.getTaskId());
-```
-
-`pauseTask(taskId)`, `resumeTask(taskId)` and `stopTask(taskId)` control it from there.
-
-> **`taskType` must be `TASK_TYPE_WAYPOINT` and `config` must be a `WaypointTaskConfig`.** The DJI
-> adapter checks this explicitly and rejects anything else with `Task type is not WAYPOINT`. A Task
-> created as `TASK_TYPE_CUSTOM_COMMAND`, or with a null `config`, cannot be started.
-
-`startTask` runs `prepareTask` first, so you do not need to call it yourself.
+Pause holds the aircraft in place; resume continues the same route. On the simulator both are
+idempotent — pausing an already-paused mission returns success — and both are **rejected when no
+mission is active**, which includes the window after the final waypoint when the aircraft has
+already begun its automatic return home.
 
 ## Configuration
 
-Both paths use `WaypointTaskConfig`. Per-waypoint entries (`WaypointDTO`) go in the required
+`mission.waypoint.execute` takes a `WaypointTaskConfig`. Per-waypoint entries (`WaypointDTO`) go in the required
 `waypoints` list:
 
 | Field | Type | Notes |
@@ -208,38 +202,38 @@ See [Assets & Sub-Assets](../concepts/assets-and-sub-assets.md).
 
 ## Tracking progress
 
-A started flight reports progress as **task notifications**, on both paths. Subscribe with
-`streamNotifications` and read `getTaskEvent()`:
+**As a Skill execution**, the execution itself carries the state: `status` moves through
+`SKILL_EXECUTION_STATUS_RUNNING` to `SUCCEEDED`, `FAILED` or `CANCELLED`, with `progress` alongside.
+Poll `getSkillExecution(id)`, or watch the Skill execution events on the notification stream.
+
+**Underneath**, the adapter reports the command's progress as **command execution events**, on the
+notification stream for either way of sending it:
 
 ```java
 var notifyRequest = new StreamNotificationRequest();
 notifyRequest.setSn("DOCK-SN");
 
 client.liveData().streamNotifications(notifyRequest, n -> {
-    var task = n.getTaskEvent();
-    if (task == null) return;
+    var event = n.getCommandExecutionEvent();
+    if (event == null) return;
 
-    log.info("{} {} {}%", task.getTaskId(), task.getStatus(),
-             task.getProgress() == null ? 0 : Math.round(task.getProgress() * 100));
+    log.info("{} {} {}", event.getCommandId(), event.getStatus(), event.getProgress());
 });
 ```
 
-`TaskEvent` carries `taskId`, `taskType`, `status`, `progress` (0.0–1.0) and `message`. `status` is
-a `TaskStatus` — `TASK_RUNNING`, `TASK_PAUSED`, `TASK_COMPLETED`, `TASK_ERROR` and so on.
+`CommandExecutionEvent` carries `commandId`, `status`, `progress`, `message` and `output`. `status`
+is `COMMAND_EXECUTION_STATUS_RUNNING` while it flies, then exactly one of `SUCCEEDED`, `FAILED` or
+`CANCELLED`.
 
 | Adapter | Progress reporting |
 | --- | --- |
-| **DJI** `1.3.0` | Full. Derived from the dock's own `flighttask_progress`, with a real percentage. Also reports take-off and fly-to progress |
-| **MAVLink** `1.3.0` | `TASK_RUNNING` with `current / total` waypoints, then `TASK_COMPLETED`; `TASK_ERROR` on failure |
-| **Simulator** `1.3.3` | **None.** The simulator publishes telemetry only and emits no notifications at all |
+| **DJI** | Derived from the dock's own `flighttask_progress` |
+| **MAVLink** | `RUNNING` as waypoints are reached, then `SUCCEEDED`; `FAILED` on failure |
+| **Simulator** | `RUNNING` with progress as it flies, then one terminal event |
 
-> **`TASK_COMPLETED` means every waypoint was reached, not that the aircraft has landed.** With the
+> **`SUCCEEDED` means every waypoint was reached, not that the aircraft has landed.** With the
 > default `WF_ACTION_GO_HOME` finish action it is normally still flying home when that event
 > arrives. Watch telemetry if you need the actual landing.
-
-**Developing against the simulator:** the notification stream stays silent for a mission that is
-running perfectly. Infer progress from telemetry instead — position advancing through the legs, and
-`mode` returning to `ASSET_MODE_IDLE` once the flight ends. Expect real events only on hardware.
 
 ## Checking what an asset supports
 
@@ -254,5 +248,5 @@ authoritative for `WaypointTaskConfig`.
 ## See also
 
 - [Remote Control](REMOTE_CONTROL.md) — the rest of the direct command surface
-- [Connector](CONNECTOR.md) — Mission and Task records
+- [Applications & Skills](../concepts/applications-and-skills.md) — making a route one step of a Skill
 - [Assets & Sub-Assets](../concepts/assets-and-sub-assets.md) — which SN to address

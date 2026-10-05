@@ -1,7 +1,7 @@
 # Live Video Streams
 
-This page covers live video on the **1.3.x line**: how a stream gets on air, how to start and stop
-one from your own application, and how to play it back.
+This page covers live video: how a stream gets on air, how to start and stop one from your own
+application, how to play it back, and how to lock the media server down with stream keys.
 
 > **The platform does not carry your video.** It is the control plane only. The device pushes RTMP
 > straight to a media server, and your player pulls from that same media server. No video frame ever
@@ -10,19 +10,24 @@ one from your own application, and how to play it back.
 
 ## Which assets can stream
 
-| Adapter (released 1.3.x) | Live video |
+| Adapter (`2.0.0`) | Live video |
 | --- | --- |
-| **DJI** `1.3.1` | **Yes** — `startLiveStream` / `stopLiveStream`, plus lens, zoom and split-screen |
-| **MAVLink** `1.3.0` | No |
-| **Betaflight** `1.3.0` | No |
-| **RNS** `1.3.0` | No |
-| **SAPIENT** `1.3.0` | No |
-| **Simulator** `1.3.x` | No |
+| **DJI** | **Yes** — `startLiveStream` / `stopLiveStream`, plus lens, zoom and split-screen |
+| **Simulator** | **Yes** — a test pattern published with `ffmpeg` (see below) |
+| **MAVLink** | No |
+| **Betaflight** | No |
+| **RNS** | No |
+| **SAPIENT** | No |
+| **AI** | No — it reads streams from the media server, it does not publish one |
 
-On 1.3.x, live video is a **DJI-only** capability. The Edge SDK declares `start_live_stream` /
-`stop_live_stream` for every adapter, but only the DJI adapter implements them — the others inherit
-the default and answer *not supported*. If you call the API against a MAVLink aircraft you get that
-answer back, not a stream.
+The Edge SDK declares `start_live_stream` / `stop_live_stream` for every adapter, but only the DJI
+adapter and the simulator implement them — the others inherit the default and answer *not
+supported*. If you call the API against a MAVLink aircraft you get that answer back, not a stream.
+
+The **simulator** publishes colour bars with the device's serial and telemetry burnt in, to exactly
+the URL the platform sent, credential included. It needs `ffmpeg` on the simulator's host (or
+`SIM_FFMPEG` pointing at one). `SIM_STREAM_VIDEO` publishes a video file in a loop instead, and
+`SIM_STREAM_VIDEO_FOR` limits that video to some serials (comma-separated globs, e.g. `SIM-SXF-*`).
 
 For DJI, the stream belongs to the **aircraft camera**. The dock only acts as the gateway that
 carries the command to the aircraft; you do not start a stream "on a dock".
@@ -47,10 +52,20 @@ carries the command to the aircraft; you do not start a stream "on a dock".
 ### Automatically, when the camera becomes available
 
 The DJI adapter watches what the dock reports about its camera capacity. When an aircraft's camera
-becomes available, the adapter starts the stream **on its own**, and stops it again when the camera
-goes away. Nobody has to press anything, and no API call is involved.
+becomes available, the stream starts **on its own**, and stops again when the camera goes away.
+Nobody has to press anything. Who sends the start command is a deployment choice:
 
-This happens only when the aircraft's record carries both:
+| Mode | Set | What happens |
+| --- | --- | --- |
+| **Adapter** (default) | nothing | The DJI adapter starts the stream itself, with the push URL stored on the aircraft's record |
+| **Platform** | `livestream.autostart.mode=platform` on the DJI adapter **and** `LIVE_STREAM_AUTO_START_ENABLED=true` on the Admin Console API | The adapter only reports that the camera can stream; the platform answers with the ordinary start — the same one as the console button, with a freshly minted push URL |
+
+Set both or neither: with only one of them, either nobody starts the stream or the adapter keeps
+starting it. Use **platform** mode when the media server authenticates (see
+[Stream keys](#authenticated-media-server-stream-keys)) — the adapter cannot mint a credential, so in
+adapter mode it publishes with whatever was stored on the record.
+
+In adapter mode the start happens only when the aircraft's record carries both:
 
 - `streamUrlPredefined = true`
 - a non-empty `liveStreamPushUrl` — the RTMP URL that aircraft should push to
@@ -115,7 +130,7 @@ The response describes the command, and for a successful start it carries the pl
   "sn": "1581F5BMD227T00A1234",
   "tid": "0b2c1e8a-...",
   "videoId": "1581F5BMD227T00A1234/99-0-0/normal-0",
-  "streamUrl": "https://media.example.com/live/1581F5BMD227T00A1234/DRONE",
+  "streamUrl": "https://media.example.com/live/1581F5BMD227T00A1234/drone",
   "success": true,
   "message": "Livestream started successfully",
   "timestamp": "2026-09-22T09:14:02Z"
@@ -126,8 +141,12 @@ The response describes the command, and for a successful start it carries the pl
 `assetType` and `startedAt`. It is the right call to make when a page loads, because a stream may
 already be running — started automatically, or by another operator.
 
-Access control on these endpoints is a property of your deployment (typically the reverse proxy in
-front of the Admin Console API), not of the API itself.
+Every endpoint needs a signed-in console user. Reading the state is open to any of them; start,
+stop, lens and zoom need the **operator** role.
+
+When the Admin Console API knows the media server's API (`LIVE_STREAM_MEDIA_SERVER_API_URL`),
+`live` reflects whether video is really arriving there, not just whether the device accepted the
+start command.
 
 ## Option B — the Client SDK
 
@@ -138,7 +157,9 @@ depend on the Admin Console API.
 **What you give up:** the SDK does not resolve anything for you. Your application supplies the
 `videoId` and the RTMP push URL itself, and derives the playback URL itself. Everything in
 [Identifying the camera](#identifying-the-camera-videoid) and
-[Where the push URL comes from](#where-the-push-url-comes-from) becomes your responsibility.
+[Where the push URL comes from](#where-the-push-url-comes-from) becomes your responsibility — and,
+when the media server authenticates, so does the credential: the SDK cannot mint one, so put a
+[stream key](#stream-keys-for-devices-the-platform-cannot-start) into the push URL.
 
 ### Java
 
@@ -152,7 +173,7 @@ var response = client.liveData().startLiveStream(
         LiveDataStartLiveStreamRequest.builder()
                 .sn("1581F5BMD227T00A1234")
                 .videoId("1581F5BMD227T00A1234/99-0-0/normal-0")
-                .streamServer("rtmp://media.example.com/live/1581F5BMD227T00A1234/DRONE")
+                .streamServer("rtmp://media.example.com/live/1581F5BMD227T00A1234/drone")
                 .streamType(LiveStreamTypeEnum.LIVE_STREAM_TYPE_RTMP)
                 .assetType(AssetTypeEnum.ASSET_TYPE_AIRCRAFT)
                 .build())
@@ -188,7 +209,7 @@ async with ZequentClient.from_env() as client:
         LiveDataStartLiveStreamRequest(
             sn="1581F5BMD227T00A1234",
             video_id="1581F5BMD227T00A1234/99-0-0/normal-0",
-            stream_server="rtmp://media.example.com/live/1581F5BMD227T00A1234/DRONE",
+            stream_server="rtmp://media.example.com/live/1581F5BMD227T00A1234/drone",
         )
     )
     if not result.success:
@@ -209,7 +230,7 @@ process.
 ### Go
 
 The Go SDK is a thin wrapper — you build the protobuf request yourself and dial the connection with
-your own TLS and retry policy:
+your own TLS and retry policy (`livedata.New(conn)`, dialled as in the [Go quickstart](QUICKSTART_GO.md)):
 
 ```go
 resp, err := liveDataClient.StartLiveStream(ctx, &devicecontrol.LiveStreamStartCommandRequest{
@@ -227,7 +248,7 @@ resp, err := liveDataClient.StartLiveStream(ctx, &devicecontrol.LiveStreamStartC
 
 Over the SDK, a successful start returns success, `tid`, `sn` and a message — **not** a playback
 URL. The response type has a field that looks like it should carry one (`liveStreamStartResponse` /
-`live_stream_start`); on the 1.3.x line the platform never fills it, so it is always absent.
+`live_stream_start`); the platform never fills it, so it is always absent.
 
 Build the playback URL yourself from the RTMP URL you supplied — same path, pointed at your media
 server's WHEP endpoint, query string preserved — or call
@@ -253,24 +274,71 @@ video to split, which reads like a failure but is the expected answer.
 
 On the **automatic** path, the aircraft pushes to the `liveStreamPushUrl` stored on its own record.
 
-On the **on-demand** path through the Admin Console API, the push URL is built from the deployment's
-configured base URL:
+On the **on-demand** path through the Admin Console API (and in platform auto-start mode), the base
+is the asset's own `liveStreamPushUrl` when it has one, and `LIVE_STREAM_SERVER_URL` otherwise. The
+platform then adds the serial and, for a DJI dock, which of its two cameras:
 
 ```
-${LIVE_STREAM_SERVER_URL}/{sn}/{DRONE|DJI_DOCK}
+{base}/{sn}/drone       aircraft camera
+{base}/{sn}/dji_dock    dock camera
+{base}/{sn}             any other asset — it has one stream
 ```
 
-and the playback URL is that same path re-pointed at `${LIVE_WHEP_BASE_URL}`, preserving any query
+A base that already contains the serial is used as it is. Media-server paths are case-sensitive:
+the segments are lower case.
+
+The playback URL is that same path re-pointed at `${LIVE_WHEP_BASE_URL}`, preserving any query
 string.
 
 | Variable | Set on | Meaning |
 | --- | --- | --- |
 | `LIVE_STREAM_SERVER_URL` | Admin Console API | RTMP base the device publishes to, e.g. `rtmp://media.example.com/live` |
 | `LIVE_WHEP_BASE_URL` | Admin Console API | HTTP base your player pulls from, e.g. `https://media.example.com` |
+| `LIVE_STREAM_MEDIA_SERVER_API_URL` | Admin Console API | Optional. The media server's API, used to check that a stream is really live |
+| `LIVE_STREAM_AUTO_START_ENABLED` | Admin Console API | `true` for platform auto-start mode (default `false`) |
+| `LIVE_STREAM_AUTH_ENABLED` | Admin Console API | `true` when the media server authenticates (default `false`) — see below |
+| `LIVE_STREAM_AUTH_HOOK_SECRET` | Admin Console API | Secret the media server must send to the authentication hook |
+| `LIVE_STREAM_KEYS_PEPPER` | Admin Console API | Secret mixed into stored stream-key hashes |
 
-> Because the two paths derive the URL differently, the same aircraft can publish to a different URL
-> depending on whether the stream was started automatically or on demand. If you use both, keep
-> `liveStreamPushUrl` consistent with what `LIVE_STREAM_SERVER_URL` produces for that serial.
+## Authenticated media server (stream keys)
+
+By default the media server takes anything that connects. To require a credential, configure the
+media server to ask the platform (MediaMTX: `authMethod: http`, with `authHTTPAddress` pointing at
+`http://admin-console:8005/api/admin-console/streams/auth?secret=<hook secret>`) and set
+`LIVE_STREAM_AUTH_ENABLED=true` on the Admin Console API. Switch both on together: with only the
+platform side on, URLs carry credentials nobody checks; with only the media server side on, every
+stream is refused.
+
+### Keys the platform mints itself
+
+Every start through the Admin Console API mints a short-lived credential for that one stream path:
+
+- a **publish** key, good for 10 minutes, put into the push URL the device receives;
+- a **read** key, good for 2 minutes, put into the playback URL a viewer receives — a fresh one on
+  every state call while the stream is live.
+
+For RTMP, RTSP and SRT the key travels in the query (`?user=zqnt-pub&pass=<key>`); for an HTTP
+playback URL it travels as `zqnt-read:<key>@host`. The publish key never comes back to whoever
+started the stream.
+
+### Stream keys for devices the platform cannot start
+
+A camera started from its own web interface, a third-party encoder, or your own application
+starting streams through the Client SDK needs a longer-lived key. An organization admin cuts one in
+the Admin Console in the **Stream keys** panel on the Assets page (or with
+`POST /api/admin-console/streams/keys`):
+
+| Field | Meaning |
+| --- | --- |
+| `path` | The media-server path the key is for, e.g. `live/1581F5BMD227T00A1234/drone` |
+| `permission` | `publish` or `read` |
+| `assetSn`, `label` | What it is for, so it can be found later |
+| `ttlDays` | Lifetime: 30 days by default, at most 90 |
+
+The key is shown **once**, in the response; only its hash is stored. Present it as the password, or
+as `?key=<key>` on the URL. `GET /api/admin-console/streams/keys` lists the organization's keys with
+their last use, and `DELETE /api/admin-console/streams/keys/{id}` revokes one. A connection already
+open with a revoked key keeps running until it reconnects.
 
 Live video is a licensed feature. Without a valid licence lease covering live streaming, the start
 call is refused before it reaches the device.
@@ -282,16 +350,20 @@ live, and a start for a stream it already believes is live returns success **wit
 device** — the message says so (*"Stream for SN is already live"*). If the device is in fact not
 streaming, stop the stream first, then start it again.
 
-**The call times out although the stream comes up.** Both the client SDK and the adapter allow about
-30 seconds — the SDK for the whole call, the adapter for the dock's reply. A slow dock can therefore
-surface as a client-side timeout on a command that succeeded. Raise the SDK's request timeout if you
-see this; do not retry blindly, or you will start and immediately re-start the same camera.
+**The call times out although the stream comes up.** The Client SDK allows 30 seconds by default
+for the whole call. A slow dock can therefore surface as a client-side timeout on a command that
+succeeded. Raise the SDK's request timeout if you see this; do not retry blindly, or you will start
+and immediately re-start the same camera.
+
+**The start succeeds but the player stays black, with authentication on.** The media server refused
+the credential. Check that the device was given the URL unchanged, that the media server sends the
+hook secret, and — in adapter auto-start mode — that you have switched to platform mode.
 
 **The device rejects the start.** Nearly always the `videoId` or the push URL. Check the `videoId`
 against the aircraft's real serial and payload index, and confirm the media server accepts a publish
 at that path.
 
-**Nothing at all happens for an aircraft that is not DJI.** Expected — see
+**Nothing at all happens for an asset that is not DJI or the simulator.** Expected — see
 [Which assets can stream](#which-assets-can-stream).
 
 **The stream stops by itself.** If the dock reports the camera as no longer available, the adapter

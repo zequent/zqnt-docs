@@ -99,16 +99,13 @@ async with client.live_data.stream_telemetry(StreamTelemetryRequest(sn="DOCK-1")
 
 ## Streaming
 
-Server-streaming RPCs return an async iterator. Cancellation, back-pressure, and clean-up are managed by the iterator protocol — you don't need to call `.close()` on a stream you've already exhausted or broken out of.
-
-For long-lived streams that you want to control explicitly (start/stop from different coroutines), use `StreamHandle`:
+Streams reconnect on their own after transient gRPC errors. For a long-lived stream that you
+start and stop from different coroutines, keep the `StreamHandle`:
 
 ```python
-from client_sdk import StreamHandle
-
-handle: StreamHandle = await client.live_data.stream_telemetry(sn="DOCK-1", on_data=consume)
+handle = client.live_data.stream_telemetry(StreamTelemetryRequest(sn="DOCK-1"), on_frame, on_error)
 # ... later, from anywhere:
-await handle.close()
+await handle.stop()
 ```
 
 For manual control, which streams your inputs to the platform, use the

@@ -12,7 +12,7 @@ Add the Zequent Client SDK to your `pom.xml`:
 <dependency>
     <groupId>com.zqnt.sdk</groupId>
     <artifactId>client-java-sdk</artifactId>
-    <version>1.3.2</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
@@ -24,6 +24,8 @@ Create a `.env` file in your project root (or configure via `application.propert
 
 ```bash
 # .env
+ZQNT_CLIENT_TOKEN=<your client credential>
+
 REMOTE_CONTROL_SERVICE_HOST=localhost
 REMOTE_CONTROL_SERVICE_PORT=8002
 
@@ -32,7 +34,14 @@ MISSION_AUTONOMY_SERVICE_PORT=8004
 
 LIVE_DATA_SERVICE_HOST=localhost
 LIVE_DATA_SERVICE_PORT=8003
+
+CONNECTOR_SERVICE_HOST=localhost
+CONNECTOR_SERVICE_PORT=8010
 ```
+
+`ZQNT_CLIENT_TOKEN` is the application's **client credential**, issued in the Admin Console under
+**Manage → Access & Integrations → Credentials**. Every call carries it; without one the platform
+refuses every call. See [Client SDK Configuration](CONFIGURATION.md).
 
 For Docker Compose or Kubernetes, use the service DNS names from your deployment instead of `localhost`.
 
@@ -101,6 +110,7 @@ public class MyApp {
                     .host("localhost")
                     .port(8002)
                     .done()
+                .clientToken(token)   // or leave it out to read ZQNT_CLIENT_TOKEN
                 .build()) {
 
             var request = TakeoffRequest.builder()
@@ -251,46 +261,48 @@ env:
 ## Available Services
 
 `client.remoteControl()` sends direct, imperative commands (flight, dock, manual control,
-capability discovery) — see [Remote Control](REMOTE_CONTROL.md). `client.connector()` and
-`client.missionAutonomy()` cover assets, missions, tasks, and schedulers — see the sections below.
-`client.liveData()` streams telemetry and detections.
+capability discovery) — see [Remote Control](REMOTE_CONTROL.md). `client.missionAutonomy()` runs
+Applications and Skills and manages schedulers, and `client.connector()` covers assets, schedulers
+and configuration — see the sections below. `client.liveData()` streams telemetry and detections.
 
-### Flying a waypoint mission
+### Running Applications and Skills
 
-**There are two execution paths on 1.3.x, and which one applies depends on your adapter.** DJI uses
-the task-based path; MAVLink and the simulator use a single command. They are not interchangeable:
-
-```java
-// Task-based (DJI)
-client.missionAutonomy().createTask(taskDTO)      // taskType = TASK_TYPE_WAYPOINT
-client.missionAutonomy().startTask(taskId)
-
-// Command-based (MAVLink, simulator)
-client.remoteControl().sendCustomCommand(request) // commandType = "mission.waypoint.execute"
-```
-
-Both are configured with the same `WaypointTaskConfig`. Read
-**[Waypoint Missions](WAYPOINT_MISSIONS.md)** before writing either — it has the per-adapter table,
-the full parameter contract and progress tracking.
-
-### Mission Autonomy — missions, tasks & scheduling
-
-`client.missionAutonomy()` creates missions/tasks/schedulers (route-optimized — see the
-[reference](../api-reference/client-sdk-mission-autonomy-1.3.md) for why this differs from Connector's
-copies of the same methods) and is the only interface that can start, stop, pause, or resume a task:
+Multi-step automated work is built as Skills and Applications — see
+[Applications & Skills](../concepts/applications-and-skills.md). Run a Skill from your code:
 
 ```java
-client.missionAutonomy().createTask(taskDTO)
-client.missionAutonomy().startTask(taskId)
-client.missionAutonomy().pauseTask(taskId)
+import com.zqnt.sdk.client.missionautonomy.capabilities.SkillExecutionCommand;
+
+var run = SkillExecutionCommand.packaged(
+        "YOUR_DEVICE_SN",
+        "perimeter-patrol-app",  // applicationId
+        "patrol-and-report",     // skillId
+        null,                    // version: null runs the Production version, or the newest
+        parameters,              // google.protobuf.Struct
+        null);                   // idempotency key: generated when null
+
+client.missionAutonomy().executeSkill(run)
+    .thenAccept(execution -> System.out.println("Execution: " + execution.getId()));
 ```
 
-The task lifecycle methods forward a bare task ID to the adapter. Only DJI resolves it via the
-Connector service; MAVLink and the simulator never receive a bare task ID at all (they take the
-command-based path above instead); SAPIENT implements the methods but passes the ID straight
-through as its own protocol's identifier, without a Connector lookup. Betaflight and RNS implement
-none of them and return `startTask is not implemented for this asset`. See
-[Waypoint Missions](WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use) for the full picture.
+See the [Mission Autonomy reference](../api-reference/client-sdk-mission-autonomy.md) for querying,
+pausing, resuming, cancelling and signalling an execution.
+
+### Flying a waypoint route
+
+A waypoint route is one command, `mission.waypoint.execute`, supported by the DJI, MAVLink and
+simulator adapters. Run it through the execution engine, so it is tracked like any other
+execution, or make it a step of a Skill:
+
+```java
+var route = SkillExecutionCommand.simple("YOUR_DEVICE_SN", "mission.waypoint.execute",
+        null,          // target: null = the asset itself
+        parameters,    // the waypoints and settings
+        null);
+client.missionAutonomy().executeSkill(route);
+```
+
+Read **[Waypoint Missions](WAYPOINT_MISSIONS.md)** for the parameters and progress tracking.
 
 ### Live Data
 ```java
@@ -299,8 +311,8 @@ client.liveData().streamTelemetryData(request, onData, onError)
 
 ### Connector — assets, organizations, schedulers, technical config
 
-`client.connector()` covers what `missionAutonomy()` doesn't: asset lookup, asset payloads,
-organizations, and technical config/policies — see [Connector](CONNECTOR.md) for the full method
+`client.connector()` covers asset lookup, asset payloads, organizations, schedulers, technical
+config/policies and the Skill Registry — see [Connector](CONNECTOR.md) for the full method
 reference.
 
 ## Built-in Features
@@ -317,6 +329,9 @@ reference.
 All settings can be configured via environment variables:
 
 ```bash
+# Client credential
+ZQNT_CLIENT_TOKEN=<your client credential>
+
 # Service Endpoints
 REMOTE_CONTROL_SERVICE_HOST=localhost
 REMOTE_CONTROL_SERVICE_PORT=8002
@@ -324,6 +339,8 @@ MISSION_AUTONOMY_SERVICE_HOST=localhost
 MISSION_AUTONOMY_SERVICE_PORT=8004
 LIVE_DATA_SERVICE_HOST=localhost
 LIVE_DATA_SERVICE_PORT=8003
+CONNECTOR_SERVICE_HOST=localhost
+CONNECTOR_SERVICE_PORT=8010
 
 # Resilience
 ZEQUENT_MAX_RETRY_ATTEMPTS=3
@@ -387,7 +404,7 @@ cat .env
 ## Summary
 
 1. Add the dependency to `pom.xml`.
-2. Create `.env` with service endpoints.
+2. Create `.env` with your client credential and the service endpoints.
 3. Inject `ZequentClient` in your code.
 4. Use it: `client.remoteControl().takeoff(...)`.
 

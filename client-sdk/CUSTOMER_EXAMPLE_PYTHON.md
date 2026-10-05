@@ -24,18 +24,23 @@ name = "my-drone-gateway"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "zqnt-client-sdk>=1.0.0",
+    "zqnt-client-sdk>=2.0.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "python-dotenv>=1.0.0",
 ]
+
+[tool.uv.sources]
+zqnt-client-sdk = { git = "https://github.com/zequent/zqnt-client-sdk-python", tag = "v2.0.0" }
+zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", tag = "v2.0.0" }
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 ```
 
-Install with:
+The SDK is not on PyPI yet, so `[tool.uv.sources]` installs it, and `zqnt-utils`, from their Git
+release tags — see [Quickstart](QUICKSTART_PYTHON.md#step-1-add-the-dependency). Install with:
 
 ```bash
 uv sync
@@ -44,6 +49,7 @@ uv sync
 ## `.env`
 
 ```bash
+ZQNT_CLIENT_TOKEN=<your client credential>
 REMOTE_CONTROL_SERVICE_HOST=localhost
 REMOTE_CONTROL_SERVICE_PORT=8002
 MISSION_AUTONOMY_SERVICE_HOST=localhost
@@ -51,6 +57,9 @@ MISSION_AUTONOMY_SERVICE_PORT=8004
 LIVE_DATA_SERVICE_HOST=localhost
 LIVE_DATA_SERVICE_PORT=8003
 ```
+
+`ZQNT_CLIENT_TOKEN` is the service's **client credential**, issued in the Admin Console under
+**Manage → Access & Integrations → Credentials**. Without one the platform refuses every call.
 
 ## `app/models.py`
 
@@ -70,32 +79,34 @@ class GoToBody(TakeoffBody):
     pass
 
 
-class WaypointBody(BaseModel):
-    latitude: float
-    longitude: float
-    altitude: float | None = None
-    speed: float | None = None
+class SkillRunBody(BaseModel):
+    application_id: str
+    skill_id: str
+    parameters: dict | None = None
 ```
 
 ## `app/main.py`
 
 ```python
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
+from google.protobuf.json_format import MessageToDict
 
 from client_sdk import (
     GoToRequest,
     ReturnToHomeRequest,
+    StreamTelemetryRequest,
     TakeoffRequest,
     ZequentClient,
     ZequentClientError,
     ZequentRetryExhaustedError,
 )
 
-from .models import GoToBody, TakeoffBody, WaypointBody
+from .models import GoToBody, SkillRunBody, TakeoffBody
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -155,24 +166,33 @@ async def return_home(sn: str, client: ZequentClient = Depends(get_client)):
 
 
 # ----------------------------------------------------------------------
-# Mission Autonomy — missions & tasks
-# See: WAYPOINT_MISSIONS.md
+# Mission Autonomy — Skill executions
+# See: ../concepts/applications-and-skills.md
 # ----------------------------------------------------------------------
 
-@app.post("/drones/{sn}/tasks/{task_id}/start")
-async def start_task(task_id: str, client: ZequentClient = Depends(get_client)):
-    """Start a task that was created with create_task."""
-    return await client.mission_autonomy.start_task(task_id)
+@app.post("/drones/{sn}/skills/run")
+async def run_skill(
+    sn: str, body: SkillRunBody,
+    client: ZequentClient = Depends(get_client),
+):
+    """Run a Skill of a deployed Application (Production version, or the newest)."""
+    try:
+        execution = await client.mission_autonomy.execute_application(
+            sn, body.application_id, body.skill_id, parameters=body.parameters
+        )
+    except ZequentClientError as e:
+        raise HTTPException(502, str(e)) from e
+    return MessageToDict(execution)
 
 
-@app.get("/tasks/{task_id}")
-async def get_task(task_id: str, client: ZequentClient = Depends(get_client)):
-    return await client.mission_autonomy.get_task(task_id)
+@app.get("/executions/{execution_id}")
+async def get_execution(execution_id: str, client: ZequentClient = Depends(get_client)):
+    return MessageToDict(await client.mission_autonomy.get_skill_execution(execution_id))
 
 
-@app.post("/tasks/{task_id}/stop")
-async def stop_task(task_id: str, client: ZequentClient = Depends(get_client)):
-    return await client.mission_autonomy.stop_task(task_id)
+@app.post("/executions/{execution_id}/cancel")
+async def cancel_execution(execution_id: str, client: ZequentClient = Depends(get_client)):
+    return MessageToDict(await client.mission_autonomy.cancel_skill_execution(execution_id))
 
 
 # ----------------------------------------------------------------------
@@ -185,12 +205,21 @@ async def telemetry_window(
 ):
     """Collect the next N telemetry frames and return them as a list."""
     out = []
-    async for frame in client.live_data.stream_telemetry(asset_sn=sn):
-        out.append(frame)
+    enough = asyncio.Event()
+
+    def on_frame(frame):
+        out.append(str(frame))
         if len(out) >= frames:
-            break
+            enough.set()
+
+    async with client.live_data.stream_telemetry(StreamTelemetryRequest(sn=sn), on_frame):
+        await asyncio.wait_for(enough.wait(), timeout=30)
     return out
 ```
+
+Skill executions come back as protobuf messages, so the handlers convert them with `MessageToDict`
+before FastAPI returns them. Failed Application and Skill execution calls raise
+`MissionAutonomyError`, a `ZequentClientError`.
 
 ## Run it
 
@@ -212,7 +241,7 @@ curl -X POST http://localhost:8000/drones/DOCK-1/takeoff \
 
 - Use a long-lived `ZequentClient` per process (the lifespan does this) — never instantiate one per request.
 - Wrap each handler in proper error mapping; the example covers the SDK's two main exception types.
-- For high-fanout streaming endpoints, prefer FastAPI's `StreamingResponse` to push frames as they arrive instead of buffering.
-- Add structured request logging that captures `sn` + `task_id` so you can correlate with platform logs.
+- For high-fanout streaming endpoints, push frames to the caller as they arrive (for example over a WebSocket) instead of buffering them.
+- Add structured request logging that captures `sn` + the execution id so you can correlate with platform logs.
 - Don't forget `--workers 1` if you rely on a single `ZequentClient` in `app.state` — for multi-worker setups, each worker creates its own client instance, which is fine.
 - Configure TLS via custom channels (see [CONFIGURATION_PYTHON.md](CONFIGURATION_PYTHON.md)) when deploying outside a private network.

@@ -174,7 +174,7 @@ The Admin Console provides browser workflows for asset monitoring, telemetry, re
 
 If you consume private Zequent packages, configure access to the relevant package registry before building your customer application or adapter.
 
-For Maven packages, configure your `~/.m2/settings.xml` with a token that has package read access. The Python SDKs are not published on PyPI yet: install them from their private Git repositories at the release tag (`v2.0.0`), with a token that has read access to them.
+For Maven packages, configure your `~/.m2/settings.xml` with a token that has package read access. The Python SDKs are not published on PyPI yet: install them, together with the `zqnt-utils` package they depend on, from their private Git repositories at the release tag (`v2.0.0`), with access to those repositories.
 
 ## Production Notes
 

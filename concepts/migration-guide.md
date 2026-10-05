@@ -23,7 +23,7 @@ The platform no longer runs work through an adapter's task methods — see
 | --- | --- |
 | Java (Client and Edge) | `client-java-sdk` / `edge-java-sdk` version `2.0.0` |
 | Go (Client and Edge) | The modules are now `/v2`: `go get github.com/Zequent/zqnt-client-sdk-go/v2@v2.0.0` and `go get github.com/Zequent/zqnt-edge-sdk-go/v2@v2.0.0`, and every import path gains `/v2` (for example `github.com/Zequent/zqnt-client-sdk-go/v2/missionautonomy`). Without `/v2`, Go keeps installing the 1.3 line, without an error. |
-| Python (Client and Edge) | Not on PyPI yet. Install from the Git tag, for example with uv: `zqnt-client-sdk = { git = "https://github.com/zequent/zqnt-client-sdk-python", tag = "v2.0.0" }` and `edge-python-sdk = { git = "https://github.com/zequent/zqnt-edge-sdk-python", tag = "v2.0.0" }` under `[tool.uv.sources]`. |
+| Python (Client and Edge) | Not on PyPI yet. Install from the Git tags, together with `zqnt-utils`, the Zequent package both SDKs depend on. With uv, under `[tool.uv.sources]`: `zqnt-client-sdk = { git = "https://github.com/zequent/zqnt-client-sdk-python", tag = "v2.0.0" }` (or `edge-python-sdk = { git = "https://github.com/zequent/zqnt-edge-sdk-python", tag = "v2.0.0" }`) and `zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", tag = "v2.0.0" }`. |
 
 ## Credentials (new in 2.0)
 

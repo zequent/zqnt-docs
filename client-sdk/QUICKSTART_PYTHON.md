@@ -10,19 +10,28 @@ For Java, see [QUICKSTART.md](QUICKSTART.md).
 
 ## Step 1: Add the dependency
 
-```bash
-uv add zqnt-client-sdk
-# or
-pip install zqnt-client-sdk
-```
+The SDK is not on PyPI yet. Install it from its Git release tag, together with `zqnt-utils`, the
+Zequent package it depends on (also from Git). Both repositories are private: you need GitHub
+access to them.
 
 `pyproject.toml` (uv-managed projects):
 
 ```toml
 [project]
 dependencies = [
-    "zqnt-client-sdk>=1.2.0",
+    "zqnt-client-sdk>=2.0.0",
 ]
+
+[tool.uv.sources]
+zqnt-client-sdk = { git = "https://github.com/zequent/zqnt-client-sdk-python", tag = "v2.0.0" }
+zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", tag = "v2.0.0" }
+```
+
+then `uv sync`. With pip:
+
+```bash
+pip install "zqnt-utils @ git+https://github.com/zequent/zqnt-utils-python@v2.0.0" \
+            "zqnt-client-sdk @ git+https://github.com/zequent/zqnt-client-sdk-python@v2.0.0"
 ```
 
 That's it for dependencies. Everything is auto-discovered from environment variables.
@@ -35,6 +44,8 @@ Create a `.env` file in your project root (or export the variables in your shell
 
 ```bash
 # .env
+ZQNT_CLIENT_TOKEN=<your client credential>
+
 REMOTE_CONTROL_SERVICE_HOST=localhost
 REMOTE_CONTROL_SERVICE_PORT=8002
 
@@ -43,7 +54,14 @@ MISSION_AUTONOMY_SERVICE_PORT=8004
 
 LIVE_DATA_SERVICE_HOST=localhost
 LIVE_DATA_SERVICE_PORT=8003
+
+CONNECTOR_SERVICE_HOST=localhost
+CONNECTOR_SERVICE_PORT=8010
 ```
+
+`ZQNT_CLIENT_TOKEN` is the application's **client credential**, issued in the Admin Console under
+**Manage → Access & Integrations → Credentials**. Every call carries it; without one the platform
+refuses every call. See [Configuration](CONFIGURATION_PYTHON.md#client-credential-zqnt_client_token).
 
 If you're using `python-dotenv`, load it before constructing the client:
 
@@ -134,12 +152,13 @@ async with ZequentClient(
 ## Complete example: a FastAPI drone gateway
 
 ```python
+import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from client_sdk import (
     ZequentClient,
     TakeoffRequest, GoToRequest, ReturnToHomeRequest,
-    DockOperationRequest,
+    DockOperationRequest, StreamTelemetryRequest,
 )
 
 
@@ -157,8 +176,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-def get_client(req) -> ZequentClient:
-    return req.app.state.zequent
+def get_client(request: Request) -> ZequentClient:
+    return request.app.state.zequent
 
 
 @app.post("/api/drone/{sn}/takeoff")
@@ -188,20 +207,23 @@ async def return_home(sn: str, client: ZequentClient = Depends(get_client)):
 
 @app.post("/api/drone/{sn}/dock/open-cover")
 async def open_cover(sn: str, client: ZequentClient = Depends(get_client)):
-    return await client.remote_control.dock_operation(
-        DockOperationRequest(sn=sn, operation="OPEN_COVER")
-    )
+    return await client.remote_control.open_cover(DockOperationRequest(sn=sn))
 
 
 @app.get("/api/drone/{sn}/telemetry")
 async def telemetry_stream(sn: str, client: ZequentClient = Depends(get_client)):
-    # Aggregate first 5 telemetry frames and return them
-    out = []
-    async for frame in client.live_data.stream_telemetry(asset_sn=sn):
-        out.append(frame)
-        if len(out) >= 5:
-            break
-    return out
+    # Collect the first 5 telemetry frames and return them
+    frames = []
+    enough = asyncio.Event()
+
+    def on_frame(frame):
+        frames.append(str(frame))
+        if len(frames) >= 5:
+            enough.set()
+
+    async with client.live_data.stream_telemetry(StreamTelemetryRequest(sn=sn), on_frame):
+        await asyncio.wait_for(enough.wait(), timeout=30)
+    return frames
 ```
 
 ---
@@ -218,9 +240,10 @@ docker compose -f docker-compose.customer.yml up -d
 
 ## Next steps
 
-- [Waypoint Missions](WAYPOINT_MISSIONS.md) — flying a waypoint mission
+- [Applications & Skills](../concepts/applications-and-skills.md) — running Skills and Applications from your code
+- [Mission Autonomy reference](../api-reference/client-sdk-mission-autonomy-python.md) — executions, Applications & schedulers
+- [Waypoint Missions](WAYPOINT_MISSIONS.md) — flying a waypoint route
 - [Remote Control](REMOTE_CONTROL_PYTHON.md) — flight ops, dock ops, manual control
-- [Mission Autonomy](MISSION_AUTONOMY_PYTHON-1.3.md) — creating missions, tasks & schedulers
 - [Connector reference](CONNECTOR_PYTHON.md) — assets, organizations, schedulers, technical config
 - [Configuration reference](CONFIGURATION_PYTHON.md) — every env var the SDK reads
 - [Customer example](CUSTOMER_EXAMPLE_PYTHON.md) — full working FastAPI sample

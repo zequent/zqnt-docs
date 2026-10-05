@@ -26,7 +26,7 @@ Open `pom.xml` and add:
 <dependency>
     <groupId>com.zqnt.sdk</groupId>
     <artifactId>client-java-sdk</artifactId>
-    <version>1.3.2</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
@@ -34,11 +34,16 @@ Open `pom.xml` and add:
 
 ```bash
 # .env in project root
+ZQNT_CLIENT_TOKEN=<your client credential>
+
 REMOTE_CONTROL_SERVICE_HOST=localhost
 REMOTE_CONTROL_SERVICE_PORT=8002
 LIVE_DATA_SERVICE_HOST=localhost
 LIVE_DATA_SERVICE_PORT=8003
 ```
+
+`ZQNT_CLIENT_TOKEN` is the application's **client credential**, issued in the Admin Console under
+**Manage → Access & Integrations → Credentials**. Without one the platform refuses every call.
 
 ### 4. Write Your First API
 
@@ -244,7 +249,8 @@ That's the full loop: scaffold, add the dependency, inject `ZequentClient`, and 
 [QUICKSTART.md — Built-in Features](QUICKSTART.md#built-in-features) for what the SDK is doing for
 you under the hood (retry, circuit breaker, load balancing, service discovery).
 
-For flying a waypoint mission instead of one-off commands, see [Waypoint Missions](WAYPOINT_MISSIONS.md).
+For flying a whole waypoint route as one command instead of one `goTo` at a time, see
+[Waypoint Missions](WAYPOINT_MISSIONS.md).
 
 ## Support
 

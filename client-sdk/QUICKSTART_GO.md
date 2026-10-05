@@ -11,10 +11,11 @@ equivalents — the underlying gRPC contract is identical, only the calling conv
 ```bash
 go env -w GONOSUMDB="github.com/Zequent/*"
 go env -w GONOPROXY="github.com/Zequent/*"
-go get github.com/Zequent/zqnt-client-sdk-go@latest
+go get github.com/Zequent/zqnt-client-sdk-go/v2@v2.0.0
 ```
 
-Requires Go 1.26+ (this module's own `go.mod` pins `go 1.26.2`).
+Requires Go 1.26+ (this module's own `go.mod` pins `go 1.26.2`). The module path ends in `/v2`, and
+so does every import path below — without it, Go installs the end-of-life 1.3 line.
 
 ## Step 2: Dial each service you need
 
@@ -29,10 +30,13 @@ import (
     "google.golang.org/grpc"
     "google.golang.org/grpc/credentials/insecure"
 
-    "github.com/Zequent/zqnt-client-sdk-go/remotecontrol"
+    "github.com/Zequent/zqnt-client-sdk-go/v2/auth"
+    "github.com/Zequent/zqnt-client-sdk-go/v2/remotecontrol"
 )
 
-conn, err := grpc.NewClient("localhost:8002", grpc.WithTransportCredentials(insecure.NewCredentials()))
+// auth.DialOptions sends the client credential on every call; "" reads ZQNT_CLIENT_TOKEN.
+opts := append(auth.DialOptions(""), grpc.WithTransportCredentials(insecure.NewCredentials()))
+conn, err := grpc.NewClient("localhost:8002", opts...)
 if err != nil {
     log.Fatal(err)
 }
@@ -41,7 +45,9 @@ defer conn.Close()
 rc := remotecontrol.New(conn)
 ```
 
-For TLS in production, pass real transport credentials instead of `insecure.NewCredentials()`.
+The **client credential** is issued in the Admin Console under **Manage → Access & Integrations →
+Credentials**. Without one the platform refuses every call. For TLS in production, pass real
+transport credentials instead of `insecure.NewCredentials()`.
 
 ## Step 3: Call it
 
@@ -61,12 +67,14 @@ import (
     "google.golang.org/grpc"
     "google.golang.org/grpc/credentials/insecure"
 
-    "github.com/Zequent/zqnt-client-sdk-go/remotecontrol"
-    devicecontrol "github.com/Zequent/zqnt-client-sdk-go/gen/devicecontrol/contracts/proto"
+    "github.com/Zequent/zqnt-client-sdk-go/v2/auth"
+    "github.com/Zequent/zqnt-client-sdk-go/v2/remotecontrol"
+    devicecontrol "github.com/Zequent/zqnt-client-sdk-go/v2/gen/devicecontrol/contracts/proto"
 )
 
 func main() {
-    conn, err := grpc.NewClient("localhost:8002", grpc.WithTransportCredentials(insecure.NewCredentials()))
+    opts := append(auth.DialOptions(""), grpc.WithTransportCredentials(insecure.NewCredentials()))
+    conn, err := grpc.NewClient("localhost:8002", opts...)
     if err != nil {
         log.Fatal(err)
     }
@@ -94,10 +102,11 @@ func main() {
 rc := remotecontrol.New(conn)   // dial remote-control-service, default port 8002
 
 rc.TakeOff(ctx, sn, coordinate)
-rc.GoTo(ctx, sn, coordinate)
+rc.GoTo(ctx, sn, coordinate) / rc.GoToWithOptions(ctx, sn, coordinate, options)
 rc.ReturnToHome(ctx, sn, altitude)
 rc.EnterManualControl(ctx, sn, clientID, userID, sessionID)
-rc.LookAt(ctx, ...)
+rc.LookAt(ctx, sn, coordinate, locked)
+rc.SendCustomCommand(ctx, sn, commandID, params, target)
 rc.OpenCover(ctx, sn) / rc.CloseCover(ctx, sn, force)
 rc.StartCharging(ctx, sn) / rc.StopCharging(ctx, sn)
 rc.RebootAsset(ctx, sn)
@@ -108,28 +117,28 @@ rc.GetCapabilities(ctx, sn)
 Shares its request/response shapes with `EdgeAdapterService` (`devicecontrol` package) — the same
 types flow end to end from this client through to the edge adapter that actually talks to the
 hardware. See the [Remote Control API Reference](../api-reference/client-sdk-remote-control-go.md)
-for every method (23 total — this list is illustrative, not exhaustive).
+for every method (this list is illustrative, not exhaustive).
 
-### `missionautonomy` — missions, tasks & schedulers
+### `missionautonomy` — Applications & Skill executions
 
 ```go
 ma := missionautonomy.New(conn)   // dial mission-autonomy-service, default port 8004
 
-ma.CreateMission(ctx, mission) / ma.UpdateMission(ctx, id, mission)
-ma.GetMission(ctx, missionID)   / ma.DeleteMission(ctx, missionID)
+// Run a Skill of a deployed Application ("" version = Production, or the newest), or one command
+ma.ExecuteApplication(ctx, sn, applicationID, skillID, "", params, idempotencyKey)
+ma.ExecuteSimple(ctx, sn, commandID, params, idempotencyKey)
 
-ma.CreateTask(ctx, task) / ma.UpdateTask(ctx, id, task) / ma.DeleteTask(ctx, taskID)
-ma.GetTask(ctx, taskID)  / ma.GetTaskByFlightID(ctx, flightID)
+ma.GetSkillExecution(ctx, executionID) / ma.ListSkillExecutions(ctx, query)
+ma.PauseSkillExecution(ctx, executionID) / ma.ResumeSkillExecution(ctx, executionID)
+ma.CancelSkillExecution(ctx, executionID)
+ma.SignalSkillExecution(ctx, executionID, nodeID, eventType, data, approved)
 
-ma.StartTask(ctx, taskID) / ma.StopTask(ctx, taskID)
-ma.PauseTask(ctx, taskID) / ma.ResumeTask(ctx, taskID)
-
-ma.ListSchedulers(ctx, taskID)   // taskID == "" lists every scheduler, unfiltered
+ma.UpsertApplication(ctx, app, expectedRevision) / ma.GetApplication(ctx, applicationID, version)
+ma.ListApplications(ctx, scope, enabledOnly, pageSize, pageToken)
 ```
 
-See [Waypoint Missions](WAYPOINT_MISSIONS.md) for which of these actually flies an asset — the task
-lifecycle reaches the device only on adapters that implement it. Full reference, including which
-methods are route-optimized: [Mission Autonomy API Reference](../api-reference/client-sdk-mission-autonomy-go-1.3.md).
+See [Applications & Skills](../concepts/applications-and-skills.md#go) for a runnable example, and
+[Waypoint Missions](WAYPOINT_MISSIONS.md) for flying a waypoint route.
 
 ### `connector` — assets, schedulers, policies, config
 
@@ -138,13 +147,15 @@ c := connector.New(conn)   // dial connector-service, default port 8010
 
 c.GetAssetBySn(ctx, sn)
 
-// Schedulers -- listing lives on missionautonomy.Client instead (ma.ListSchedulers above);
-// ConnectorService has no ListSchedulers RPC at this contract version.
+// Schedulers
+c.ListSchedulers(ctx)
 c.GetScheduler(ctx, schedulerID)
 c.CreateScheduler(ctx, scheduler) / c.CreateSchedulers(ctx, schedulers)
 c.UpdateScheduler(ctx, schedulerID, scheduler)
 c.DeleteScheduler(ctx, schedulerID) / c.DeleteSchedulers(ctx, schedulerIDs)
-c.DeleteSchedulersByTask(ctx, taskID)
+
+// Skill Registry
+c.ListSkillContracts(ctx, status, commandID)
 
 // Policies & technical config (read-only)
 c.GetActivePoliciesByType(ctx, policyType)
@@ -196,7 +207,7 @@ authenticated with GitHub (SSH key or a PAT in your git credential helper).
 
 ## Summary
 
-1. `go get github.com/Zequent/zqnt-client-sdk-go@latest`
-2. Dial the backend service(s) you need with a plain `grpc.NewClient(...)`.
+1. `go get github.com/Zequent/zqnt-client-sdk-go/v2@v2.0.0`
+2. Dial the backend service(s) you need with `grpc.NewClient(...)` and `auth.DialOptions(...)` for the client credential.
 3. Wrap the connection: `remotecontrol.New(conn)`, `connector.New(conn)`, etc.
 4. Call methods directly — `ctx` in, `(*Response, error)` out.
