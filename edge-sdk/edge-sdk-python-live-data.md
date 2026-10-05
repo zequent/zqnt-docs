@@ -17,6 +17,8 @@ async with LiveDataService(host="localhost", port=8003, sn="DOCK-1") as live:
     await live.produce_telemetry(asset_telemetry)
 ```
 
+Every stream carries the adapter's edge credential: `token=` defaults to `ZQNT_EDGE_TOKEN`.
+
 Or manage it explicitly:
 
 ```python
@@ -113,27 +115,32 @@ await live.produce_detection(
 
 ## Notifications
 
-Three cases: reporting an asset's online/offline transitions, reporting progress or completion of a task your adapter is running, and (less commonly — no confirmed usage in any current adapter) mission-level events. See the [reference](../api-reference/edge-sdk-python-live-data-reference.md#notifications) for `MissionEvent`'s fields.
+Three cases: reporting an asset's online/offline transitions, reporting the progress and outcome of a command your adapter is running, and (less commonly — no confirmed usage in any current adapter) mission-level events. See the [reference](../api-reference/edge-sdk-python-live-data-reference.md#notifications) for `MissionEvent`'s fields.
 
 ```python
-from edge_sdk import AssetStatusEvent, TaskEvent, TaskStatus, TaskType
+from edge_sdk import AssetStatusEvent, CommandExecutionEvent, CommandExecutionStatus
 
 # Asset went offline
 await live.produce_notification(
     AssetStatusEvent(sn="DOCK-1", online=False, message="Lost connection to device")
 )
 
-# Progress for a task your adapter is running
+# Progress for a command your adapter accepted
 await live.produce_notification(
-    TaskEvent(
-        task_id=task_id,
-        task_type=TaskType.WAYPOINT,
-        status=TaskStatus.RUNNING,
+    CommandExecutionEvent(
+        external_execution_id=execution_id,   # the id you returned with the command
+        status=CommandExecutionStatus.RUNNING,
         sn="DRONE-1",
+        command_id="mission.waypoint.execute",
         progress=0.42,
     )
 )
 ```
+
+Finish every accepted command with exactly one terminal status — `SUCCEEDED`, `FAILED` or
+`CANCELLED` — or a Skill waiting on it never moves on; see
+[Edge Adapter — Reporting progress](edge-sdk-python-adapter.md#reporting-progress-for-long-running-commands).
+2.0 no longer processes task events.
 
 ---
 
@@ -180,7 +187,7 @@ async with config.runtime() as runtime:
     live = LiveDataService(host=config.telemetry_host, port=config.telemetry_port, sn=config.adapter_sn)
     await live.connect()
     try:
-        adapter = MyAdapter(live=live, connector=runtime.connector)
+        adapter = MyAdapter(live=live)
         await runtime.serve(adapter)
     finally:
         await live.close()

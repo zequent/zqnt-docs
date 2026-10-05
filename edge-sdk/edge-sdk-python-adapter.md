@@ -55,7 +55,7 @@ EdgeResponse.not_supported(tid, sn)            # default for un-overridden metho
 EdgeResponse.ok(tid, sn, progress=CommandProgress(progress=42.0, state="climbing", left_time_seconds=30.0))
 ```
 
-`ok(...)` also accepts `external_execution_id` — set it when the command you just accepted keeps running asynchronously, so a later notification can be correlated back to it (see [Live Data](edge-sdk-python-live-data.md#notifications)).
+`ok(...)` also accepts `external_execution_id` — set it when the command you just accepted keeps running asynchronously, so its command execution events can be correlated back to it (see [Reporting progress](#reporting-progress-for-long-running-commands)).
 
 For long-running commands you can stream multiple `EdgeResponse` objects via the streaming variants (see below).
 
@@ -75,8 +75,8 @@ categories are:
 - **Detection** — `get_detections` (the one server-streaming, async-generator method)
 - **Dock and asset operations** — `open_cover`, `close_cover`, `start_charging`, `stop_charging`, `reboot_asset`, `boot_up_sub_asset`, `boot_down_sub_asset`, `register_asset`, `deregister_asset`
 - **Debug and maintenance** — `enter_or_close_remote_debug_mode`, `change_ac_mode`
-- **Tasks** — `prepare_task`, `start_task`, `stop_task` — each takes a bare `task_id: str`, not a `Task` object
-- **Custom commands** — `send_custom_command`
+- **Tasks** — `prepare_task`, `start_task`, `stop_task` — see [Tasks](#tasks)
+- **Custom commands** — `register_command`, and `send_custom_command`, which dispatches to what you registered
 
 ```python
 class MyDroneAdapter(EdgeAdapter):
@@ -88,44 +88,86 @@ class MyDroneAdapter(EdgeAdapter):
         return EdgeResponse.ok(ctx.tid, ctx.sn)
 ```
 
+### Custom commands
+
+Declare each command your adapter runs with `register_command`. One registration does both halves:
+the command appears in `_auto_capabilities`, and the default `send_custom_command` dispatches to its
+handler. A well-known command (`mission.waypoint.execute`, ...) takes its description and input
+schema from the platform's catalog, so registering it is one line; a hardware-specific command goes
+under a `vendor.` prefix and brings its own `input_schema` (built with `schema(...)`). A handler takes
+the `RequestContext` and the command's `params`, and returns a `CustomCommandResponse` — see the
+example below.
+
 ### Tasks
 
-`prepare_task`/`start_task`/`stop_task` each receive only a bare `task_id: str` — not a `Task`
-object. No confirmed real Python adapter resolves that ID through `ConnectorClient.get_task` (see
-the [Connector reference](../api-reference/edge-sdk-python-connector-reference-1.3.md#missions-and-tasks)):
-SAPIENT implements all three, but `prepare_task` is a no-op acknowledgment and `start_task`/
-`stop_task` forward `task_id` straight into a SAPIENT protocol control command, with no Connector
-lookup. MAVLink implements none of the three — it accepts `mission.waypoint.execute` through
-`send_custom_command` instead, with waypoints and configuration arriving inline, so no task lookup
-is needed at all. See
-[Mission Autonomy — Best practices](edge-sdk-python-mission-autonomy.md#best-practices) for the full
-per-adapter picture. Both approaches are valid; leaving the task methods unimplemented returns
-`NOT_IMPLEMENTED`, which callers handle — pick one and document it.
+`prepare_task`/`start_task`/`stop_task` still exist, and by default delegate to the registered
+commands `mission.prepare`/`mission.start`/`mission.stop`. The 2.0 platform never calls `prepare_task`
+or `start_task`. It calls `stop_task` to **cancel a running command**, passing that command's
+`external_execution_id` as `task_id` — so implement `stop_task` if your long-running commands can be
+aborted. See [Upgrading from 1.3](../concepts/migration-guide.md#task-based-execution-is-gone).
 
 ---
 
 ## Reporting progress for long-running commands
 
-There is no streaming variant of `EdgeResponse` for progress updates — `start_task` (and `send_custom_command` for vendor-specific commands) should return immediately with `EdgeResponse.ok(...)` and report progress separately via `LiveDataService.produce_notification(TaskEvent(...))`. See [Live Data — Notifications](edge-sdk-python-live-data.md#notifications).
+How a custom command's handler answers decides when the platform considers it finished — which is
+when a Skill execution moves on to its next step. (`take_off`, `go_to`, `look_at` and `return_to_home`
+always count as still running: report their outcome with events as below.)
+
+- **Finished at once:** return `CustomCommandResponse.ok(ctx.tid, ctx.sn, command_id, result={...})`.
+  The `result` is the step's output.
+- **Still running:** return `ok(...)` with an `external_execution_id` and no `result`, and report the
+  outcome as **command execution events** under that id: `RUNNING` with `progress` (0.0–1.0) while it
+  runs, then exactly one of `SUCCEEDED` (optionally with `output`), `FAILED` or `CANCELLED`. Without a
+  terminal event the Skill waits until it times out.
 
 ```python
-async def start_task(self, ctx: RequestContext, task_id: str) -> EdgeResponse:
-    self._executor.submit(task_id)  # runs in the background, reports progress itself
-    return EdgeResponse.ok(ctx.tid, ctx.sn, "Task started")
+import asyncio
+import uuid
 
-async def _on_progress(self, task_id: str, percent: float):
-    await self._live.produce_notification(
-        TaskEvent(
-            task_id=task_id,
-            task_type=TaskType.WAYPOINT,
-            status=TaskStatus.RUNNING,
-            sn=self._sn,
-            progress=percent / 100,
-        )
-    )
+from edge_sdk import (
+    AssetType, CommandExecutionEvent, CommandExecutionStatus, EdgeAdapter, LiveDataService, RequestContext,
+)
+from edge_sdk.models.common import CustomCommandResponse
+
+
+class MyDroneAdapter(EdgeAdapter):
+
+    def __init__(self, live: LiveDataService):
+        super().__init__()
+        self._live = live
+        # One registration: advertised in get_capabilities, and dispatched by send_custom_command
+        self.register_command("mission.waypoint.execute", self._fly_route)
+
+    async def get_capabilities(self, sn, asset_id):
+        return self._auto_capabilities(sn, AssetType.AIRCRAFT)
+
+    async def _fly_route(self, ctx: RequestContext, params: dict) -> CustomCommandResponse:
+        execution_id = str(uuid.uuid4())
+        asyncio.create_task(self._fly(ctx.sn, execution_id, params["waypoints"]))
+        # Accepted, not finished: the outcome follows as command execution events
+        return CustomCommandResponse.ok(ctx.tid, ctx.sn, "mission.waypoint.execute",
+                                        external_execution_id=execution_id)
+
+    async def _fly(self, sn: str, execution_id: str, waypoints: list[dict]):
+        for i, waypoint in enumerate(waypoints):
+            await hardware.fly_to(waypoint)
+            await self._report(sn, execution_id, CommandExecutionStatus.RUNNING, (i + 1) / len(waypoints))
+        await self._report(sn, execution_id, CommandExecutionStatus.SUCCEEDED)
+
+    async def _report(self, sn: str, execution_id: str, status: CommandExecutionStatus, progress=None):
+        await self._live.produce_notification(CommandExecutionEvent(
+            external_execution_id=execution_id,
+            status=status,
+            sn=sn,
+            command_id="mission.waypoint.execute",
+            progress=progress,
+        ))
 ```
 
-The one real async-generator method on `EdgeAdapter` is `get_detections`, used for pull-based detection streaming (see [Method groups](#method-groups) above) — it is not a general progress-reporting mechanism.
+`produce_notification` is on `LiveDataService` (see [Live Data](edge-sdk-python-live-data.md#notifications));
+2.0 no longer processes task events. The one real async-generator method on `EdgeAdapter` is
+`get_detections`, used for pull-based detection streaming — it is not a progress-reporting mechanism.
 
 ---
 
@@ -141,19 +183,28 @@ The one real async-generator method on `EdgeAdapter` is `get_detections`, used f
 
 ## Testing your adapter
 
-`EdgeServer` works in-process with a real `grpc.aio` server, so a typical test:
+Adapter methods are plain coroutines, so a unit test calls them directly:
 
 ```python
+from datetime import datetime
+
 import pytest
-from edge_sdk import EdgeServer
-from edge_sdk.generated import edge_pb2_grpc, common_pb2
+from edge_sdk import Coordinates, RequestContext
+
+from my_edge_adapter.adapter import MyDeviceAdapter
+
 
 @pytest.mark.asyncio
-async def test_takeoff(monkeypatch):
-    server = EdgeServer(adapter=MyDeviceAdapter(), port=0)
-    addr = await server.start()
-    # ... use a generated stub to call take_off and assert on the response
-    await server.stop()
+async def test_takeoff():
+    adapter = MyDeviceAdapter()
+    ctx = RequestContext(tid="t-1", sn="DOCK-1", timestamp=datetime.now())
+
+    response = await adapter.take_off(ctx, Coordinates(latitude=47.37, longitude=8.54, altitude=100.0))
+
+    assert response.success
+    assert response.tid == "t-1"
 ```
 
-Or use the lower-level dispatcher with a `MagicMock` for purely unit-style tests; see the SDK's own `tests/` directory for examples.
+For an end-to-end check against a running adapter, see the `grpcurl` call in the
+[Quickstart](edge-sdk-python-quickstart.md#step-6-verify-against-the-platform). The SDK's own `tests/`
+directory has more examples.

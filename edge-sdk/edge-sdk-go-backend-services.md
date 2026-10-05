@@ -2,11 +2,12 @@
 
 `edgesdk.NewEdgeClient` builds client stubs for the three backend services alongside the
 `EdgeAdapter` gRPC server (see [Overview](edge-sdk-go-overview.md)) — access them via
-`client.LiveData()`, `client.Connector()`, and `client.MissionAutonomy()`.
+`client.LiveData()`, `client.Connector()`, and `client.MissionAutonomy()`. Every call carries the
+adapter's edge credential (`ZQNT_EDGE_TOKEN`).
 
 ## Live Data
 
-`LiveDataService` (`github.com/Zequent/zqnt-edge-sdk-go/livedata`) manages persistent gRPC
+`LiveDataService` (`github.com/Zequent/zqnt-edge-sdk-go/v2/livedata`) manages persistent gRPC
 client-streaming connections and routes telemetry frames through them — one open stream per device
 serial number, reused across calls rather than redialed each time.
 
@@ -16,8 +17,11 @@ serial number, reused across calls rather than redialed each time.
 | `ProduceTelemetry(ctx, deviceSN, *proto.ProduceTelemetryRequest)` | Push a pre-built proto request directly, for advanced/full-control cases |
 | `CloseStream(ctx, deviceSN)` | Close the persistent stream for one device |
 | `CloseAllStreams(ctx)` | Close every open stream — call during shutdown (`client.Shutdown` already does this for you) |
+| `PublishCommandExecutionEvent(ctx, *domains.CommandExecutionEvent)` | Report a command's progress and outcome — see [Edge Adapter — Reporting a command's outcome](edge-sdk-go-adapter.md#reporting-a-commands-outcome) |
+| `CloseNotificationStream(ctx)` | Close the notification stream — call during shutdown |
 
 ```go
+lat, lon := float32(47.3769), float32(8.5417)
 client.LiveData().ProduceTelemetryData(ctx, &domains.TelemetryRequestData{
     SN:   "YOUR-DEVICE-SN",
     Type: domains.TelemetryTypeAsset,
@@ -34,21 +38,16 @@ paired-drone/sub-asset telemetry (`TelemetryTypeSubAsset`).
 
 ## Connector
 
-`ConnectorService` (`github.com/Zequent/zqnt-edge-sdk-go/connector`) is this SDK's **old-API**
-Connector surface — asset registration and organization lookup only, not the current-model
-Connector the Java/Python Edge SDKs and the Go **client** SDK's
-[`connector` package](../client-sdk/CONNECTOR_GO.md) expose. No scheduler or Mission/Task methods
-exist on it at all — see below.
+`ConnectorService` (`github.com/Zequent/zqnt-edge-sdk-go/v2/connector`) covers asset lookup and
+registration, and organization lookup — narrower than the Java and Python Edge SDKs' Connector: no
+pairing-code methods, no Skill Registry and no schedulers.
 
 | Category | Methods |
 |----------|---------|
 | Assets | `GetAssetBySN`, `GetAssetByID`, `GetSubAssetBySN`, `UpdateAsset`, `RegisterAsset`, `DeRegisterAsset` |
 | Organizations | `GetOrganizationByID` |
 
-Mission and task lookup are not part of the Go Edge SDK's connector client — unlike the Java and
-Python Edge SDKs, it has no `GetTask`. A Go adapter therefore cannot resolve a bare task id, which
-is why it can only take the command-based execution path (see
-[Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md)).
+`DeRegisterAsset(ctx, sn)` deletes the asset with that serial number — don't call it on shutdown.
 
 ```go
 asset, err := client.Connector().GetAssetBySN(ctx, "YOUR-DEVICE-SN")
@@ -56,15 +55,13 @@ asset, err := client.Connector().GetAssetBySN(ctx, "YOUR-DEVICE-SN")
 
 ## Mission Autonomy
 
-`MissionAutonomyService` (`github.com/Zequent/zqnt-edge-sdk-go/missionautonomy`) is likewise the
-**old** Mission/Task model's namesake, not the Application/Skill execution engine — but its surface
-here is a single read, not CRUD:
+`MissionAutonomyService` (`github.com/Zequent/zqnt-edge-sdk-go/v2/missionautonomy`) is a single read:
 
 | Category | Methods |
 |----------|---------|
 | Schedulers | `GetScheduler` |
 
-That is the whole surface: the Go Edge SDK's `missionautonomy` package exposes scheduler lookup
-only — no create/update/delete, and no mission or task methods at all. Creating and managing
-missions and tasks belongs to the **Client SDK**, used by customer applications.
+`GetScheduler(ctx, schedulerID, sn)` reads a scheduler definition; a scheduler now targets a Skill or a
+single command directly. Work reaches your adapter as commands — see [Edge Adapter](edge-sdk-go-adapter.md).
+Authoring and running Applications and Skills belongs to the Admin Console and the **Client SDK**.
 

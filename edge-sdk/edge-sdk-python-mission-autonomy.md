@@ -1,6 +1,8 @@
 # Edge SDK (Python) — Mission Autonomy
 
-`MissionAutonomyClient` is a small, focused client: it lets an edge adapter look up a **scheduler** definition directly. Everything else related to running automated behavior on an asset — receiving task lifecycle calls, reporting progress, custom commands — happens through other parts of the SDK, described below.
+`MissionAutonomyClient` is a small, focused client: it lets an edge adapter look up a **scheduler**
+definition directly. Everything else related to running automated behavior on an asset — receiving
+commands, reporting their progress — happens through other parts of the SDK, described below.
 
 For Java, see [edge-sdk-mission-autonomy.md](edge-sdk-mission-autonomy.md).
 
@@ -11,7 +13,7 @@ For Java, see [edge-sdk-mission-autonomy.md](edge-sdk-mission-autonomy.md).
 ```python
 from edge_sdk import MissionAutonomyClient
 
-client = MissionAutonomyClient(host="localhost", port=8004)
+client = MissionAutonomyClient(host="localhost", port=8004)   # token defaults to ZQNT_EDGE_TOKEN
 await client.connect()
 try:
     scheduler = await client.get_scheduler(scheduler_id="scheduler-uuid")
@@ -19,96 +21,36 @@ finally:
     await client.close()
 ```
 
-> **Beta preview — 2.0.x, not yet released.** This client's surface itself doesn't change on the
-> unmerged branch (it's already just scheduler lookup today) — but the `SchedulerDTO` it returns
-> does. This SDK's `edge_sdk.models.scheduler.SchedulerDTO` is its own plain-Python model, separate
-> from (but field-equivalent to) the client SDK's own `SchedulerDTO` — both mirror the same
-> `SchedulerProtoDTO` wire message. See the
-> [2.0.x migration guide](../concepts/migration-guide.md#scheduler-shape-change-affects-every-sdk)
-> for the full field breakdown.
+`EdgeAdapterRuntime` connects one for you as `runtime.mission_autonomy`. A scheduler now targets a
+Skill or a single command directly, not a Mission or Task — see
+[Upgrading from 1.3 — Scheduler shape change](../concepts/migration-guide.md#scheduler-shape-change-affects-every-sdk)
+for the fields.
 
 ---
 
-## Receiving tasks (the common case)
+## How Skill executions reach your adapter
 
-The platform drives task execution by calling *into* your `EdgeAdapter` — you don't poll or manage tasks yourself. Task methods receive a `task_id`; fetch whatever your adapter actually needs (e.g. a stored flight plan) through `ConnectorClient` rather than through `MissionAutonomyClient`:
-
-```python
-from edge_sdk import EdgeAdapter, EdgeResponse, ErrorMessage, ErrorCode
-
-class MyAdapter(EdgeAdapter):
-
-    async def prepare_task(self, ctx, task_id: str) -> EdgeResponse:
-        task = await self._connector.get_task(task_id, sn=ctx.sn)
-        if task is None:
-            return EdgeResponse.fail(ctx.tid, ctx.sn,
-                ErrorMessage(message="No task found for this id", code=ErrorCode.CLIENT_ERROR))
-        self._pending[task_id] = task
-        return EdgeResponse.ok(ctx.tid, ctx.sn, "Task prepared")
-
-    async def start_task(self, ctx, task_id: str) -> EdgeResponse:
-        self._executor.submit(task_id, self._pending[task_id])
-        return EdgeResponse.ok(ctx.tid, ctx.sn, "Task started")
-
-    async def stop_task(self, ctx, task_id: str) -> EdgeResponse:
-        await self._executor.cancel(task_id)
-        return EdgeResponse.ok(ctx.tid, ctx.sn, "Task stopped")
-```
-
-## Custom commands
-
-For vendor-specific commands that don't map to a standard `EdgeAdapter` method (e.g. a proprietary waypoint-execute call), override `send_custom_command`:
-
-```python
-from edge_sdk import CustomCommandRequest, CustomCommandResponse
-
-class MyAdapter(EdgeAdapter):
-
-    async def send_custom_command(
-        self, ctx, request: CustomCommandRequest,
-    ) -> CustomCommandResponse:
-        if request.command_type == "mission.waypoint.execute":
-            execution_id = await self._start_waypoint_mission(request.params)
-            return CustomCommandResponse.ok(
-                ctx.tid, ctx.sn, request.command_type,
-                external_execution_id=execution_id,  # lets mission-autonomy cancel/correlate later
-            )
-        return CustomCommandResponse.not_supported(ctx.tid, ctx.sn, request.command_type)
-```
-
-Set `external_execution_id` when the command you just accepted keeps running asynchronously — mission-autonomy uses it to later cancel the command (`StopTask`) and to correlate progress notifications back to this specific execution.
-
----
-
-## Reporting progress
-
-Progress flows back to the platform via `LiveDataService.produce_notification`, not as a task RPC return value — see [Live Data](edge-sdk-python-live-data.md).
-
----
-
-## Where things live
+Automated work is authored as Applications and Skills (see
+[Applications & Skills](../concepts/applications-and-skills.md)). The platform runs a Skill by calling
+*into* your `EdgeAdapter`, one command at a time — you don't poll or manage executions yourself:
 
 | Concern | Where it lives |
 | --- | --- |
-| Receiving `prepare_task`/`start_task`/`stop_task` calls | `EdgeAdapter` — see [Edge Adapter](edge-sdk-python-adapter.md) |
-| Vendor-specific commands | `EdgeAdapter.send_custom_command` (above) |
-| Reporting progress/telemetry while a task runs | `LiveDataService` — see [Live Data](edge-sdk-python-live-data.md) |
-| Declaring which commands your adapter supports | `get_capabilities` on `EdgeAdapter` — see [Connector](edge-sdk-python-connector.md#capabilities) |
-| Creating missions and tasks, and triggering them | The **Client SDK**, used by customer applications |
+| Receiving a command — typed (`take_off`, `go_to`, ...) or custom (`mission.waypoint.execute`, ...) | `EdgeAdapter`, with custom commands declared through `register_command` — see [Edge Adapter — Custom commands](edge-sdk-python-adapter.md#custom-commands) |
+| Reporting a command's progress and outcome | Command execution events through `LiveDataService` — see [Edge Adapter — Reporting progress](edge-sdk-python-adapter.md#reporting-progress-for-long-running-commands) |
+| Cancelling a running command | `stop_task`, called with the command's `external_execution_id` — see [Edge Adapter — Tasks](edge-sdk-python-adapter.md#tasks) |
+| Declaring which commands your adapter supports | `get_capabilities` on `EdgeAdapter`, and the Skill Registry — see [Connector](edge-sdk-python-connector.md#capabilities-and-the-skill-registry) |
+| Authoring Applications and Skills, and running them | The Admin Console and the **Client SDK** |
+
+The 2.0 platform no longer calls `prepare_task` or `start_task` — see
+[Upgrading from 1.3](../concepts/migration-guide.md#task-based-execution-is-gone).
 
 ---
 
 ## Best practices
 
-> These apply if your adapter implements the task methods at all. SAPIENT does — but by passing
-> `task_id` straight through as its own protocol's task identifier, not by resolving it through
-> `ConnectorClient`: its `prepare_task` is a no-op acknowledgment, and `start_task`/`stop_task`
-> forward `task_id` directly into a SAPIENT control command. MAVLink implements none of the task
-> methods — it accepts `mission.waypoint.execute` through `send_custom_command` instead, with
-> waypoints and configuration arriving inline, and none of this applies. See
-> [Edge Adapter](edge-sdk-python-adapter.md#tasks).
-
-- **Validate in `prepare_task`**; return an error there if you can't handle the task. Don't accept and then fail in `start_task`.
-- **Make `start_task` non-blocking.** Schedule the work and return success immediately. Use `LiveDataService` to report state.
-- **Idempotent `stop_task`.** Cancelling a task that's already finished must be a no-op.
-- **Persist `task_id`** if you need to recover after a restart; the platform may re-issue a `start_task` for a task you already started.
+- **Return quickly.** A long-running command answers at once with an `external_execution_id`, and
+  reports its progress with command execution events.
+- **End every accepted command with exactly one terminal event** — `SUCCEEDED`, `FAILED` or
+  `CANCELLED`. A Skill waiting on a command without one waits until it times out.
+- **Make cancellation idempotent.** Cancelling a command that has already finished must be a no-op.

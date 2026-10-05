@@ -43,7 +43,7 @@ there is no `get_capabilities` method (or any capability-related method) anywher
 SDK, unlike Java's `client.remoteControl().getCapabilities(sn)` and Go's `rc.GetCapabilities(ctx,
 sn)`. If you need capability discovery, call it from Java or Go, or query the platform directly.
 What an asset reports comes from its edge adapter — see
-[Edge SDK (Python) — Connector](../edge-sdk/edge-sdk-python-connector.md#capabilities).
+[Edge SDK (Python) — Connector](../edge-sdk/edge-sdk-python-connector.md#capabilities-and-the-skill-registry).
 
 ## Error handling
 

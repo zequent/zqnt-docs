@@ -1,15 +1,16 @@
 # Edge SDK -- Connector Service
 
-The `ConnectorService` interface gives an edge adapter access to the platform's asset registry over gRPC. It covers what an adapter itself needs — registering and updating its own asset(s), resolving and updating the task it's currently executing, looking up schedulers and organization info, and reporting which commands it supports. **Creating** mission/task records, and managing missions at all, stays a **Client SDK** (customer application) concern — see [Tasks](#tasks) below for the precise, code-verified boundary.
+The `ConnectorService` interface gives an edge adapter access to the platform's asset registry over gRPC. It covers what an adapter itself needs — pairing and updating its own asset(s), looking up schedulers and organization info, reporting the commands it supports to the Skill Registry, and registering media files it uploaded. The 1.3 Mission and Task methods are gone: work reaches an adapter as commands (see [Edge Adapter — Custom Commands](edge-sdk-adapter.md#custom-commands)).
 
-Full method-by-method reference: [Connector API Reference](../api-reference/edge-sdk-connector-reference-1.3.md).
+Full method-by-method reference: [Connector API Reference](../api-reference/edge-sdk-connector-reference.md).
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Asset Management](#asset-management)
 - [Asset Payloads](#asset-payloads)
-- [Tasks](#tasks)
+- [Skill Registry](#skill-registry)
+- [Media Files](#media-files)
 - [Schedulers](#schedulers)
 - [Organization](#organization)
 - [Capabilities](#capabilities)
@@ -23,37 +24,40 @@ Full method-by-method reference: [Connector API Reference](../api-reference/edge
 
 From the edge adapter, you use `ConnectorService` to:
 
-- Register your asset when the adapter starts, and deregister it on shutdown.
+- Make sure your asset exists when the adapter starts — pairing it with a one-time code if the platform doesn't know it yet.
 - Update asset state as it changes.
-- Resolve a task the platform handed you, and write adapter-computed fields or a status change back onto it.
 - Fetch a scheduler's definition and the organization it belongs to.
+- Report the commands your adapter supports to the Skill Registry.
+- Register a media file the device uploaded.
 - Store and retrieve asset payloads (arbitrary versioned metadata blobs, e.g. calibration data).
 - Report which commands your adapter currently supports, by implementing `getCapabilities` on `EdgeAdapterService` — this is what lets the Admin Console show only the controls an asset actually implements.
 
-The SDK provides a ready-to-use implementation (`ConnectorServiceImpl`) that handles gRPC communication and Proto-to-DTO mapping.
+The SDK provides a ready-to-use implementation (`ConnectorServiceImpl`) that handles gRPC communication and Proto-to-DTO mapping; your adapter creates it (see [Quickstart — Wire the SDK](edge-sdk-quickstart.md#step-3b-wire-the-sdk)).
 
 ---
 
 ## Asset Management
 
-### Register an Asset
+### Pair the Asset at Startup
+
+An adapter does not create assets. Its asset is either created in the Admin Console, or **paired**
+with a one-time pairing code (Admin Console, Assets page, **Pairing codes**). `ensureAsset` covers both:
+it looks the serial number up, and redeems the code only if the asset is unknown — a code is single-use,
+so after the first pairing there is nothing left to redeem.
 
 ```java
-import com.zqnt.utils.asset.domains.AssetDTO;
-
-AssetDTO asset = new AssetDTO();
-asset.setSn("YOUR_DEVICE_SN");
-asset.setName("Dock Alpha");
-asset.setAssetType("ASSET_TYPE_DOCK");
-asset.setVendor("DJI");
-
-connectorService.registerAsset(asset)
-    .thenAccept(registered -> log.info("Asset registered with ID: {}", registered.getId()))
-    .exceptionally(err -> {
-        log.error("Failed to register asset", err);
-        return null;
-    });
+connectorService.ensureAsset(asset, pairingCode)   // pairingCode may be null
+    .thenAccept(found -> log.info("Asset: {}", found == null ? "not on the platform yet" : found.getId()));
 ```
+
+- `redeemAssetClaim(code, asset)` trades a code for an asset directly. The organization the asset lands
+  in comes from the code, never from `asset`. It completes with `null` for every refusal alike —
+  unknown, expired, revoked, exhausted, or not valid for this kind of device.
+- `describeAssetClaim(code)` returns the name of the organization a code would pair into, without
+  spending it — so a device can ask its operator to confirm first.
+- `registerAsset` is **deprecated**: it creates an asset with no organization, which no tenant can see.
+
+See [Usage Examples](#usage-examples) for a complete startup class.
 
 ### Get Asset by Serial Number / ID
 
@@ -77,9 +81,10 @@ connectorService.getSubAssetBySn("YOUR_DEVICE_SNXXX")
 ### Update an Asset
 
 ```java
-AssetDTO update = new AssetDTO();
-update.setSn("YOUR_DEVICE_SN");
-update.setName("Dock Alpha -- Updated");
+AssetDTO update = AssetDTO.builder()
+    .sn("YOUR_DEVICE_SN")
+    .name("Dock Alpha -- Updated")
+    .build();
 
 connectorService.updateAsset("550e8400-e29b-41d4-a716-446655440000", update)
     .thenAccept(updated -> log.info("Asset updated"));
@@ -87,12 +92,9 @@ connectorService.updateAsset("550e8400-e29b-41d4-a716-446655440000", update)
 
 ### Deregister an Asset
 
-```java
-connectorService.deRegisterAsset("550e8400-e29b-41d4-a716-446655440000")
-    .thenAccept(success -> {
-        if (success) log.info("Asset deregistered");
-    });
-```
+`deRegisterAsset(id)` deletes the asset record. Do not call it on shutdown: a paired asset would have
+to be paired again with a new code. In 2.0.0 the platform deletes by serial number, which this method
+does not send, so it completes with `false`.
 
 ---
 
@@ -107,47 +109,9 @@ connectorService.upsertAssetPayload("YOUR_DEVICE_SN", null, payloadDTO)
 
 ---
 
-## Tasks
-
-`EdgeAdapterService`'s `prepareTask`/`startTask` receive only a task ID (see
-[Edge Adapter Reference — Task Execution](../api-reference/edge-sdk-adapter-reference.md#task-execution)) — resolve it with
-`getTaskById`, then write back onto that same record with `updateTask` as your adapter learns more
-(e.g. a generated flight-plan file's URL) or as the task's status changes:
-
-```java
-connectorService.getTaskById(taskId)
-    .thenCompose(taskDTO -> {
-        // ... generate and upload your flight plan from taskDTO.getConfig() ...
-
-        WaypointTaskConfig config = (WaypointTaskConfig) taskDTO.getConfig();
-        config.setFileUrl(uploadedFileUrl);
-        config.setFileMd5(uploadedFileMd5);
-
-        // Persist it — the platform's response to updateTask does not echo these fields back,
-        // so re-fetching afterward would lose them. Keep using this same in-memory taskDTO.
-        return connectorService.updateTask(taskDTO.getId().toString(), taskDTO);
-    })
-    .thenAccept(updated -> log.info("Task prepared: {}", updated.getId()));
-```
-
-```java
-taskDTO.setStatus(TaskStatus.TASK_RUNNING);
-connectorService.updateTask(taskDTO.getId().toString(), taskDTO)
-    .thenAccept(updated -> {
-        // Now actually trigger the flight on your hardware.
-    });
-```
-
-**`createTask`/`deleteTask` exist on the interface but have no confirmed real-adapter usage** —
-creating and deleting task records is a Client SDK (customer application) responsibility. The same
-holds for every Mission method (`getMissionById`/`createMission`/`updateMission`/`deleteMission`) —
-mission management stays client-side entirely.
-
----
-
 ## Schedulers
 
-Schedulers define when and how often a task or command runs.
+Schedulers define when a Skill or a single command runs, and on which asset.
 
 ```java
 connectorService.getSchedulerById("scheduler-uuid")
@@ -199,12 +163,31 @@ public CompletableFuture<CurrentCapabilities> getCapabilities(String sn) {
 Return `CurrentCapabilities.empty(sn)` for an asset you do not recognise. See
 [Edge Adapter](edge-sdk-adapter.md) for the full `EdgeAdapterService` surface.
 
-> **Beta preview — 2.0.x, not yet released.** An unmerged branch adds Skill Registry
-> self-reporting to this interface (beyond the live `getCapabilities` snapshot above) and removes
-> every Mission/Task method outright. See the
-> [2.0.x migration guide](../concepts/migration-guide.md#per-sdk-impact) for what replaces
-> them, or the [2.0.x reference](../api-reference/edge-sdk-connector-reference.md) for the exact
-> methods.
+---
+
+## Skill Registry
+
+Beyond the live `getCapabilities` snapshot, an adapter can report its commands to the platform's
+persisted Skill Registry — one entry per `(command_id, schema_version)`, which Skill authors build on:
+
+| Method | Purpose |
+| --- | --- |
+| `observeSkillContract(contract)` | Add a contract, or refresh one already known |
+| `listSkillContracts(status, commandId)` | List the registry; with `commandId`, that command's version history |
+| `setSkillContractStatus(id, status)` | Move a contract through `ACTIVE` / `DRAFT` / `DEPRECATED` / `RETIRED` |
+| `setSkillContractPermissions(id, requiredPermissions)` | Replace its required permissions (stored, not yet enforced) |
+
+See the [Connector reference](../api-reference/edge-sdk-connector-reference.md#skill-registry--new-in-20x).
+
+---
+
+## Media Files
+
+`registerMediaFile(request)` records a file the device uploaded to the platform's inbox bucket. The
+platform attributes it to the execution that was running on the asset and files it under its
+organization. Reporting the same object twice is harmless.
+
+---
 
 ## Error Handling
 
@@ -233,69 +216,76 @@ connectorService.getAssetBySn("SOME_SN")
 
 ## Configuration
 
-```properties
-quarkus.grpc.clients.connector-service.host=localhost
-quarkus.grpc.clients.connector-service.port=8010
-quarkus.grpc.clients.connector-service.keep-alive-without-calls=true
-```
-
-See the [Configuration Guide](edge-sdk-configuration.md) for the complete reference.
+The Connector address is `grpc.client.connector.host` / `.port` (`CONNECTOR_SERVICE_HOST` /
+`CONNECTOR_SERVICE_PORT`, default port `8010`). See the [Configuration Guide](edge-sdk-configuration.md#grpc-client-configuration).
 
 ---
 
 ## Usage Examples
 
-### Startup Registration Pattern
+### Startup Pairing Pattern
 
 ```java
+package com.example.edge;
+
+import com.zqnt.sdk.edge.connector.application.ConnectorService;
+import com.zqnt.utils.asset.domains.AssetDTO;
+import com.zqnt.utils.common.proto.AssetTypeEnum;
+import com.zqnt.utils.common.proto.AssetVendor;
 import io.quarkus.runtime.StartupEvent;
-import io.quarkus.runtime.ShutdownEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.util.Optional;
 
 @Slf4j
 @ApplicationScoped
-public class AssetRegistration {
+public class AssetPairing {
 
     private final ConnectorService connectorService;
-    private final EdgeClientConfig config;
-    private String registeredAssetId;
 
-    public AssetRegistration(ConnectorService connectorService, EdgeClientConfig config) {
+    @ConfigProperty(name = "zequent.edge.sn")
+    String sn;
+
+    // One-time pairing code from the Admin Console; only needed for a device the platform doesn't know yet
+    @ConfigProperty(name = "zqnt.claim-code")
+    Optional<String> claimCode;
+
+    public AssetPairing(ConnectorService connectorService) {
         this.connectorService = connectorService;
-        this.config = config;
     }
 
     void onStart(@Observes StartupEvent event) {
-        AssetDTO asset = new AssetDTO();
-        asset.setSn(config.sn());
-        asset.setAssetType(config.assetType().name());
-        asset.setVendor(config.assetVendor().name());
+        AssetDTO asset = AssetDTO.builder()
+                .sn(sn)
+                .name("Dock Alpha")
+                .type(AssetTypeEnum.ASSET_TYPE_DOCK)
+                .vendor(AssetVendor.ASSET_VENDOR_DJI)
+                .build();
 
-        connectorService.registerAsset(asset)
-            .thenAccept(registered -> {
-                registeredAssetId = registered.getId();
-                log.info("Asset registered: {}", registeredAssetId);
-            })
-            .exceptionally(err -> {
-                log.error("Asset registration failed", err);
-                return null;
-            });
-    }
-
-    void onStop(@Observes ShutdownEvent event) {
-        if (registeredAssetId != null) {
-            connectorService.deRegisterAsset(registeredAssetId).join();
-            log.info("Asset deregistered");
-        }
+        connectorService.ensureAsset(asset, claimCode.orElse(null))
+                .thenAccept(found -> {
+                    if (found == null) {
+                        log.warn("Asset {} is not on the platform yet: create it in the console or set a pairing code", sn);
+                    } else {
+                        log.info("Asset {} is {}", sn, found.getId());
+                    }
+                })
+                .exceptionally(err -> {
+                    log.error("Asset lookup failed", err);
+                    return null;
+                });
     }
 }
 ```
+
+`zqnt.claim-code` reads `ZQNT_CLAIM_CODE`. Once the asset is paired, the code can be removed.
 
 ---
 
 ## See also
 
-- [Connector API Reference](../api-reference/edge-sdk-connector-reference-1.3.md) — every method, including which ones have confirmed real-adapter usage and which don't
-- [Edge Adapter Reference — Task Execution](../api-reference/edge-sdk-adapter-reference.md#task-execution) — how `prepareTask`/`startTask`/`stopTask` reach your adapter in the first place
+- [Connector API Reference](../api-reference/edge-sdk-connector-reference.md) — every method
+- [Edge Adapter — Custom Commands](edge-sdk-adapter.md#custom-commands) — how work reaches your adapter in 2.0

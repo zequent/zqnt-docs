@@ -49,7 +49,7 @@ Exhaustive method reference for `ConnectorClient`.
 | `get_asset_by_sn(sn)` | `Asset \| None` | Look up an asset by serial number; `None` if not found |
 | `ensure_asset(asset)` | `Asset \| None` | Make sure the asset's serial number exists on the platform: return it if it does, otherwise redeem the configured `claim_code` for it. With no claim code it reports what it found and creates nothing |
 | `redeem_asset_claim(code, asset)` | `Asset \| None` | Trade a one-time claim code for an asset, and return it; `None` when the code is refused |
-| `watch_assets()` | `AsyncIterator[list[Asset]]` | Subscribe to the platform's asset-monitoring stream — yields a snapshot list on every server push; runs until cancelled or the server closes it |
+| `watch_assets()` | `AsyncIterator[list[Asset]]` | Subscribe to the platform's asset-monitoring stream. **The 2.0.0 platform does not implement this stream** and answers it with an error |
 
 **Pairing.** Call `ensure_asset` at startup. Because a claim is single-use, the lookup comes first:
 after the first successful pairing there is nothing left to redeem, and the adapter would otherwise

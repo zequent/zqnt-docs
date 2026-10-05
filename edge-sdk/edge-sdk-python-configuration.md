@@ -22,6 +22,15 @@ For Java/Quarkus configuration see [edge-sdk-configuration.md](edge-sdk-configur
 | `LOG_LEVEL` | Python log level name | `INFO` |
 | `LOG_FORMAT` | `json` or `text` | `json` |
 
+### Credentials and pairing
+
+| Variable | Description | Default |
+|----------|--------------|---------|
+| `ZQNT_EDGE_TOKEN` | The adapter's **edge credential**, sent on every call to the platform. Issued in the Admin Console under **Manage → Access & Integrations → Credentials** (kind *Edge adapter*). Without it the platform refuses the calls | unset |
+| `ZQNT_PLATFORM_PUBLIC_KEY` | The platform's public key (alias `SERVICE_AUTH_PUBLIC_KEY`). The adapter's server refuses every call the platform did not sign with it; without it, every call is refused | unset |
+| `ZQNT_EDGE_AUTH_DISABLED` | `true` turns that check off — for a local simulator stack only | `false` |
+| `ZQNT_CLAIM_CODE` | One-time pairing code, redeemed by `ensure_asset` for an asset the platform doesn't know yet | unset |
+
 **The library's built-in port defaults do not match the platform's real service ports.** Always set `CONNECTOR_PORT=8010`, `TELEMETRY_PORT=8003`, and `MISSION_AUTONOMY_PORT=8004` (or your deployment's actual ports) explicitly — don't rely on the defaults above.
 
 ```python
@@ -55,13 +64,8 @@ from edge_sdk import RegistrationConfig
 registration = RegistrationConfig.from_env()  # reads EDGE_ENDPOINT / ASSET_TYPE / ASSET_VENDOR / REDIS_URL
 ```
 
-**Redis key format: `zqnt:edge-endpoints:{VENDOR}`.** This does *not* currently match the Java SDK's
-own `CacheKeys.EDGE_ENDPOINTS` key (`edge-endpoints:{vendor}`, no `zqnt:` prefix) or the Go SDK's
-`discovery` package (which explicitly mirrors Java's un-prefixed key, per its own code comment). This
-is a real, confirmed cross-language mismatch in the current Python Edge SDK, not a documentation
-choice — a Python adapter's `EDGE_ENDPOINT` registration writes to a different Redis key than what
-Java-side code reads from, so it will not be discovered the way a Java or Go adapter's registration
-would be.
+**Redis key format: `zqnt:edge-endpoints:{VENDOR}`** — the same key the platform and the Java and Go
+SDKs use in 2.0.
 
 ---
 
@@ -78,13 +82,11 @@ logging.getLogger("edge_sdk").setLevel(logging.DEBUG)
 
 ## TLS / authentication
 
-**Not supported, at any layer.** Confirmed directly in source: `ConnectorClient.connect()`,
-`TelemetryPublisher`'s internal stream setup, and `MissionAutonomyClient.connect()` each construct
-their gRPC channel with a hardcoded `grpc.aio.insecure_channel(host:port)` call — none of these
-classes accepts a `channel`, credentials, or any other override in their constructor or `connect()`.
-There is currently no way to reach the platform over TLS, or attach per-call auth metadata, from the
-Python Edge SDK's own client classes. If your deployment requires TLS between the adapter and the
-platform, terminate it at a sidecar/proxy in front of the platform services instead.
+**Authentication** is built in, in both directions — see [Credentials and pairing](#credentials-and-pairing).
+
+**TLS is not supported.** The SDK's clients always open plaintext gRPC channels to the platform. If your
+deployment requires TLS between the adapter and the platform, terminate it at a sidecar/proxy in front
+of the platform services instead.
 
 ---
 

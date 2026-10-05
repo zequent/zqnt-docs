@@ -24,18 +24,26 @@ This creates a `pyproject.toml` and a `.venv/` managed by `uv`.
 
 ## Step 2: Add the Edge SDK dependency
 
-```bash
-uv add edge-python-sdk
-```
-
-If pulling from a private GitHub repository, configure `[tool.uv.sources]` in `pyproject.toml`:
+The SDK is not on PyPI yet. Install it from its Git release tag, together with `zqnt-utils`, the
+Zequent package it depends on (also from Git). In `pyproject.toml`:
 
 ```toml
+[project]
+dependencies = [
+    "edge-python-sdk>=2.0.0",
+]
+
 [tool.uv.sources]
-edge-python-sdk = { git = "https://github.com/Zequent/zqnt-edge-sdk-python", rev = "v1.2.3" }
+edge-python-sdk = { git = "https://github.com/zequent/zqnt-edge-sdk-python", tag = "v2.0.0" }
+zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", tag = "v2.0.0" }
 ```
 
-and provide a token via `GITHUB_TOKEN` when running `uv sync`.
+then `uv sync` — both repositories are private, so you need GitHub access to them. With pip:
+
+```bash
+pip install "zqnt-utils @ git+https://github.com/zequent/zqnt-utils-python@v2.0.0" \
+            "edge-python-sdk @ git+https://github.com/zequent/zqnt-edge-sdk-python@v2.0.0"
+```
 
 ---
 
@@ -58,7 +66,18 @@ MISSION_AUTONOMY_PORT=8004
 
 ADAPTER_SN=YOUR_DEVICE_SERIAL_NUMBER
 LOG_LEVEL=INFO
+
+# Edge credential: the Admin Console, Manage -> Access & Integrations -> Credentials (kind "Edge adapter")
+ZQNT_EDGE_TOKEN=<your edge credential>
+# The platform's public key, to check the platform's calls into the adapter
+ZQNT_PLATFORM_PUBLIC_KEY=<the platform's service public key>
+# Optional: a one-time pairing code, for a device the platform doesn't know yet
+# ZQNT_CLAIM_CODE=<pairing code>
 ```
+
+Every call the runtime makes to the platform carries `ZQNT_EDGE_TOKEN`; without it the platform
+refuses them. The adapter's server refuses every call that the platform did not sign with the key in
+`ZQNT_PLATFORM_PUBLIC_KEY` — `ZQNT_EDGE_AUTH_DISABLED=true` turns that off, for a local stack only.
 
 The library's own built-in defaults for `CONNECTOR_PORT`/`TELEMETRY_PORT`/`MISSION_AUTONOMY_PORT` (`50053`/`50052`/`50054`) do **not** match the platform's real service ports (`8010`/`8003`/`8004`) — always set these explicitly for your deployment rather than relying on the defaults.
 
@@ -142,7 +161,7 @@ uv run python -m my_edge_adapter
 
 You should see a startup log line reporting the gRPC/Connector/Telemetry/MissionAutonomy addresses it connected with.
 
-If your adapter needs to look up or register its own asset on startup, use `runtime.connector` (a connected `ConnectorClient`) before calling `runtime.serve(...)` — see [Connector](edge-sdk-python-connector.md#typical-startup-pattern). If it needs to push telemetry, pass `runtime.telemetry` (a connected `TelemetryPublisher`) into your adapter's constructor — see [Live Data](edge-sdk-python-live-data.md).
+If your adapter needs to look up or pair its own asset on startup, use `runtime.connector` (a connected `ConnectorClient`) before calling `runtime.serve(...)` — see [Connector](edge-sdk-python-connector.md#typical-startup-pattern). If it needs to push telemetry, pass `runtime.telemetry` (a connected `TelemetryPublisher`) into your adapter's constructor — see [Live Data](edge-sdk-python-live-data.md).
 
 ---
 
@@ -154,6 +173,17 @@ With the platform services running from the published container images (see [Zeq
 2. Sending a takeoff command from a Client SDK (Java or Python) lands on your `take_off` method.
 3. Telemetry pushed via `runtime.telemetry` is visible through the Live Data service.
 
+To call it by hand with `grpcurl`, run it with `ZQNT_EDGE_AUTH_DISABLED=true` — locally only. The
+server has no gRPC reflection, so point `grpcurl` at the protocol files (`edge.proto` from the
+`zqnt-protos` repository):
+
+```bash
+grpcurl -plaintext -import-path zqnt-protos -proto edge.proto -d '{
+  "base": {"sn": "YOUR_DEVICE_SN", "tid": "test-123", "timestamp": "2026-01-01T00:00:00Z"},
+  "coordinate": {"latitude": 47.3769, "longitude": 8.5417, "altitude": 100.0}
+}' localhost:9001 zqnt.EdgeAdapterService/TakeOff
+```
+
 ---
 
 ## Next steps
@@ -161,4 +191,4 @@ With the platform services running from the published container images (see [Zeq
 - [Configuration reference](edge-sdk-python-configuration.md) — every env var the SDK reads
 - [Adapter reference](edge-sdk-python-adapter.md) — full list of overridable methods
 - [Live Data reference](edge-sdk-python-live-data.md) — telemetry, detections, and notifications
-- [Connector reference](edge-sdk-python-connector.md) — asset registration helpers
+- [Connector reference](edge-sdk-python-connector.md) — asset pairing and the Skill Registry

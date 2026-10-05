@@ -17,7 +17,7 @@ Full method-by-method reference: [Edge Adapter API Reference](../api-reference/e
 
 ## How It Works
 
-When your Quarkus application starts, the SDK registers a gRPC service (`EdgeAdapterGrpcServiceImpl`) that receives commands from the platform and delegates them to your `EdgeAdapterService` bean. The flow is:
+The SDK's gRPC service (`EdgeAdapterGrpcServiceImpl`) receives commands from the platform and delegates them to your `EdgeAdapterService` bean. Your adapter registers it, by subclassing it with `@GrpcService` (see [gRPC Layer](#grpc-layer)). The flow is:
 
 ```
 Platform Services  --(gRPC)-->  EdgeAdapterGrpcServiceImpl  --(delegates)-->  Your EdgeAdapterService implementation
@@ -97,37 +97,68 @@ Any method that you do not override will automatically return a `NOT_IMPLEMENTED
 
 See the [API Reference](../api-reference/edge-sdk-adapter-reference.md) for the full command surface, grouped
 by area (Flight Control, Dock Operations, Camera and Gimbal, Manual Control, Live Streaming, Debug
-and Maintenance, Task Execution, Capability Reporting), plus `CommandResult`, the default
+and Maintenance, Task Execution — of which 2.0 only still calls the cancel path —, Capability
+Reporting), plus `CommandResult`, the default
 convenience-method overloads, and the error-code mapping.
 
 ---
 
 ## Custom Commands
 
-For a command that doesn't map to a standard `EdgeAdapterService` method, override `sendCustomCommand`:
+For a command that doesn't map to a standard `EdgeAdapterService` method, override `sendCustomCommand`.
+This is how a waypoint route reaches an adapter in 2.0: the waypoints and configuration arrive inline in
+`params` as `mission.waypoint.execute` (see [Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md#which-adapters-support-it)).
+
+**The platform waits for the outcome.** A successful custom command is answered as *accepted*, not as
+finished: when it runs as part of a Skill execution, the step completes only when your adapter reports a
+**command execution event** for it. The same holds for `takeOff`, `goTo`, `lookAt` and `returnToHome`. So return `CommandResult.accepted(...)` with your own execution id,
+and publish the outcome under that id through `LiveDataService`:
 
 ```java
 @Override
 public CompletableFuture<CommandResult> sendCustomCommand(String sn, String componentId,
         String commandType, Map<String, Object> params) {
-    if ("mission.waypoint.execute".equals(commandType)) {
-        String executionId = deviceApi.startWaypointMission(params);
-        return CompletableFuture.completedFuture(
-            CommandResult.success("Waypoint mission started", executionId, sn)
-        );
+    if (!"mission.waypoint.execute".equals(commandType)) {
+        return CompletableFuture.completedFuture(CommandResult.notImplemented("Unknown command " + commandType, sn));
     }
-    return CompletableFuture.completedFuture(CommandResult.notImplemented("Unknown command", sn));
+    String executionId = UUID.randomUUID().toString();
+    deviceApi.startWaypointMission(params, () ->
+            report(sn, executionId, commandType, CommandExecutionStatus.COMMAND_EXECUTION_STATUS_SUCCEEDED));
+    return CompletableFuture.completedFuture(
+            CommandResult.accepted("Waypoint mission started", executionId, sn));
+}
+
+@Override
+public CompletableFuture<CommandResult> cancelExecution(String sn, String externalExecutionId) {
+    deviceApi.abortMission(externalExecutionId);
+    return CompletableFuture.completedFuture(CommandResult.success("Mission aborted", sn));
+}
+
+private void report(String sn, String executionId, String commandId, CommandExecutionStatus status) {
+    liveData.produceNotificationData(NotificationRequestData.builder()
+            .sn(sn)
+            .tid(UUID.randomUUID().toString())
+            .timestamp(LocalDateTime.now())
+            .eventType(NotificationEventType.NOTIFICATION_EVENT_COMMAND_EXECUTION)
+            .commandExecutionEvent(NotificationRequestData.CommandExecutionEventData.builder()
+                    .externalExecutionId(executionId)
+                    .commandId(commandId)
+                    .assetSn(sn)
+                    .status(status)
+                    .occurredAt(LocalDateTime.now())
+                    .build())
+            .build());
 }
 ```
 
-This is the path MAVLink and the simulator use for waypoint missions instead of the Task Execution
-methods (`prepareTask`/`startTask`) — waypoints and configuration arrive inline in `params`, so no
-task lookup is needed. See [Task Execution](../api-reference/edge-sdk-adapter-reference.md#task-execution) for
-the alternative, task-ID-based path DJI and SAPIENT use, and
-[Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md#which-path-does-your-adapter-use) for the
-full per-adapter picture. Both approaches are valid; leaving a method unimplemented returns
-`NOT_IMPLEMENTED`, which callers handle. Whichever you choose, document it, because the two are not
-interchangeable from a customer application's point of view.
+- Publish `COMMAND_EXECUTION_STATUS_RUNNING` with `progress` while it runs, and exactly one terminal
+  status: `SUCCEEDED`, `FAILED` (with `error`) or `CANCELLED`. Report the outcome even for a command
+  that finishes at once, or the Skill waits until it times out.
+- The platform cancels a running command by calling `cancelExecution(sn, externalExecutionId)` with
+  the id you returned. Its default calls `stopTask`, so an adapter that only implements `stopTask`
+  keeps working.
+- The task methods (`prepareTask`, `startTask`, `pauseTask`, `resumeTask`) are still on the interface,
+  but 2.0 never calls them — see [Upgrading from 1.3](../concepts/migration-guide.md#task-based-execution-is-gone).
 
 ### Command ID naming convention
 
@@ -143,15 +174,17 @@ Every built-in command maps to a well-known, vendor-neutral `command_id` string.
 
 ## gRPC Layer
 
-The `EdgeAdapterGrpcServiceImpl` class is registered as a `@GrpcService`. It:
+The `EdgeAdapterGrpcServiceImpl` class is not registered on its own: subclass it in your adapter and
+annotate the subclass with `@GrpcService`, as in
+[Quickstart — Wire the SDK](edge-sdk-quickstart.md#step-3b-wire-the-sdk). It:
 
-1. Receives incoming gRPC requests from the platform (Remote Control Service, Client SDK).
+1. Receives incoming gRPC requests from the platform (Remote Control, Mission Autonomy and Live Data services).
 2. Maps Proto request messages to SDK model POJOs using `ProtoJsonMapper`.
 3. Delegates to your `EdgeAdapterService` implementation.
-4. Converts `CommandResult` back to an `EdgeResponse` Proto message.
+4. Converts `CommandResult` back to a `CommandResponse` Proto message.
 5. Handles errors with proper gRPC error codes and `GlobalErrorMessage`.
 
-You typically do not need to interact with this class directly. It is wired automatically by the CDI container and the Quarkus gRPC extension.
+Beyond that subclass, you typically do not need to interact with this class directly.
 
 ---
 

@@ -2,7 +2,7 @@
 
 The Betaflight Edge Adapter connects a Betaflight-based flight controller (FC) to the Zequent platform over a direct serial/USB connection, arming and controlling it via RC-style channel commands.
 
-**Status: source-only, very early.** No `Dockerfile` or CI pipeline exists yet for this adapter — it's run directly from source. Because it needs a serial device (`/dev/ttyACM0` or similar) passed through, containerizing it will need `--device`/privileged access whenever that packaging does land.
+The published image is `ghcr.io/zequent/zqnt-adapter-betaflight:2.0.0`; you can also run it from source. It needs the flight controller's serial device (`/dev/ttyACM0` or similar), so the container needs it passed through with `--device`.
 
 ---
 
@@ -43,6 +43,9 @@ Everything else defaults to "not supported."
 | `GRPC_HOST` | `0.0.0.0` | gRPC server bind host |
 | `GRPC_PORT` | `50051` | gRPC server bind port |
 | `ZQNT_CLAIM_CODE` | _unset_ | A one-time pairing code from the console's **Pair device** dialog. Used only when the platform does not already know a serial number this adapter is bringing up: the code decides which organization the resulting asset belongs to, and that cannot be changed afterwards. Leave it unset once the assets exist — an already-paired device does not need it, and the code is single-use. Without it, an unknown serial simply has no asset, and the adapter creates nothing. |
+| `ZQNT_EDGE_TOKEN` | _unset_ | The adapter's **edge credential**, sent on every call to the platform. Issued in the Admin Console under **Manage → Access & Integrations → Credentials** (kind *Edge adapter*); without it the platform refuses the calls |
+| `ZQNT_PLATFORM_PUBLIC_KEY` | _unset_ | The platform's public key (alias `SERVICE_AUTH_PUBLIC_KEY`). The adapter refuses every command the platform did not sign with it; without it, every command is refused |
+| `ZQNT_EDGE_AUTH_DISABLED` | `false` | `true` accepts commands from anyone who can reach the port — local stacks only |
 | `CONNECTOR_HOST` | `localhost` | Connector Service host |
 | `CONNECTOR_PORT` | `50053` | Connector Service port — override to `8010` for a real deployment |
 | `TELEMETRY_HOST` | `localhost` | Live Data Service host |
@@ -56,6 +59,16 @@ Everything else defaults to "not supported."
 | `LOG_FORMAT` | `json` | `json` or `text` |
 
 The library's own built-in `CONNECTOR_PORT`/`TELEMETRY_PORT` defaults (`50053`/`50052`) do not match the platform's real service ports (`8010`/`8003`) — set them explicitly for your deployment.
+
+---
+
+## Running the published image
+
+The adapter needs the flight controller's serial device passed into the container:
+
+```bash
+docker run --env-file .env --device /dev/ttyACM0 -p 50051:50051 ghcr.io/zequent/zqnt-adapter-betaflight:2.0.0
+```
 
 ---
 

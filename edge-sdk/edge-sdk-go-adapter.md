@@ -1,10 +1,9 @@
 # Edge SDK (Go) — Edge Adapter
 
-The `adapter.EdgeAdapter` interface (`github.com/Zequent/zqnt-edge-sdk-go/adapter`) is the core
-contract of the Go Edge SDK — the direct hardware-command surface, one method per operation. This is
-the SDK's narrower API shape (see
-[Overview](edge-sdk-go-overview.md)); commands are called directly by method name, not routed through
-a Skill Contract the way `EdgeAdapterService` is in the Java/Python SDKs.
+The `adapter.EdgeAdapter` interface (`github.com/Zequent/zqnt-edge-sdk-go/v2/adapter`) is the core
+contract of the Go Edge SDK — the direct hardware-command surface, one method per operation, plus
+`SendCustomCommand` for everything else. See the [Overview](edge-sdk-go-overview.md) for what this SDK
+covers.
 
 ## How it works
 
@@ -104,28 +103,63 @@ for anything you don't override.
 |--------|--------------|
 | `GetCapabilities(ctx, sn)` | Report the device's current capability snapshot (`*domains.CurrentCapabilities`) |
 
-Go's `Capability` struct is near-parity with Java's, not a bare 2-value schema — confirmed
-field-for-field against `adapter/domains/capability.go`: `Command`, `Description`, `Available`,
-`UnavailableReason`, `Metadata`, `TargetType`, `TargetRef`, `SchemaVersion` all exist here exactly
-as they do on Java's `Capability`. The only fields Go is missing are the three JSON-Schema-shaped
-ones — `constraints`, `inputSchema`, `outputSchema`.
+Each `Capability` carries `Command`, `Description`, `Available`, `UnavailableReason`, `Metadata`,
+`TargetType`, `TargetRef`, `SchemaVersion`, `InputSchema`/`OutputSchema` (JSON Schema), `Errors`,
+`Events`, `Requirements` and `SkillID` — see `adapter/domains/capability.go`.
 
 ### Task execution
 | Method | Description |
 |--------|--------------|
-| `PrepareTask(ctx, taskID, tid string)` | Prepare a task before starting it |
-| `StartTask(ctx, taskID, tid string)` | Start executing a task |
-| `PauseTask(ctx, taskID, tid string)` | Pause a running task |
-| `ResumeTask(ctx, taskID, tid string)` | Resume a paused task |
-| `StopTask(ctx, taskID string)` | Stop a running task |
+| `PrepareTask(ctx, sn, taskID, tid string)` | Not called by the 2.0 platform |
+| `StartTask(ctx, sn, taskID, tid string)` | Not called by the 2.0 platform |
+| `PauseTask(ctx, sn, taskID, tid string)` | Not called by the 2.0 platform |
+| `ResumeTask(ctx, sn, taskID, tid string)` | Not called by the 2.0 platform |
+| `StopTask(ctx, sn, taskID, tid string)` | **Cancels a running command** — `taskID` is the command's execution id (see below) |
 
-These correspond to the platform's Mission/Task model — see
-[Overview](edge-sdk-go-overview.md) for what that means for this SDK.
+See [Upgrading from 1.3](../concepts/migration-guide.md#task-based-execution-is-gone).
 
 ### Custom commands
 | Method | Description |
 |--------|--------------|
-| `SendCustomCommand(ctx, *CustomCommandRequest)` | Handle a command that doesn't map to a standard method above. `CustomCommandRequest` carries `SN`, `TID`, `CommandID`, an optional `TargetRef`, and `Params map[string]any` |
+| `SendCustomCommand(ctx, *CustomCommandRequest)` | Handle a command that doesn't map to a standard method above — for example `mission.waypoint.execute`. `CustomCommandRequest` carries `SN`, `TID`, `CommandID`, an optional `TargetRef`, and `Params map[string]any` |
+
+## Reporting a command's outcome
+
+When a command runs as part of a Skill execution, a successful answer means *accepted*, not
+finished: the step completes only when your adapter publishes a **command execution event** for it.
+That holds for every custom command, and for `TakeOff`, `GoTo`, `LookAt` and `ReturnToHome`. The id
+the platform waits on is the request's `TID`, so publish under it — `RUNNING` with `Progress` while it
+runs, then exactly one of `CommandExecutionSucceeded` (optionally with `Output`), `CommandExecutionFailed`
+or `CommandExecutionCancelled`:
+
+```go
+type MyDroneAdapter struct {
+    adapter.UnimplementedEdgeAdapter
+    live livedata.LiveDataService // set to client.LiveData() after NewEdgeClient
+}
+
+func (a *MyDroneAdapter) SendCustomCommand(ctx context.Context, req *domains.CustomCommandRequest) (*domains.CommandResult, error) {
+    if req.CommandID != "mission.waypoint.execute" {
+        return domains.NotImplemented("unknown command "+req.CommandID, req.SN), nil
+    }
+    // The request's TID is the id the platform waits on
+    go a.flyRoute(req.SN, req.TID, req.Params)
+    return domains.SuccessWithTID("route accepted", req.TID, req.SN), nil
+}
+
+func (a *MyDroneAdapter) flyRoute(sn, executionID string, params map[string]any) {
+    // ... fly the route, publishing CommandExecutionRunning events with Progress as it goes ...
+    _ = a.live.PublishCommandExecutionEvent(context.Background(), &domains.CommandExecutionEvent{
+        SN:                  sn,
+        ExternalExecutionID: executionID,
+        CommandID:           "mission.waypoint.execute",
+        Status:              domains.CommandExecutionSucceeded,
+    })
+}
+```
+
+Without a terminal event the Skill waits until it times out. To cancel, the platform calls `StopTask`
+with that same id.
 
 ## `CommandResult`
 

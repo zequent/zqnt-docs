@@ -46,15 +46,14 @@ Manages a persistent gRPC connection to the Live Data service. Lets you push ass
 
 ### `ConnectorClient`
 
-Talks to the platform's Connector Service over gRPC for asset registration and lookup. It has a
-handful of task-resolution methods too, but no real adapter actually uses them — the platform
-drives task execution by calling into your `EdgeAdapter` instead (see
-[Connector](edge-sdk-python-connector.md) for the details, and
-[Mission Autonomy](edge-sdk-python-mission-autonomy.md)).
+Talks to the platform's Connector Service over gRPC: asset lookup, pairing an unknown asset with a
+one-time code (`ensure_asset`), and reporting your commands to the Skill Registry. Work itself reaches
+your adapter as commands the platform calls into your `EdgeAdapter` (see
+[Connector](edge-sdk-python-connector.md) and [Mission Autonomy](edge-sdk-python-mission-autonomy.md)).
 
 ### `EdgeAdapterConfig` / `EdgeAdapterRuntime`
 
-`EdgeAdapterConfig.from_env()` centralizes all environment-variable reading; its `.runtime()` gives you an async context manager (`EdgeAdapterRuntime`) that connects `ConnectorClient`, `TelemetryPublisher`, and `MissionAutonomyClient` for you and exposes `serve(adapter)` to start the gRPC server. This is the recommended way to wire up `main()` — see the [Quickstart](edge-sdk-python-quickstart.md).
+`EdgeAdapterConfig.from_env()` centralizes all environment-variable reading; its `.runtime()` gives you an async context manager (`EdgeAdapterRuntime`) that connects `ConnectorClient`, `TelemetryPublisher`, and `MissionAutonomyClient` for you — each carrying the adapter's edge credential — and exposes `serve(adapter)` to start the gRPC server, which refuses calls the platform did not sign. This is the recommended way to wire up `main()` — see the [Quickstart](edge-sdk-python-quickstart.md).
 
 ## Available Documentation
 
@@ -65,7 +64,7 @@ drives task execution by calling into your `EdgeAdapter` instead (see
 | [Edge Adapter](edge-sdk-python-adapter.md)                                | Implementing the `EdgeAdapter` base class                            |
 | [Live Data](edge-sdk-python-live-data.md)                                 | Producing telemetry data streams from your adapter                   |
 | [Connector](edge-sdk-python-connector.md)                                 | Asset and resource management via the Connector Service              |
-| [Mission Autonomy](edge-sdk-python-mission-autonomy.md)                   | Scheduler lookup, task lifecycle, and custom commands                |
+| [Mission Autonomy](edge-sdk-python-mission-autonomy.md)                   | Scheduler lookup, and how Skill executions reach your adapter        |
 | [Models Reference](../api-reference/edge-sdk-python-models.md)            | Request, response, and telemetry data model reference                |
 
 Ready-made adapters built on this SDK, and their deployment guides:
@@ -80,12 +79,13 @@ Ready-made adapters built on this SDK, and their deployment guides:
 
 ## Quick Start
 
-Install the Edge SDK:
+Install the Edge SDK. It is not on PyPI yet: install it from its Git release tag, together with
+`zqnt-utils`, the Zequent package it depends on — see the [Quickstart](edge-sdk-python-quickstart.md)
+for the `pyproject.toml` form:
 
 ```bash
-uv add edge-python-sdk
-# or
-pip install edge-python-sdk
+pip install "zqnt-utils @ git+https://github.com/zequent/zqnt-utils-python@v2.0.0" \
+            "edge-python-sdk @ git+https://github.com/zequent/zqnt-edge-sdk-python@v2.0.0"
 ```
 
 Configure your edge via environment variables (see [Configuration](edge-sdk-python-configuration.md) for the full list; the platform's real service ports are `8010`/`8003`/`8004`, not the library's own defaults):
@@ -99,6 +99,8 @@ export TELEMETRY_PORT=8003
 export MISSION_AUTONOMY_HOST=localhost
 export MISSION_AUTONOMY_PORT=8004
 export ADAPTER_SN=YOUR_DEVICE_SERIAL_NUMBER
+export ZQNT_EDGE_TOKEN=<your edge credential>
+export ZQNT_PLATFORM_PUBLIC_KEY=<the platform's service public key>
 ```
 
 Implement the adapter:

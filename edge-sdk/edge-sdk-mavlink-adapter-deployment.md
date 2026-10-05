@@ -24,14 +24,15 @@ The MAVLink Edge Adapter connects PX4 and ArduPilot vehicles to the Zequent plat
 | `ExitManualControl` | `action.hold` |
 | `ManualControlInput` | streams stick input → `manual_control.set_manual_control_input` |
 | `SendCustomCommand("mission.waypoint.execute")` | uploads the inline waypoint list as a MAVSDK mission (`mission.upload_mission`), arms, then `mission.start_mission` |
-| `StopTask` | `mission.pause_mission` |
+| `SendCustomCommand("mission.pause")` / `("mission.resume")` | `mission.pause_mission` / `mission.start_mission` |
+| `StopTask` | `mission.pause_mission` — the platform calls it to cancel a running command |
 | `RegisterAsset` | registers with the Connector Service and eagerly opens the MAVSDK connection |
 | `DeRegisterAsset` | releases the MAVSDK connection |
 
 Every other command defaults to "not supported" and is reported as such through `GetCapabilities` —
-**including `PrepareTask`/`StartTask`.** Mission/Task CRUD is retired platform-wide, so there's no
-RPC left to resolve a bare task ID into waypoint data; this adapter takes the command-based path
-instead, the same way the simulator and edge-dji do. See
+**including `PrepareTask`/`StartTask`**, which the 2.0 platform never calls. Waypoint routes arrive as
+the `mission.waypoint.execute` command, the same way as on the simulator and edge-dji, and the adapter
+reports their progress with command execution events. See
 [Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md) for the full picture across adapters.
 
 ---
@@ -47,6 +48,9 @@ own real defaults, confirmed in `edge_sdk/config.py`:
 | `GRPC_HOST` | `0.0.0.0` | gRPC server bind host |
 | `GRPC_PORT` | `50051` | gRPC server bind port — this is what the platform reaches the adapter on |
 | `ZQNT_CLAIM_CODE` | _unset_ | A one-time pairing code from the console's **Pair device** dialog. Used only when the platform does not already know a serial number this adapter is bringing up: the code decides which organization the resulting asset belongs to, and that cannot be changed afterwards. Leave it unset once the assets exist — an already-paired device does not need it, and the code is single-use. Without it, an unknown serial simply has no asset, and the adapter creates nothing. |
+| `ZQNT_EDGE_TOKEN` | _unset_ | The adapter's **edge credential**, sent on every call to the platform. Issued in the Admin Console under **Manage → Access & Integrations → Credentials** (kind *Edge adapter*); without it the platform refuses the calls |
+| `ZQNT_PLATFORM_PUBLIC_KEY` | _unset_ | The platform's public key (alias `SERVICE_AUTH_PUBLIC_KEY`). The adapter refuses every command the platform did not sign with it; without it, every command is refused |
+| `ZQNT_EDGE_AUTH_DISABLED` | `false` | `true` accepts commands from anyone who can reach the port — local stacks only |
 | `CONNECTOR_HOST` | `localhost` | Connector Service host |
 | `CONNECTOR_PORT` | `50053` | Connector Service port — **not** the real Connector Service platform port (`8010`, see the [image table](../README.md#platform-service-images)); set it explicitly, don't rely on this default |
 | `TELEMETRY_HOST` | `localhost` | Live Data Service host — telemetry forwarding is always on, there's no way to disable it via this variable |
@@ -70,7 +74,7 @@ The vehicle's MAVLink connection string (e.g. `udp://:14540`, `serial:///dev/tty
 ```yaml
 services:
   edge-mavlink:
-    image: ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0
+    image: ghcr.io/zequent/zqnt-adapter-mavlink:2.0.0
     env_file:
       - .env
     ports:
@@ -112,7 +116,7 @@ spec:
     spec:
       containers:
         - name: edge-mavlink
-          image: ghcr.io/zequent/zqnt-adapter-mavlink:1.3.0
+          image: ghcr.io/zequent/zqnt-adapter-mavlink:2.0.0
           ports:
             - containerPort: 50051
           env:

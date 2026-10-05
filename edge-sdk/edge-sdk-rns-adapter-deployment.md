@@ -9,7 +9,7 @@ message ... and publish to ZQNT platform`, with no call to a telemetry or detect
 anywhere in the adapter. Setting `TELEMETRY_HOST`/`TELEMETRY_PORT` wires up the connection but has
 nothing to actually publish yet.
 
-**Status: source-only.** Real, working code with its own `Dockerfile` and CI pipeline, but no version has ever been tagged, so no image has been published yet. Run it from source with `uv`, or build your own image.
+The published image is `ghcr.io/zequent/zqnt-adapter-rns:2.0.0`; you can also run it from source with `uv`, or build your own image.
 
 ---
 
@@ -40,6 +40,9 @@ Everything else defaults to "not supported." If you need the standard command se
 | `GRPC_HOST` | `[::]` | gRPC server bind host |
 | `GRPC_PORT` | `50051` | gRPC server bind port |
 | `ZQNT_CLAIM_CODE` | _unset_ | A one-time pairing code from the console's **Pair device** dialog. Used only when the platform does not already know a serial number this adapter is bringing up: the code decides which organization the resulting asset belongs to, and that cannot be changed afterwards. Leave it unset once the assets exist — an already-paired device does not need it, and the code is single-use. Without it, an unknown serial simply has no asset, and the adapter creates nothing. |
+| `ZQNT_EDGE_TOKEN` | _unset_ | The adapter's **edge credential**, sent on every call to the platform. Issued in the Admin Console under **Manage → Access & Integrations → Credentials** (kind *Edge adapter*); without it the platform refuses the calls |
+| `ZQNT_PLATFORM_PUBLIC_KEY` | _unset_ | The platform's public key (alias `SERVICE_AUTH_PUBLIC_KEY`). The adapter refuses every command the platform did not sign with it; without it, every command is refused |
+| `ZQNT_EDGE_AUTH_DISABLED` | `false` | `true` accepts commands from anyone who can reach the port — local stacks only |
 | `CONNECTOR_HOST` | `localhost` | Connector Service host |
 | `CONNECTOR_PORT` | `8010` | Connector Service port |
 | `TELEMETRY_HOST` | _unset_ (empty string) | Live Data Service host — connection setup only; see the note above, nothing is published yet regardless of this value |
@@ -50,6 +53,14 @@ Everything else defaults to "not supported." If you need the standard command se
 | `ASSET_TYPE` | _unset_ | Full proto-style name, **not** the bare enum member — `ASSET_TYPE_AIRCRAFT`, not `AIRCRAFT` |
 | `ASSET_VENDOR` | _unset_ | Same requirement — `ASSET_VENDOR_RNS`, not `RNS` |
 | `REDIS_URL` | `redis://localhost:6379` | Used only when `EDGE_ENDPOINT` is set |
+
+---
+
+## Running the published image
+
+```bash
+docker run --env-file .env -p 50051:50051 ghcr.io/zequent/zqnt-adapter-rns:2.0.0
+```
 
 ---
 

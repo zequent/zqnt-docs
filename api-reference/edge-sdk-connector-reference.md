@@ -39,7 +39,7 @@ attempts) before it fails. For the asset, asset payload, scheduler and organizat
 | `redeemAssetClaim(code, AssetDTO)` | `AssetDTO` | Trade a one-time claim code for an asset, and return it |
 | `describeAssetClaim(code)` | `String` | The name of the organization a claim code would provision into, without spending the code |
 | `updateAsset(id, AssetDTO)` | `AssetDTO` | Update an existing asset |
-| `deRegisterAsset(id)` | `Boolean` | Deregister an asset |
+| `deRegisterAsset(id)` | `Boolean` | Delete an asset record. In 2.0.0 the platform deletes by serial number, which this method does not send, so it returns `false` |
 | `registerAsset(AssetDTO)` | `AssetDTO` | **Deprecated** — use `ensureAsset` |
 
 **Pairing.** Call `ensureAsset` at startup. Because a claim is single-use, the lookup comes first:

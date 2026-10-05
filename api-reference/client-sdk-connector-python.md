@@ -67,4 +67,4 @@ Capability discovery lives on `client.remote_control`, not `client.connector` �
 [Remote Control — Capabilities](../client-sdk/REMOTE_CONTROL.md#capabilities--custom-commands) (Java
 page; the Python client mirrors the same `get_capabilities(sn)` call). What an asset reports comes
 from its edge adapter — see
-[Edge SDK (Python) — Connector](../edge-sdk/edge-sdk-python-connector.md#capabilities).
+[Edge SDK (Python) — Connector](../edge-sdk/edge-sdk-python-connector.md#capabilities-and-the-skill-registry).

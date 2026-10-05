@@ -4,29 +4,22 @@ The Go Edge SDK connects a physical asset (drone, dock, vehicle) to Zequent by r
 server your process hosts — the platform dials in and calls your `EdgeAdapter` implementation, the
 same inversion-of-control shape as the Java/Python Edge SDKs' `EdgeAdapterService`.
 
-## Status: an older API surface than Java/Python — read this before you start
+## Status: a narrower API surface than Java/Python — read this before you start
 
-This SDK has a narrower surface than its Java and Python counterparts. Its `connector` client
-covers assets and organizations only — there is no task or mission lookup, so a Go adapter cannot
-resolve a bare task id and can only take the command-based execution path (see
-[Waypoint Missions](../client-sdk/WAYPOINT_MISSIONS.md)). Its `missionautonomy` client exposes
-scheduler lookup only. Its `Capability` struct is near-parity with Java's, though — confirmed
-field-for-field against source, it's missing only the three JSON-Schema-shaped fields
-(`constraints`, `inputSchema`, `outputSchema`); see
-[Edge Adapter — Capability reporting](edge-sdk-go-adapter.md#capability-reporting).
+This SDK has a narrower surface than its Java and Python counterparts. Its `connector` client covers
+asset lookup/registration and organizations only — no pairing-code methods, no Skill Registry and no
+schedulers. Its `missionautonomy` client exposes scheduler lookup only. Commands, capabilities
+(including input/output schemas) and command execution events are fully supported, so a Go adapter
+takes part in Skill executions like any other — see [Edge Adapter](edge-sdk-go-adapter.md).
 
-It is real, tagged, published (`go get github.com/Zequent/zqnt-edge-sdk-go@latest` works) and CI'd
-— just smaller in scope. Build a Go adapter on it when the command surface is enough for your
-device; use the Java or Python Edge SDK when you need the task lifecycle. **No confirmed real Go
-adapter exists in this ecosystem today** — every real, in-production adapter found (DJI, MAVLink,
-SAPIENT, Betaflight, RNS) is a Java or Python implementation.
+It is tagged, published and CI'd. The platform's own simulator is built on it.
 
 ## Tech Specs
 
 | Requirement | Version |
 |-------------|---------|
-| Go          | 1.24+   |
-| Module      | `github.com/Zequent/zqnt-edge-sdk-go` |
+| Go          | 1.25+   |
+| Module      | `github.com/Zequent/zqnt-edge-sdk-go/v2` |
 | Transport   | gRPC (server you host; client stubs to the backend) |
 
 ## Overview
@@ -59,8 +52,11 @@ Zequent Backend  ──gRPC──>  Your App (EdgeAdapter)  ──>  Hardware
 ```bash
 go env -w GONOSUMDB="github.com/Zequent/*"
 go env -w GONOPROXY="github.com/Zequent/*"
-go get github.com/Zequent/zqnt-edge-sdk-go@latest
+go get github.com/Zequent/zqnt-edge-sdk-go/v2@v2.0.0
 ```
+
+The module path ends in `/v2`, and so does every import path — without it, Go installs the
+end-of-life 1.3 line.
 
 ```go
 type MyDroneAdapter struct {
@@ -71,7 +67,10 @@ func (a *MyDroneAdapter) TakeOff(ctx context.Context, req *domains.TakeOffReques
     return domains.SuccessWithTID("ok", req.TID, req.SN), nil
 }
 
-client, _ := edgesdk.NewEdgeClient("your-backend:50051", "YOUR-DEVICE-SN", &MyDroneAdapter{})
+// ZQNT_EDGE_TOKEN and ZQNT_PLATFORM_PUBLIC_KEY are read from the environment
+client, _ := edgesdk.NewEdgeClient("live-data-service:8003", "YOUR-DEVICE-SN", &MyDroneAdapter{},
+    edgesdk.WithConnectorAddr("connector-service:8010"),
+    edgesdk.WithMissionAutonomyAddr("mission-autonomy-service:8004"))
 lis, _ := net.Listen("tcp", ":9090")
 client.StartServing(context.Background(), lis)
 ```

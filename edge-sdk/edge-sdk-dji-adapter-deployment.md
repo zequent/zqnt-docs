@@ -79,6 +79,8 @@ one.
 | `LIVE_DATA_SERVICE_HOST` | Hostname of the Live Data Service |
 | `MISSION_AUTONOMY_SERVICE_HOST` | Hostname of the Mission Autonomy Service |
 | `REMOTE_CONTROL_SERVICE_HOST` | Hostname of the Remote Control Service |
+| `ZQNT_EDGE_TOKEN` | The adapter's **edge credential**, sent on every call to the platform. Issued in the Admin Console under **Manage → Access & Integrations → Credentials** (kind *Edge adapter*) |
+| `ZQNT_PLATFORM_PUBLIC_KEY` | The platform's public key (alias `SERVICE_AUTH_PUBLIC_KEY`). The adapter refuses every command the platform did not sign with it |
 
 ### Optional
 
@@ -92,6 +94,8 @@ one.
 | `EDGE_ADAPTER_TARGET_ENDPOINTS` | `edge-adapter-dji:9001` | Address at which this adapter is reachable by the platform |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection used by the adapter's caching layer |
 | `ZQNT_DOCK_OFFLINE_TIMEOUT` | `10s` | A dock is reported offline if no OSD telemetry arrives within this window |
+| `ZQNT_EDGE_AUTH_DISABLED` | `false` | `true` accepts commands from anyone who can reach the port — local stacks only |
+| `LIVESTREAM_AUTOSTART_MODE` | `adapter` | `platform` lets the platform start a camera's stream when it becomes available, with a fresh stream key — set together with the Admin Console's `LIVE_STREAM_AUTO_START_ENABLED`; see [Live Video](../client-sdk/LIVE_VIDEO.md#automatically-when-the-camera-becomes-available) |
 | `ZQNT_DOCK_WATCHDOG_INTERVAL` | `2s` | How often the adapter checks each dock's telemetry age against `ZQNT_DOCK_OFFLINE_TIMEOUT` |
 | `S3_ENDPOINT` | `https://s3.amazonaws.com` | S3-compatible storage endpoint |
 | `S3_REGION` | `eu-central-1` | S3 region |
@@ -108,7 +112,7 @@ Use the same deployment-local `.env` file as the platform stack.
 ```yaml
 services:
   edge-dji:
-    image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
+    image: ghcr.io/zequent/zqnt-edge-adapter-dji:2.0.0
     container_name: edge-adapter-dji
     env_file:
       - .env
@@ -125,7 +129,7 @@ container naming from a `edge-dji` service key would not produce this name on it
 `edge-dji` service, so the Admin Console's start/stop/restart controls will not find that container
 as shipped.
 
-Set the required MQTT, service endpoint, and optional storage values in `.env`.
+Set the required MQTT, service endpoint, credential, and optional storage values in `.env`.
 
 ---
 
@@ -148,7 +152,7 @@ spec:
     spec:
       containers:
         - name: edge-adapter-dji
-          image: ghcr.io/zequent/zqnt-edge-adapter-dji:1.3.0
+          image: ghcr.io/zequent/zqnt-edge-adapter-dji:2.0.0
           ports:
             - containerPort: 9001
           env:
@@ -156,6 +160,16 @@ spec:
               value: "k8s"
             - name: EDGE_ADAPTER_TARGET_ENDPOINTS
               value: "edge-dji:9001"
+            - name: ZQNT_EDGE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: edge-adapter-dji-secrets
+                  key: edge-token
+            - name: ZQNT_PLATFORM_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: edge-adapter-dji-secrets
+                  key: platform-public-key
             - name: ZQNT_MQTT_BROKER_HOST
               value: "your-broker.example.com"
             - name: ZQNT_MQTT_BROKER_PORT

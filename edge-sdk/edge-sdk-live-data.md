@@ -24,7 +24,7 @@ Edge adapters continuously push data to the Live Data Service, where it's broadc
 
 - **Telemetry** -- position, battery, environmental readings, camera state, and more.
 - **Detections** -- AI/vision detection results.
-- **Notifications** -- asset online/offline events, task progress/completion events, and (less commonly) mission-level events (see [API Reference — Notifications](../api-reference/edge-sdk-live-data-reference.md#notifications)).
+- **Notifications** -- asset online/offline events, command execution events (a command's progress and outcome), and (less commonly) mission-level events (see [API Reference — Notifications](../api-reference/edge-sdk-live-data-reference.md#notifications)).
 
 The `LiveDataService` abstracts the complexity of managing gRPC streams: one persistent stream per device per data kind, with automatic reconnection on failure.
 
@@ -198,27 +198,29 @@ liveDataService.produceDetectionData(batch)
 
 ## Notifications
 
-Notifications cover three cases: reporting an asset's online/offline transitions, reporting progress
-or completion of a task your adapter is running, and (less commonly — no confirmed usage in any
-current adapter) mission-level events. Exactly one event field should be set per call — see the
+Notifications cover three cases: reporting an asset's online/offline transitions, reporting the
+progress and outcome of a command your adapter is running, and (less commonly — no confirmed usage in
+any current adapter) mission-level events. Exactly one event field should be set per call — see the
 [reference](../api-reference/edge-sdk-live-data-reference.md#notifications) for the full field list of each.
 
 ```java
 import com.zqnt.sdk.edge.adapter.domains.NotificationRequestData;
-import com.zqnt.sdk.edge.adapter.domains.NotificationRequestData.TaskEventData;
-import com.zqnt.utils.mission.proto.TaskStatus;
-import com.zqnt.utils.mission.proto.TaskTypeProto;
+import com.zqnt.sdk.edge.adapter.domains.NotificationRequestData.CommandExecutionEventData;
+import com.zqnt.utils.events.proto.CommandExecutionStatus;
+import com.zqnt.utils.events.proto.NotificationEventType;
 
-// Report progress for a task your adapter is running
+// Report progress for a command your adapter accepted
 NotificationRequestData progress = NotificationRequestData.builder()
     .sn("YOUR_DEVICE_SN")
     .timestamp(LocalDateTime.now())
-    .eventType(NotificationEventType.NOTIFICATION_EVENT_TASK)
-    .taskEvent(TaskEventData.builder()
-        .taskId(taskId)
-        .taskType(TaskTypeProto.TASK_TYPE_WAYPOINT)
-        .status(TaskStatus.TASK_RUNNING)
+    .eventType(NotificationEventType.NOTIFICATION_EVENT_COMMAND_EXECUTION)
+    .commandExecutionEvent(CommandExecutionEventData.builder()
+        .externalExecutionId(executionId)   // the id you returned in CommandResult.accepted(...)
+        .commandId("mission.waypoint.execute")
+        .assetSn("YOUR_DEVICE_SN")
+        .status(CommandExecutionStatus.COMMAND_EXECUTION_STATUS_RUNNING)
         .progress(0.42f)
+        .occurredAt(LocalDateTime.now())
         .build())
     .build();
 
@@ -228,6 +230,11 @@ liveDataService.produceNotificationData(progress)
         return null;
     });
 ```
+
+`externalExecutionId`, `assetSn` and `occurredAt` are required. Finish every command with exactly one
+terminal status — `SUCCEEDED`, `FAILED` (with `error`) or `CANCELLED` — or a Skill waiting on it never
+moves on; see [Edge Adapter — Custom Commands](edge-sdk-adapter.md#custom-commands). 2.0 no longer
+processes task events.
 
 ```java
 import com.zqnt.sdk.edge.adapter.domains.NotificationRequestData.AssetStatusEventData;
@@ -311,22 +318,9 @@ not a CDI `@PreDestroy`.
 
 ## Configuration
 
-The Live Data Service gRPC client is configured in `application.properties`:
-
-```properties
-quarkus.grpc.clients.live-data-service.host=localhost
-quarkus.grpc.clients.live-data-service.port=8003
-quarkus.grpc.clients.live-data-service.keep-alive-without-calls=true
-```
-
-For container deployments:
-
-```properties
-quarkus.grpc.clients.live-data-service.host=live-data-service
-quarkus.grpc.clients.live-data-service.port=8003
-```
-
-See the [Configuration Guide](edge-sdk-configuration.md) for the complete reference.
+The Live Data address is `grpc.client.live-data.host` / `.port` (`LIVE_DATA_SERVICE_HOST` /
+`LIVE_DATA_SERVICE_PORT`, default port `8003`). See the
+[Configuration Guide](edge-sdk-configuration.md#grpc-client-configuration).
 
 ---
 
@@ -340,7 +334,7 @@ See the [Configuration Guide](edge-sdk-configuration.md) for the complete refere
 
 4. **Include a transaction ID.** Setting `tid` on every message enables end-to-end tracing across the system.
 
-5. **Keep the task id stable.** Use the same `taskId` across every `TaskEventData` notification for one run, so the platform can follow that run's progress through to completion.
+5. **Keep the execution id stable.** Use the same `externalExecutionId` across every command execution event for one command, so the platform can follow it through to completion.
 
 6. **Do not manually manage streams.** Let the SDK handle reconnection. If you need to reset a stream, call the relevant `close*Stream(deviceSn)` and the next `produce*` call will create a new one automatically.
 
