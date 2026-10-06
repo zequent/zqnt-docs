@@ -1,4 +1,4 @@
-# Edge SDK -- Mission Autonomy Service
+# Edge SDK — Mission Autonomy Service
 
 `MissionAutonomyService` gives an edge adapter one method: `getScheduler`, which reads a scheduler's
 definition from the platform's `mission-autonomy-service`. Everything related to actually running

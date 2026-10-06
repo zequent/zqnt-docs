@@ -1,4 +1,4 @@
-# DJI Edge Adapter -- Deployment Guide
+# DJI Edge Adapter — Deployment Guide
 
 The DJI Edge Adapter connects DJI docking stations and their sub-assets (drones) to the Zequent platform. It communicates with the dock via MQTT and exposes a gRPC interface toward the platform services.
 

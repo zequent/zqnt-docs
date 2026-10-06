@@ -1,4 +1,4 @@
-# Zequent Client SDK (Python) - Customer Example
+# Zequent Client SDK (Python) — Customer Example
 
 A complete, runnable example of a small FastAPI service that uses the Python Client SDK to expose a REST API for drone operations. This is the Python counterpart of [CUSTOMER_EXAMPLE.md](CUSTOMER_EXAMPLE.md).
 

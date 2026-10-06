@@ -1,4 +1,4 @@
-# MAVLink Edge Adapter -- Deployment Guide
+# MAVLink Edge Adapter — Deployment Guide
 
 The MAVLink Edge Adapter connects PX4 and ArduPilot vehicles to the Zequent platform. It's built on the Python Edge SDK and [MAVSDK-Python](https://github.com/mavlink/MAVSDK-Python), exposing the standard `EdgeAdapterService` gRPC interface and translating incoming platform commands into MAVSDK calls against the vehicle identified by the request's serial number.
 

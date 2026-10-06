@@ -1,4 +1,4 @@
-# AI Edge Adapter -- Deployment Guide
+# AI Edge Adapter — Deployment Guide
 
 The AI Adapter pulls a live RTMP/RTSP video stream, runs YOLO object detection/tracking on it, georeferences each detection against the target camera's live telemetry (turning a bounding box into an approximate lat/lon), publishes the results to the platform, and can optionally re-aim the target's gimbal at whatever it's currently tracking.
 

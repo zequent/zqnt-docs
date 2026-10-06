@@ -1,4 +1,4 @@
-# Integration Hub -- Deployment Guide
+# Integration Hub — Deployment Guide
 
 Integration Hub is a general-purpose data bridge: it reads from a **source** (OPC-UA, Kafka, WebSocket,
 OpenAPI/HTTP, Iosys HTTP), applies a configurable field mapping (with optional JavaScript

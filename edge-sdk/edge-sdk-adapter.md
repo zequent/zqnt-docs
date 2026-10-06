@@ -1,4 +1,4 @@
-# Edge SDK -- Edge Adapter Service
+# Edge SDK — Edge Adapter Service
 
 The `EdgeAdapterService` interface is the core contract of the Edge SDK. Every edge adapter must provide a CDI bean that implements this interface. The SDK ships with a default implementation (`EdgeAdapterServiceImpl`) whose methods all return `NOT_IMPLEMENTED`, so you only need to override the commands that your particular hardware supports.
 

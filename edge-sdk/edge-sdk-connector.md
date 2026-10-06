@@ -1,4 +1,4 @@
-# Edge SDK -- Connector Service
+# Edge SDK — Connector Service
 
 The `ConnectorService` interface gives an edge adapter access to the platform's asset registry over gRPC. It covers what an adapter itself needs — pairing and updating its own asset(s), reading schedules, reporting the commands it supports to the Skill Registry, and registering media files it uploaded. The 1.3 Mission and Task methods are gone: work reaches an adapter as commands (see [Edge Adapter — Custom Commands](edge-sdk-adapter.md#custom-commands)).
 

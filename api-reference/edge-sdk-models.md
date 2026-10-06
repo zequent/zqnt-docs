@@ -1,4 +1,4 @@
-# Edge SDK -- Models Reference
+# Edge SDK — Models Reference
 
 > For 1.3.x (end of life), see the [1.3 Models reference](edge-sdk-models-1.3.md).
 

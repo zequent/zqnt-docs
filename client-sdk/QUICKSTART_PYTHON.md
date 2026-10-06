@@ -1,4 +1,4 @@
-# Zequent Client SDK (Python) - Quick Start Guide
+# Zequent Client SDK (Python) — Quick Start Guide
 
 ## For Customers: Using the SDK in Your Project
 

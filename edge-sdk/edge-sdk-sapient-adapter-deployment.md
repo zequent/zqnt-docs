@@ -1,4 +1,4 @@
-# Sapient Edge Adapter -- Deployment Guide
+# Sapient Edge Adapter — Deployment Guide
 
 The Sapient Edge Adapter bridges TCP SAPIENT-protocol edge nodes to the Zequent platform's gRPC command interface. Incoming SAPIENT messages are translated to the platform's telemetry format; outgoing platform commands are converted to SAPIENT tasks and sent back over TCP.
 

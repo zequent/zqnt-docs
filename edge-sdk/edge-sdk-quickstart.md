@@ -1,4 +1,4 @@
-# Edge SDK -- Quickstart Guide
+# Edge SDK — Quickstart Guide
 
 This guide walks you through creating a new edge adapter project from scratch using the Zequent Edge SDK. By the end, you will have an adapter application that can be packaged as a container image, receive commands from the platform, and push telemetry data.
 

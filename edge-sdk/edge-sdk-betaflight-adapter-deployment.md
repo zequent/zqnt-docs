@@ -1,4 +1,4 @@
-# Betaflight Edge Adapter -- Deployment Guide
+# Betaflight Edge Adapter — Deployment Guide
 
 The Betaflight Edge Adapter connects a Betaflight-based flight controller (FC) to the Zequent platform over a direct serial/USB connection, arming and controlling it via RC-style channel commands.
 

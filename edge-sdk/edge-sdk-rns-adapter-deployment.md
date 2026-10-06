@@ -1,4 +1,4 @@
-# RNS Edge Adapter -- Deployment Guide
+# RNS Edge Adapter — Deployment Guide
 
 The RNS Edge Adapter bridges devices reachable over [Reticulum (RNS)](https://reticulum.network/) mesh networking to the Zequent platform. It's an early-stage adapter: it implements asset registration and vendor-specific commands through the standard custom-command mechanism, but does not yet implement the standard flight/dock command set (`TakeOff`, `GoTo`, etc.) that the DJI or MAVLink adapters do.
 

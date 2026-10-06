@@ -1,4 +1,4 @@
-# Edge SDK -- Configuration Guide
+# Edge SDK — Configuration Guide
 
 ## Overview
 

@@ -1,4 +1,4 @@
-# Edge SDK -- Live Data Service
+# Edge SDK — Live Data Service
 
 The `LiveDataService` interface manages persistent gRPC streams between the edge adapter and the platform's Live Data Service, for three kinds of outbound data: **telemetry**, **detections**, and **notifications**. It provides both a POJO-based API (recommended for most use cases) and a raw Proto-based API for advanced scenarios.
 

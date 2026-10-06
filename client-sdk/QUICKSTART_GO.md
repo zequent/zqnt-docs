@@ -1,4 +1,4 @@
-# Zequent Client SDK - Quick Start Guide (Go)
+# Zequent Client SDK (Go) — Quick Start Guide
 
 ## For Customers: Using the SDK in Your Go Project
 

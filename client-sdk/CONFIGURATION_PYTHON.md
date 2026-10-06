@@ -1,4 +1,4 @@
-# Zequent Client SDK (Python) - Configuration
+# Zequent Client SDK (Python) — Configuration
 
 The Python Client SDK is configured exclusively via **environment variables** read by `ZequentClient.from_env()`, or by passing a `ServiceConfig` per service explicitly. There is no `application.properties` equivalent and no DI container.
 

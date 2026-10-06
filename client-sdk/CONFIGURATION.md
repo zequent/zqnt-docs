@@ -1,4 +1,4 @@
-# Zequent Client SDK - Configuration
+# Zequent Client SDK — Configuration
 
 This page describes the public configuration model for external developers and customer deployments.
 

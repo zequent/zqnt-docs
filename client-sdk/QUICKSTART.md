@@ -1,4 +1,4 @@
-# Zequent Client SDK - Quick Start Guide
+# Zequent Client SDK — Quick Start Guide
 
 ## For Customers: Using the SDK in Your Project
 
