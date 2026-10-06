@@ -1,30 +1,12 @@
 # Edge SDK (Python) — Connector API Reference
 
-> For the conceptual introduction to this model, see
-> [Applications & Skills](../concepts/applications-and-skills.md). For 1.3.x (end of life), see the
-> [1.3 Connector reference](edge-sdk-python-connector-reference-1.3.md).
+> Coming from 1.3? See the [Migration guide](../concepts/migration-guide.md); for 1.3.x (end of
+> life), the [1.3 Connector reference](edge-sdk-python-connector-reference-1.3.md).
 
-Exhaustive method reference for `ConnectorClient`.
-
-## What changed from 1.3
-
-- **`get_mission`/`get_task`/`get_task_by_flight_id` are gone — not deprecated, just removed.**
-  There's no backend RPC left for any of them; the methods don't exist on `ConnectorClient` at all
-  (this SDK doesn't keep the stub-that-raises pattern the client SDK's Python
-  `MissionAutonomyClient` uses for its own retired Mission/Task methods — it just deletes them
-  outright, matching the Java Edge SDK's clean-removal approach). The 1.3 reference already found
-  [no confirmed real-adapter usage](edge-sdk-python-connector-reference-1.3.md#missions-and-tasks)
-  of any of the three, so this is unlikely to affect a real adapter migrating forward.
-- **`register_asset` is gone, replaced by pairing with a claim code** — `ensure_asset` and
-  `redeem_asset_claim`.
-- **Calls carry the adapter's edge credential.** The constructor takes `token`, which defaults to
-  `ZQNT_EDGE_TOKEN`; the platform refuses calls without one.
-- **New: Skill Registry self-reporting** — four methods, working with the raw generated
-  `SkillContractProtoDTO` rather than a plain-Python model (the contract shape is already large and
-  typed; wrapping it a second time buys little for what's normally a write-once-per-command call).
-- `ConnectorClient` has no Scheduler methods, as on 1.3 — that's `MissionAutonomyClient`'s job,
-  and it *is* affected by a cross-cutting `SchedulerDTO` reshape; see
-  [Mission Autonomy — Scheduler lookup](../edge-sdk/edge-sdk-python-mission-autonomy.md#scheduler-lookup).
+Method reference for `ConnectorClient`, the adapter's access to the platform's system of record:
+pairing and the Skill Registry. `EdgeAdapterRuntime` connects one for you as `runtime.connector`.
+Schedules are read through the Mission Autonomy client — see
+[Mission Autonomy — Scheduler lookup](../edge-sdk/edge-sdk-python-mission-autonomy.md#scheduler-lookup).
 
 ## Constructor
 
@@ -49,7 +31,6 @@ Exhaustive method reference for `ConnectorClient`.
 | `get_asset_by_sn(sn)` | `Asset \| None` | Look up an asset by serial number; `None` if not found |
 | `ensure_asset(asset)` | `Asset \| None` | Make sure the asset's serial number exists on the platform: return it if it does, otherwise redeem the configured `claim_code` for it. With no claim code it reports what it found and creates nothing |
 | `redeem_asset_claim(code, asset)` | `Asset \| None` | Trade a one-time claim code for an asset, and return it; `None` when the code is refused |
-| `watch_assets()` | `AsyncIterator[list[Asset]]` | Subscribe to the platform's asset-monitoring stream. **The 2.0.0 platform does not implement this stream** and answers it with an error |
 
 **Pairing.** Call `ensure_asset` at startup. Because a claim is single-use, the lookup comes first:
 after the first successful pairing there is nothing left to redeem, and the adapter would otherwise
@@ -62,7 +43,7 @@ the credential. The organization that owns the created asset comes from the clai
 unknown, expired, revoked, exhausted, or not valid for this kind of device — so the call cannot be
 used to discover which codes exist.
 
-## Skill Registry — new in 2.0.x
+## Skill Registry
 
 | Method | Returns | Purpose |
 | --- | --- | --- |

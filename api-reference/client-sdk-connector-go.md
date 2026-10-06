@@ -1,48 +1,49 @@
 # Zequent Client SDK (Go) — Connector API Reference
 
-Exhaustive method reference for `connector.New(conn)`. For a narrative introduction and worked
-examples, see the [Connector guide](../client-sdk/QUICKSTART_GO.md#connector--assets-schedulers-policies-config).
-For Java, see [client-sdk-connector.md](client-sdk-connector.md); for Python,
+Method reference for `connector.New(conn)` (package `github.com/Zequent/zqnt-client-sdk-go/v2/connector`).
+For a narrative introduction, see the [Connector guide](../client-sdk/CONNECTOR_GO.md). For Java, see
+[client-sdk-connector.md](client-sdk-connector.md); for Python,
 [client-sdk-connector-python.md](client-sdk-connector-python.md).
 
-Every method takes a `context.Context` first and returns `(*Result, error)` — there's no separate
-`hasErrors` flag to check; a non-nil `error` already carries the platform-side message. This is the
-**narrowest** of the three Connector surfaces: no asset payloads, organizations, asset
-register/update/deregister, missions, or tasks.
+Every method takes a `context.Context` first and returns `(result, error)`. There is no separate
+`HasErrors` flag to check: a platform-side error (e.g. no asset with that serial number) comes back
+as a non-nil `error` carrying the platform's message, and so does a transport failure. A refusal of
+the credential keeps its gRPC code, so `status.Code(err)` returns `codes.Unauthenticated` or
+`codes.PermissionDenied`.
+
+The Go connector package covers asset lookup by serial number and the Skill Registry. Updating
+assets and their payloads is available in the [Java](client-sdk-connector.md) and
+[Python](client-sdk-connector-python.md) client SDKs.
+
+## What a client credential may call
+
+A customer application authenticates with a client credential (`ZQNT_CLIENT_TOKEN`, sent by
+`auth.DialOptions`). The platform binds it to one organization:
+
+- A method marked **refused** returns an error with `codes.PermissionDenied`.
+- Looking up an asset that is not your organization's is refused the same way. An asset that does
+  not exist gets the same answer.
 
 ## Assets
 
-| Method | Purpose |
-| --- | --- |
-| `GetAssetBySn(ctx, sn)` | Look up an asset by its serial number |
+| Method | Returns | Client credential | Purpose |
+| --- | --- | --- | --- |
+| `GetAssetBySn(ctx, sn)` | `*asset.AssetProtoDTO` | allowed | Look up an asset by serial number |
 
-Read-only — registration/update is normally done by an edge adapter, not a customer app.
+## Skill Registry
 
-## Schedulers
+The platform-wide catalog of every command an edge adapter has reported, one entry per
+`(command_id, schema_version)`. Types come from `github.com/Zequent/zqnt-client-sdk-go/v2/gen/connector/proto`;
+`SkillContractStatus` is `ACTIVE`, `DRAFT`, `DEPRECATED` or `RETIRED`.
 
-`ConnectorService` has no `ListSchedulers` RPC at this contract version — listing lives on
-`missionautonomy.New(conn)` instead: `ma.ListSchedulers(ctx, taskID)` (empty `taskID` = unfiltered).
-See [Mission Autonomy — Quickstart](../client-sdk/QUICKSTART_GO.md#missionautonomy--missions-tasks--schedulers).
-
-| Method | Purpose |
-| --- | --- |
-| `GetScheduler(ctx, schedulerID)` | Get a scheduler by ID |
-| `CreateScheduler(ctx, scheduler)` | Create one scheduler |
-| `CreateSchedulers(ctx, schedulers)` | Create several in one call |
-| `UpdateScheduler(ctx, schedulerID, scheduler)` | Update a scheduler |
-| `DeleteScheduler(ctx, schedulerID)` | Delete one scheduler |
-| `DeleteSchedulers(ctx, schedulerIDs)` | Delete several in one call |
-| `DeleteSchedulersByTask(ctx, taskID)` | Delete every scheduler tied to one task |
-
-## Technical configuration & policies
-
-| Method | Purpose |
-| --- | --- |
-| `GetActivePoliciesByType(ctx, policyType)` | Fetch active operational policies of a given type |
-| `GetAllActivePolicies(ctx)` | Fetch every active operational policy |
-| `GetTechnicalConfigs(ctx, scope, scopeTarget)` | Fetch technical configuration values for a scope |
+| Method | Returns | Client credential | Purpose |
+| --- | --- | --- | --- |
+| `ListSkillContracts(ctx, status, commandID)` | `[]*SkillContractProtoDTO` | allowed | List the registry. `status` (`*SkillContractStatus`, `nil` for all) filters by lifecycle state; a non-empty `commandID` returns that command's full version history instead |
+| `ObserveSkillContract(ctx, contract)` | `*SkillContractProtoDTO` | refused | Record a contract (done by the platform when adapters report capabilities) |
+| `SetSkillContractStatus(ctx, id, status)` | `*SkillContractProtoDTO` | refused | Change a contract's lifecycle state |
+| `SetSkillContractPermissions(ctx, id, requiredPermissions)` | `*SkillContractProtoDTO` | refused | Replace a contract's required permissions |
 
 ## Capabilities
 
-Capability discovery lives on `remotecontrol.New(conn)`, not `connector.New(conn)` — see
-`rc.GetCapabilities(ctx, sn)` in the [Quickstart](../client-sdk/QUICKSTART_GO.md#remotecontrol--manual-flightdock-control-gateway).
+What a specific asset can do right now is read from the Remote Control client:
+`rc.GetCapabilities(ctx, sn)` — see [client-sdk-remote-control-go.md](client-sdk-remote-control-go.md).

@@ -52,9 +52,6 @@ if asset is None:
     log.warning("Asset not found")
 ```
 
-`watch_assets()` subscribes to the platform's asset-monitoring stream, but the 2.0.0 platform does not
-implement that stream and answers it with an error.
-
 ---
 
 ## Capabilities and the Skill Registry
@@ -68,7 +65,7 @@ rather than failing at execution time.
 Beyond that live snapshot, `observe_skill_contract`, `list_skill_contracts`,
 `set_skill_contract_status` and `set_skill_contract_permissions` report and manage the commands in the
 platform's persisted Skill Registry — see the
-[reference](../api-reference/edge-sdk-python-connector-reference.md#skill-registry--new-in-20x).
+[reference](../api-reference/edge-sdk-python-connector-reference.md#skill-registry).
 
 ## Error handling
 

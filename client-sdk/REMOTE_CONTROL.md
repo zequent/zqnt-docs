@@ -51,7 +51,7 @@ try (ManualControlInputSession session = client.remoteControl().startManualContr
 
 All of these take a `DockOperationRequest` (`sn`, `assetId`, optional `value`) except
 `liveStreamSplitScreen` — what `value` means differs per method (e.g. forcing `closeCover`, toggling
-`debugMode`); see the [reference](../api-reference/client-sdk-remote-control.md#dock--asset-ops) for
+`debugMode`); see the [reference](../api-reference/client-sdk-remote-control.md#dock-asset-and-camera) for
 the full list.
 
 ```java

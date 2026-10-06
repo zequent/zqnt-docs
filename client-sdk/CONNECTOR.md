@@ -1,6 +1,6 @@
 # Zequent Client SDK — Connector
 
-`client.connector()` gives your application direct access to the platform's system of record: asset lookups, organization info, scheduler management, technical configuration, operational policies, asset payloads, and the Skill Registry. Most integrations only need a handful of these — asset lookup and scheduler management are the most common.
+`client.connector()` gives your application access to the platform's system of record: your organization's assets, the payloads mounted on them, and the Skill Registry. A client credential (`ZQNT_CLIENT_TOKEN`) reaches only its own organization's assets. Schedules, policies, technical configuration and organizations are administration: they are managed in the Admin Console, and a client credential is refused (`PERMISSION_DENIED`) — see [what a client credential may call](../api-reference/client-sdk-connector.md#what-a-client-credential-may-call).
 
 Full method-by-method reference: [Connector API Reference](../api-reference/client-sdk-connector.md).
 
@@ -32,8 +32,8 @@ client.connector().getAssetById(request)
     .thenAccept(response -> System.out.println(response));
 ```
 
-Asset payload storage (arbitrary versioned metadata — flight-plan artifacts, calibration data),
-organization lookup, and scheduler CRUD follow the same request/response shape — see the
+Updating an asset, and listing or updating the payloads mounted on it (camera, gimbal, sensor),
+follow the same request/response shape — see the
 [reference](../api-reference/client-sdk-connector.md) for the full method list.
 
 ## Skill Registry
@@ -48,8 +48,8 @@ client.connector().listSkillContracts(null, null)   // (status, commandId) — e
             System.out.println(c.getCommandId() + " v" + c.getSchemaVersion() + " " + c.getStatus())));
 ```
 
-`observeSkillContract`, `setSkillContractStatus` and `setSkillContractPermissions` complete the
-set — see the [reference](../api-reference/client-sdk-connector.md).
+Changing the registry (`observeSkillContract`, `setSkillContractStatus`,
+`setSkillContractPermissions`) is refused for a client credential — the registry is platform-wide.
 
 Missions and tasks are gone in 2.0: automated work is built as Applications and Skills — see
 [Applications & Skills](../concepts/applications-and-skills.md). No-fly zones are managed in the

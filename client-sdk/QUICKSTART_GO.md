@@ -137,30 +137,19 @@ ma.UpsertApplication(ctx, app, expectedRevision) / ma.GetApplication(ctx, applic
 ma.ListApplications(ctx, scope, enabledOnly, pageSize, pageToken)
 ```
 
-See [Applications & Skills](../concepts/applications-and-skills.md#go) for a runnable example, and
+See the [Mission Autonomy API Reference](../api-reference/client-sdk-mission-autonomy-go.md) for every
+method, [Applications & Skills](../concepts/applications-and-skills.md#go) for a runnable example, and
 [Waypoint Missions](WAYPOINT_MISSIONS.md) for flying a waypoint route.
 
-### `connector` — assets, schedulers, policies, config
+### `connector` — asset lookup and Skill Registry
 
 ```go
 c := connector.New(conn)   // dial connector-service, default port 8010
 
 c.GetAssetBySn(ctx, sn)
 
-// Schedulers
-c.ListSchedulers(ctx)
-c.GetScheduler(ctx, schedulerID)
-c.CreateScheduler(ctx, scheduler) / c.CreateSchedulers(ctx, schedulers)
-c.UpdateScheduler(ctx, schedulerID, scheduler)
-c.DeleteScheduler(ctx, schedulerID) / c.DeleteSchedulers(ctx, schedulerIDs)
-
-// Skill Registry
+// Skill Registry (read)
 c.ListSkillContracts(ctx, status, commandID)
-
-// Policies & technical config (read-only)
-c.GetActivePoliciesByType(ctx, policyType)
-c.GetAllActivePolicies(ctx)
-c.GetTechnicalConfigs(ctx, scope, scopeTarget)
 ```
 
 See [CONNECTOR_GO.md](CONNECTOR_GO.md) for the full reference.

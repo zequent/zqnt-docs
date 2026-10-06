@@ -1,40 +1,64 @@
 # Zequent Client SDK (Python) — Functional Responses
 
-Every RemoteControl call returns a response as soon as the edge adapter replies — but "success" in that response is easy to misread as "the device did the thing." This page explains what a command response actually represents, and how to confirm what really happened on the device.
+A Remote Control call answers once the platform has checked your command and the asset's edge
+adapter has replied — but "success" in that answer is easy to misread as "the device did the
+thing." This page explains what a command response represents, and how to confirm what really
+happened on the device.
 
-For Java, see [FUNCTIONAL_RESPONSES.md](FUNCTIONAL_RESPONSES.md).
+For Java, see [FUNCTIONAL_RESPONSES.md](FUNCTIONAL_RESPONSES.md); for Go,
+[FUNCTIONAL_RESPONSES_GO.md](FUNCTIONAL_RESPONSES_GO.md).
 
-## Command calls are synchronous, not fire-and-forget
+## What happens when you send a command
 
-`await client.remote_control.takeoff(request)` doesn't return the moment your call is accepted — it awaits until the device's own command handler has actually responded. There's no separate "ack" that arrives later on some other channel: the `RemoteControlResponse` you get back *is* that answer.
+Every command except manual control runs as a **single-command run** — the same execution engine
+that runs [Applications & Skills](../concepts/applications-and-skills.md):
 
-## What `success` actually means
+1. **The platform checks it.** A movement command meets your organization's no-fly zones: a route
+   through a zone is flown around it, a command with no possible detour is refused, and a zone that
+   requires approval holds the command until someone approves it (see
+   [No-fly zones and safe returns](../concepts/airspace-safety.md)). Pre-flight checks your
+   organization has switched on can refuse it too.
+2. **The platform dispatches it** to the asset's edge adapter.
+3. **Your call answers** once the adapter has replied. The `RemoteControlResponse` you get back *is* that answer;
+   there is no separate acknowledgement on another channel.
 
-A successful response means the adapter's handler for that command returned without error — nothing more. It's entirely up to the adapter's own implementation whether that means "the flight controller accepted the takeoff command" or "the drone has physically left the ground." The platform doesn't distinguish the two, and neither does the response:
+## What the response tells you
+
+| Response | Meaning |
+| --- | --- |
+| `success` is `False` | The command was refused before it reached the device (no-fly zone without a detour, a failed pre-flight check), or the adapter rejected it. `error.error_message` says why |
+| `success` is `True`, `progress.state == "SKILL_EXECUTION_STATUS_SUCCEEDED"` | The adapter carried out a command that completes at once — dock, charging, reboot and similar commands |
+| `success` is `True`, `progress.state == "SKILL_EXECUTION_STATUS_RUNNING"` | The command is under way. `takeoff`, `go_to`, `look_at` and `return_to_home` stay running until the adapter reports their outcome; a command waiting for an approval is running too |
+
+For a running command the outcome arrives later. Follow it with
+`client.mission_autonomy.list_skill_executions(asset_sn=...)` (see
+[Tracking and controlling an execution](../concepts/applications-and-skills.md#tracking-and-controlling-an-execution)),
+or watch telemetry as shown below.
+
+Even `SUCCEEDED` means the adapter reported the command as done — whether that is "the flight
+controller accepted it" or "the cover is physically open" depends on the adapter. Telemetry is the
+source of truth for device state.
 
 ```python
 response = await client.remote_control.takeoff(request)
 
-if response.success:
-    # The adapter accepted and initiated the command.
-    # This does NOT mean the drone is airborne yet.
-    print(response.message)  # e.g. "Takeoff initiated"
+if not response.success:
+    print(f"Refused: {response.error.error_message}")
 else:
-    print(response.error.error_message)
+    # e.g. SKILL_EXECUTION_STATUS_RUNNING: the drone is taking off, not airborne yet
+    print(response.progress.state)
 ```
 
-Treat a successful response as "the command was handed off and accepted," not as confirmation of the physical outcome. For that, you need telemetry.
-
-**What that response actually looks like**, e.g. `print(response)`:
+**What that response looks like**, e.g. `print(response)`:
 
 ```
-RemoteControlResponse(success=True, tid='a1b2c3d4-1234-5678-9abc-def012345678', sn='ZQT-DOCK-0417', asset_id='550e8400-e29b-41d4-a716-446655440000', message='Takeoff initiated', error=None, progress=None)
+RemoteControlResponse(success=True, tid='a1b2c3d4-1234-5678-9abc-def012345678', sn='ZQT-DOCK-0417', asset_id=None, message=None, error=None, progress=ProgressInfo(progress=0.0, state='SKILL_EXECUTION_STATUS_RUNNING', left_time_in_seconds=0.0))
 ```
 
-A rejected command looks the same shape, with `error` populated instead of `message`:
+A refused command carries `error` instead of `progress`:
 
 ```
-RemoteControlResponse(success=False, tid='a1b2c3d4-1234-5678-9abc-def012345678', sn='ZQT-DOCK-0417', asset_id='550e8400-e29b-41d4-a716-446655440000', message=None, error=ErrorInfo(error_code='ERROR_CODE_ASSET', error_message='Asset ZQT-DOCK-0417 is not connected', timestamp=datetime.datetime(2026, 8, 26, 18, 41, 52)), progress=None)
+RemoteControlResponse(success=False, tid='a1b2c3d4-1234-5678-9abc-def012345678', sn='ZQT-DOCK-0417', asset_id=None, message=None, error=ErrorInfo(error_code='ERROR_CODE_CLIENT', error_message="Refused: The destination lies inside no-fly zone 'Airport'.", timestamp=datetime.datetime(2026, 8, 26, 18, 41, 52)), progress=None)
 ```
 
 ## Confirming what actually happened, via telemetry
@@ -55,9 +79,9 @@ Worked example, using `takeoff()`:
 response = await client.remote_control.takeoff(request)
 
 if not response.success:
-    print(f"Adapter rejected takeoff: {response.error.error_message}")
+    print(f"Takeoff refused: {response.error.error_message}")
 else:
-    # Command was accepted — now watch telemetry for what actually happens.
+    # The takeoff is running — now watch telemetry for what actually happens.
     async def on_telemetry(telemetry: StreamTelemetryResponse) -> None:
         sub_asset = telemetry.sub_asset_telemetry
         if sub_asset and sub_asset.mode == "SUBASSET_MODE_TAKEOFF_FINISHED":

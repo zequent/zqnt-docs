@@ -10,9 +10,7 @@ in `-1.3`.
 
 The Mission/Task model is replaced by **Application → Skill → SkillExecution → SkillContract** —
 see [Applications & Skills](applications-and-skills.md) for the full concept and runnable
-examples. Scheduler CRUD itself doesn't go anywhere, but what a schedule *points at* does — see
-[Scheduler shape change](#scheduler-shape-change-affects-every-sdk) below, since it's easy to miss
-and affects every SDK, including the one edge client whose method surface doesn't change at all.
+examples. What a schedule *points at* changes too — see [Schedules](#schedules) below.
 
 The platform no longer runs work through an adapter's task methods, and uses `stopTask` only to
 cancel a running command — see
@@ -72,28 +70,16 @@ adapter's own execution id (the one it returned when it accepted the command) in
 In Java this arrives at `cancelExecution(sn, externalExecutionId)`, whose default calls `stopTask`;
 in Python and Go it arrives at `stop_task` / `StopTask`.
 
-## Scheduler shape change (affects every SDK)
+## Schedules
 
-Scheduler CRUD methods (`createScheduler`/`getScheduler`/etc.) keep the same signatures everywhere.
-What changes is `SchedulerDTO` itself: `missionId`/`taskId` are `reserved` on the 2.0 wire
-protocol — not merely deprecated, permanently retired — replaced with a direct capability-execution
-target. A schedule now fires a Skill execution directly instead of triggering a Mission/Task.
+A schedule no longer triggers a Mission/Task. It runs a Skill of an Application (or a single
+command) directly: `SchedulerDTO`'s `missionId`/`taskId` are retired, replaced by `assetSn`,
+`commandId` or the Application/Skill pair, `executionParametersJson` and `autoStart`.
 
-The Java and Python SDKs use different field names for the same concept, confirmed against both
-languages' real DTOs — not yet reconciled between the two:
-
-| Concept | Java field | Python field |
-| --- | --- | --- |
-| Target asset | `assetSn` | `asset_sn` |
-| Single ad-hoc command | `commandId` | `command_id` |
-| Application + Skill pair | `capabilityPackageId` + `capabilityId` | `application_id` + `skill_id` |
-| Execution parameters | `executionParametersJson` (JSON string) | `execution_parameters` (dict) |
-| Auto-start flag | `autoStart` | `auto_start` |
-
-Java's `SchedulerDTO.validate()` enforces that exactly one of (`commandId`) or
-(`capabilityPackageId` + `capabilityId`) is set — Python's model has no equivalent client-side
-check; an invalid combination is only caught server-side. Full field-by-field breakdown:
-[Client SDK Mission Autonomy reference — Schedulers](../api-reference/client-sdk-mission-autonomy.md#schedulers--same-methods-different-schedulerdto-shape).
+Schedules and event triggers are administration in 2.0: they are managed in the Admin Console, and a
+client credential is refused when it tries to create, change or delete one. An edge adapter can read
+a schedule — see [Edge SDK Connector reference — Schedules](../api-reference/edge-sdk-connector-reference.md#schedules)
+and [Scheduled triggers](applications-and-skills.md#scheduled-triggers).
 
 ## Skill Registry, in brief
 
@@ -105,7 +91,7 @@ snapshot `getCapabilities`/`get_capabilities` already returns. Each entry carrie
 schema change that would break an existing authored Skill graph is flagged automatically.
 `required_permissions` exists on every entry and carries over to new schema versions, but nothing
 enforces it yet. See
-[Edge SDK Connector — Skill Registry](../api-reference/edge-sdk-connector-reference.md#skill-registry--new-in-20x)
+[Edge SDK Connector — Skill Registry](../api-reference/edge-sdk-connector-reference.md#skill-registry)
 for the full method-by-method reference.
 
 ## Where to go next

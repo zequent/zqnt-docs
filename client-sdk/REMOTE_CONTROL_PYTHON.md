@@ -55,7 +55,7 @@ await client.remote_control.exit_manual_control(
 All eight of these take a `DockOperationRequest` (`sn`, `asset_id`, optional `value: bool` whose
 meaning differs per method — `force` for `close_cover`, `boot` for `boot_sub_asset`, `enabled` for
 `debug_mode`, ignored otherwise); see the
-[reference](../api-reference/client-sdk-remote-control-python.md#dock-and-asset-operations) for the
+[reference](../api-reference/client-sdk-remote-control-python.md#dock-and-asset) for the
 full list.
 
 ```python
@@ -64,11 +64,6 @@ from client_sdk.models import DockOperationRequest
 request = DockOperationRequest(sn="YOUR_DOCK_SN", value=True)
 response = await client.remote_control.debug_mode(request)
 ```
-
-**`change_ac_mode` cannot actually change the AC mode** — confirmed in source: the underlying proto
-request needs a `mode` field that `DockOperationRequest` has no way to set, so this method always
-sends the idle mode no matter what you intend. This is a real, pre-existing SDK limitation, not a
-documentation gap — there is currently no way to choose an AC mode from Python.
 
 ## No capability discovery, no custom commands
 

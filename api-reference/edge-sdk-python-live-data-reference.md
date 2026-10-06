@@ -1,6 +1,8 @@
 # Edge SDK (Python) — Live Data API Reference
 
-Exhaustive method reference for `LiveDataService`, the facade over `TelemetryPublisher`,
+> For 1.3.x (end of life), see the [1.3 Live Data reference](edge-sdk-python-live-data-reference-1.3.md).
+
+Method reference for `LiveDataService`, the facade over `TelemetryPublisher`,
 `DetectionPublisher`, and `NotificationPublisher`. For a narrative introduction and worked examples,
 see the [Live Data guide](../edge-sdk/edge-sdk-python-live-data.md). For Java, see
 [edge-sdk-live-data.md](edge-sdk-live-data-reference.md).
@@ -36,15 +38,25 @@ Field reference: [Models Reference — Telemetry](edge-sdk-python-models.md#tele
 
 | Method | Parameter | Purpose |
 | --- | --- | --- |
-| `produce_notification(event)` | `AssetStatusEvent \| MissionEvent \| TaskEvent` | Routes to `publish_asset_status`/`publish_mission_event`/`publish_task_event` based on the type passed; raises `TypeError` for any other type |
+| `produce_notification(event)` | `CommandExecutionEvent \| AssetStatusEvent \| MissionEvent` | Routes to `publish_command_execution_event`/`publish_asset_status`/`publish_mission_event` based on the type passed; raises `TypeError` for any other type |
 
-Three event types — exactly one instance passed per call:
-
-| Event class | Fields | Confirmed real-adapter usage |
+| Event class | Fields | Use |
 | --- | --- | --- |
-| `AssetStatusEvent` | `sn`, `online`, `asset_id`, `message` | Yes |
-| `TaskEvent` | `task_id`, `task_type`, `status`, `sn`, `progress`, `message`, `external_task_type` | Yes |
-| `MissionEvent` | `mission_id`, `mission_type`, `status`, `sn`, `message` | No confirmed usage in any current adapter |
+| `CommandExecutionEvent` | `external_execution_id`, `status`, `sn`, `command_id`, `progress`, `message`, `output`, `occurred_at` | The outcome of a command you accepted — this is what moves a Skill run on |
+| `AssetStatusEvent` | `sn`, `online`, `asset_id`, `message` | The asset went online or offline |
+| `MissionEvent` | `mission_id`, `mission_type`, `status`, `sn`, `message` | Informational; stored as a notification |
+
+`CommandExecutionEvent`:
+
+| Field | Notes |
+| --- | --- |
+| `external_execution_id` | The execution id you returned with the accepted response (or `ctx.tid` if you returned none) — it is how the platform finds the run |
+| `status` | `CommandExecutionStatus.ACCEPTED`, `RUNNING`, `SUCCEEDED`, `FAILED` or `CANCELLED` |
+| `sn` | The asset that ran the command — always set it |
+| `command_id` | The command id, e.g. `mission.waypoint.execute` |
+| `progress` | 0.0–1.0, while `RUNNING` |
+| `output` | `dict` result on `SUCCEEDED`, available to later nodes as `$.nodes.<id>.output.<field>` |
+| `occurred_at` | When it happened; defaults to the publish time |
 
 ## Reconnection and queueing behavior
 

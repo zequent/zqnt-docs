@@ -1,12 +1,45 @@
 # Zequent Client SDK (Go) — Functional Responses
 
-Every RemoteControl call returns as soon as the edge adapter replies — but that's easy to misread as "the device did the thing." This page explains what a command call actually tells you, and how to confirm what really happened on the device.
+A Remote Control call returns once the platform has checked your command and the asset's edge
+adapter has replied — but that is easy to misread as "the device did the thing." This page explains
+what a command call tells you, and how to confirm what really happened on the device.
 
-For Java, see [FUNCTIONAL_RESPONSES.md](FUNCTIONAL_RESPONSES.md). For Python, see [FUNCTIONAL_RESPONSES_PYTHON.md](FUNCTIONAL_RESPONSES_PYTHON.md).
+For Java, see [FUNCTIONAL_RESPONSES.md](FUNCTIONAL_RESPONSES.md). For Python, see
+[FUNCTIONAL_RESPONSES_PYTHON.md](FUNCTIONAL_RESPONSES_PYTHON.md).
 
-## `error` is the only thing you check
+## What happens when you send a command
 
-Unlike Java/Python, there's no `success` field to read here — `remotecontrol.Client` folds the wire-level success/failure convention into a plain Go `error` for you:
+Every command except manual control runs as a **single-command run** — the same execution engine
+that runs [Applications & Skills](../concepts/applications-and-skills.md):
+
+1. **The platform checks it.** A movement command meets your organization's no-fly zones: a route
+   through a zone is flown around it, a command with no possible detour is refused, and a zone that
+   requires approval holds the command until someone approves it (see
+   [No-fly zones and safe returns](../concepts/airspace-safety.md)). Pre-flight checks your
+   organization has switched on can refuse it too.
+2. **The platform dispatches it** to the asset's edge adapter.
+3. **Your call answers** once the adapter has replied. The `(resp, err)` you get back *is* that answer; there is no
+   separate acknowledgement on another channel.
+
+## What the call tells you
+
+There is no `success` field: `remotecontrol.Client` folds the platform's success/failure into a
+plain Go `error`.
+
+| Result | Meaning |
+| --- | --- |
+| `err != nil` | The command was refused before it reached the device (no-fly zone without a detour, a failed pre-flight check), the adapter rejected it, or the call itself failed |
+| `err == nil`, `resp.GetProgress().GetState() == "SKILL_EXECUTION_STATUS_SUCCEEDED"` | The adapter carried out a command that completes at once — dock, camera, charging, reboot and similar commands |
+| `err == nil`, `resp.GetProgress().GetState() == "SKILL_EXECUTION_STATUS_RUNNING"` | The command is under way. `TakeOff`, `GoTo`, `LookAt` and `ReturnToHome` stay running until the adapter reports their outcome; a command waiting for an approval is running too |
+
+For a running command the outcome arrives later. Follow it with `ma.ListSkillExecutions(ctx, query)`
+(set `AssetSn` on the query; see
+[Tracking and controlling an execution](../concepts/applications-and-skills.md#tracking-and-controlling-an-execution)),
+or watch telemetry as shown below.
+
+Even `SUCCEEDED` means the adapter reported the command as done — whether that is "the flight
+controller accepted it" or "the cover is physically open" depends on the adapter. Telemetry is the
+source of truth for device state.
 
 ```go
 rc := remotecontrol.New(conn)
@@ -15,27 +48,11 @@ coordinate := &devicecontrol.GeoCoordinate{Latitude: 41.015137, Longitude: 28.97
 resp, err := rc.TakeOff(ctx, "ZQT-DOCK-0417", coordinate)
 if err != nil {
     log.Println(err)
-    // e.g. "remotecontrol: TakeOff: asset ZQT-DOCK-0417 is not connected"
+    // e.g. "remotecontrol: TakeOff: Refused: The destination lies inside no-fly zone 'Airport'."
     return
 }
-```
-
-`err == nil` means the same thing it means in Java/Python: the adapter's own `TakeOff` handler returned without error — nothing more. It's up to that handler's own implementation whether that means "accepted" or "physically airborne." The SDK's own shipped example adapter makes the distinction explicit:
-
-```go
-func (a *MyDroneAdapter) TakeOff(ctx context.Context, req *domains.TakeOffRequest) (*domains.CommandResult, error) {
-    a.log.Info("TakeOff requested", "sn", req.SN, "alt", req.Coordinates.Alt)
-    // TODO: send takeoff command to real hardware here.
-    return domains.SuccessWithTID("takeOff accepted", req.TID, req.SN), nil
-}
-```
-
-It returns success immediately, before any hardware command is even issued. "Accepted," not "completed."
-
-**What a successful `resp` actually contains** — on the plain success path only `HasErrors` and `Meta` are set (no progress/error payload):
-
-```
-has_errors:false  meta:{tid:"a1b2c3d4-1234-5678-9abc-def012345678"  sn:"ZQT-DOCK-0417"  timestamp:{seconds:1756233727}}
+// e.g. SKILL_EXECUTION_STATUS_RUNNING: the drone is taking off, not airborne yet
+log.Println(resp.GetProgress().GetState())
 ```
 
 ## Confirming what actually happened, via telemetry

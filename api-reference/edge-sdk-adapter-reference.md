@@ -1,158 +1,119 @@
 # Edge SDK — Edge Adapter API Reference
 
-Exhaustive method reference for `EdgeAdapterService`. For a narrative introduction, the interface's
-role in the gRPC flow, and worked examples, see the [Edge Adapter guide](../edge-sdk/edge-sdk-adapter.md).
+> Coming from 1.3? See the [Migration guide](../concepts/migration-guide.md); for 1.3.x (end of
+> life), the [1.3 Edge Adapter reference](edge-sdk-adapter-reference-1.3.md).
 
-Every method returns `CompletableFuture<CommandResult>` (`getCapabilities` returns
-`CompletableFuture<CurrentCapabilities>`). All are `default` methods returning `NOT_IMPLEMENTED` —
-override only what your adapter supports.
+Method reference for `EdgeAdapterService`, the interface your adapter implements. For a narrative
+introduction and worked examples, see the [Edge Adapter guide](../edge-sdk/edge-sdk-adapter.md).
 
-## Flight Control
+Every method is a `default` method returning `NOT_IMPLEMENTED` — override only what your device
+supports. Every method returns `CompletableFuture<CommandResult>`, except `getCapabilities`
+(`CompletableFuture<CurrentCapabilities>`).
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `takeOff(TakeOffRequest)` | sn, tid, coordinates | Initiate takeoff at the given coordinates |
-| `returnToHome(ReturnToHomeRequest)` | sn, tid, altitude | Return the sub-asset to its home position |
-| `goTo(GoToRequest)` | sn, tid, coordinates | Navigate to the specified coordinates |
+## How commands arrive
 
-## Dock Operations
+The platform runs work as Skills. Each command node of a run is dispatched to your adapter by its
+command id: a built-in id lands on the matching method below, any other id on `sendCustomCommand`.
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `openCover(String sn)` | sn | Open the dock cover |
-| `closeCover(String sn, Boolean force)` | sn, force | Close the dock cover, optionally forcing it |
-| `startCharging(String sn)` | sn | Start charging the sub-asset |
-| `stopCharging(String sn)` | sn | Stop charging the sub-asset |
-| `rebootAsset(String sn)` | sn | Reboot the asset (dock) |
-| `bootUpSubAsset(String sn)` | sn | Power on the sub-asset (drone) |
-| `bootDownSubAsset(String sn)` | sn | Power off the sub-asset (drone) |
+- **Waits for your report.** `flight.takeoff`, `navigation.go_to`, `gimbal.look_at` and
+  `flight.return_to_home`, and a custom command that returns no result, are *accepted*: the node
+  stays running until you report a command execution event for it (`SUCCEEDED`, `FAILED`, ...). Return
+  `CommandResult.accepted(message, externalExecutionId, sn)` with your own execution id; without one,
+  the platform uses the request's transaction id. See
+  [Edge Adapter guide — Custom Commands](../edge-sdk/edge-sdk-adapter.md#custom-commands).
+- **Done on success.** Every other built-in command is complete when you return success.
+- **Cancel.** The platform cancels a running command with `cancelExecution(sn, externalExecutionId)`.
 
-## Camera and Gimbal
+## Flight
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `lookAt(LookAtRequest)` | sn, lat, lon, alt, locked, payloadIndex | Point the camera at coordinates |
-| `changeLens(ChangeLensRequest)` | sn, lens, videoId | Switch the active camera lens |
-| `changeZoom(ChangeZoomRequest)` | sn, lens, payloadIndex, zoom | Adjust the camera zoom level |
-| `takePhoto(TakePhotoRequest)` | sn, payloadIndex | Capture a still photo |
-| `enableGimbalTracking(String sn, boolean enabled)` | sn, enabled | Enable or disable gimbal tracking mode |
-| `liveStreamSplitScreen(String sn, boolean enabled)` | sn, enabled | Toggle split-screen view across multiple lenses/payloads |
+| Method | Command id | Description |
+| --- | --- | --- |
+| `takeOff(TakeOffRequest)` | `flight.takeoff` | Take off and fly to the target coordinates |
+| `goTo(GoToRequest)` | `navigation.go_to` | Fly to the target coordinates; altitude is relative to the takeoff point |
+| `returnToHome(ReturnToHomeRequest)` | `flight.return_to_home` | Return home; `altitude` optional |
+| `enterManualControl(String sn)` | `flight.manual.enter` | Enter manual (stick) control |
+| `exitManualControl(String sn)` | `flight.manual.exit` | Leave manual control |
+| `manualControlInput(ManualControlInput)` | — | Called once per stick-input frame while a manual control session is active |
 
-## Manual Control
+## Camera, gimbal and stream
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `enterManualControl(String sn)` | sn | Enter manual (joystick) control mode |
-| `exitManualControl(String sn)` | sn | Exit manual control mode |
-| `manualControlInput(ManualControlInput)` | input | Called once per incoming stick-input frame while a manual control session is active |
+| Method | Command id | Description |
+| --- | --- | --- |
+| `lookAt(LookAtRequest)` | `gimbal.look_at` | Point the camera at coordinates (`locked`, `payloadIndex` optional) |
+| `enableGimbalTracking(String sn, boolean enabled)` | `gimbal.tracking` | Gimbal tracking on/off |
+| `takePhoto(TakePhotoRequest)` | `camera.take_photo` | Capture a still photo |
+| `changeLens(ChangeLensRequest)` | `camera.change_lens` | Switch the active lens |
+| `changeZoom(ChangeZoomRequest)` | `camera.change_zoom` | Set the zoom level for a lens |
+| `startLiveStream(LiveStreamStartRequest)` | `stream.start` | Start publishing video to the stream server URL in the request |
+| `stopLiveStream(LiveStreamStopRequest)` | `stream.stop` | Stop publishing |
+| `liveStreamSplitScreen(String sn, boolean enabled)` | `stream.split_screen` | Split-screen view across lenses on/off |
 
-## Live Streaming
+## Dock and asset
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `startLiveStream(LiveStreamStartRequest)` | sn, tid, videoId, streamServer, videoType | Start a video live stream |
-| `stopLiveStream(LiveStreamStopRequest)` | sn, tid, videoId | Stop a video live stream |
+| Method | Command id | Description |
+| --- | --- | --- |
+| `openCover(String sn)` | `dock.open_cover` | Open the dock cover |
+| `closeCover(String sn, Boolean force)` | `dock.close_cover` | Close the dock cover, optionally forced |
+| `startCharging(String sn)` | `dock.start_charging` | Start charging the drone |
+| `stopCharging(String sn)` | `dock.stop_charging` | Stop charging |
+| `rebootAsset(String sn)` | `asset.reboot` | Reboot the asset |
+| `bootUpSubAsset(String sn)` / `bootDownSubAsset(String sn)` | `asset.boot_sub_asset` | Power the sub-asset (drone) on / off |
+| `enterRemoteDebugMode(String sn)` / `closeRemoteDebugMode(String sn)` | `asset.remote_debug` | Remote debug mode on / off |
+| `changeAcMode(String sn, String mode)` | `asset.change_ac_mode` | Set the air conditioner; `mode` is `AIR_CONDITIONER_IDLE`, `_COOL`, `_HEAT` or `_DEHUMIDIFICATION` |
 
-## Debug and Maintenance
+## Custom commands
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `enterRemoteDebugMode(String sn)` | sn | Enter remote debug mode on the device |
-| `closeRemoteDebugMode(String sn)` | sn | Exit remote debug mode |
-| `changeAcMode(String sn, String mode)` | sn, mode | Change the air conditioner mode of the asset |
+| Method | Description |
+| --- | --- |
+| `sendCustomCommand(String sn, String componentId, String commandType, Map<String, Object> params)` | Every command id without a built-in method — vendor-, payload- and mission-specific commands (e.g. `mission.waypoint.execute`). `componentId` is the target's `targetRef` (e.g. which payload), or `null` |
 
-## Task Execution
+Advertise each one through `getCapabilities` so it can be used in Skills. See
+[Command ID naming convention](../edge-sdk/edge-sdk-adapter.md#command-id-naming-convention).
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `prepareTask(String taskId, String tid)` | taskId, tid | Prepare a task for execution. Receives only a task ID — see the note below |
-| `startTask(String taskId, String tid)` | taskId, tid | Start executing a previously prepared task. Receives only a task ID — see the note below |
-| `pauseTask(String taskId)` | taskId | Pause a running task |
-| `resumeTask(String taskId)` | taskId | Resume a paused task |
-| `stopTask(String taskId)` | taskId | Stop a running task |
+## Capabilities and cancellation
 
-> **The task methods receive only a task ID.** To act on one, resolve it with
-> `ConnectorService.getTaskById(taskId)` and read the `WaypointTaskConfig` off the returned
-> `TaskDTO` — that is what the DJI adapter does to build and upload its KMZ. SAPIENT implements
-> them too, because its own protocol owns the task that ID refers to. MAVLink and the simulator
-> implement none of them — see [Custom Commands](../edge-sdk/edge-sdk-adapter.md#custom-commands)
-> for the alternative path they use instead.
+| Method | Returns | Description |
+| --- | --- | --- |
+| `getCapabilities(String sn)` | `CurrentCapabilities` | What this asset supports right now — see [Capability reporting](#capability-reporting) |
+| `cancelExecution(String sn, String externalExecutionId)` | `CommandResult` | Stop a running command you accepted earlier |
 
-## Custom Commands
+### Capability reporting
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `sendCustomCommand(String sn, String componentId, String commandType, Map<String, Object> params)` | sn, componentId, commandType, params | Handle a command that doesn't map to a standard method above |
-
-See [Command ID naming convention](../edge-sdk/edge-sdk-adapter.md#command-id-naming-convention) for
-how to name a custom command.
-
-## Capability Reporting
-
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `getCapabilities(String sn)` | sn | Return the set of capabilities this adapter supports |
+`getCapabilities` returns the device's live capability snapshot. The platform reads it to know which
+command ids an asset offers (built-in ones too), shows it to operators and client applications, and
+records each command in the Skill Registry. The default returns an empty snapshot. See
+[Edge Adapter guide — Custom Commands](../edge-sdk/edge-sdk-adapter.md#custom-commands) and the
+[models reference](edge-sdk-models.md) for the `Capability` fields.
 
 ## CommandResult
 
-Static factory methods on `CommandResult`:
-
 ```java
-// Success without transaction ID
-CommandResult.success("Message", sn);
-
-// Success with transaction ID
-CommandResult.success("Message", tid, sn);
-
-// Error without transaction ID
-CommandResult.error("Error description", sn);
-
-// Error with transaction ID
-CommandResult.error("Error description", tid, sn);
-
-// Accepted, but still running asynchronously — pass externalExecutionId so a later
-// stopTask call can reference this specific run
-CommandResult.success("Waypoint mission started", vendorExecutionId, sn);
-
-// Not Implemented (used by default methods)
-CommandResult.notImplemented("Command not supported", sn);
+CommandResult.success("Cover opened", sn);                 // done
+CommandResult.success("Cover opened", tid, sn);            // done, with a transaction id
+CommandResult.accepted("Mission started", executionId, sn); // running; report its outcome later
+CommandResult.error("Cover is blocked", sn);               // failed
+CommandResult.error("Cover is blocked", tid, sn);
+CommandResult.notImplemented("Not supported", sn);         // what the defaults return
 ```
 
-`CommandResult.ResultType`:
+`CommandResult.CommandResultType`: `SUCCESS`, `ACCEPTED`, `ERROR`, `NOT_IMPLEMENTED`.
 
-| Value | Meaning |
-|---|---|
-| `SUCCESS` | command executed successfully |
-| `ERROR` | command failed |
-| `NOT_IMPLEMENTED` | command is not supported by this adapter |
+## Error handling
 
-## Default Implementation Convenience Methods
+An exception thrown by your method is turned into an error response:
 
-`EdgeAdapterServiceImpl` extends the interface with convenience overloads that automatically use the
-configured serial number from `EdgeClientConfig.sn()`:
+| Exception | Error code |
+| --- | --- |
+| `IllegalArgumentException`, `UnsupportedOperationException` | `ERROR_CODE_CLIENT` |
+| `TimeoutException` and everything else | `ERROR_CODE_SYSTEM` |
 
-- `openCover()` / `closeCover()` (no sn parameter)
-- `startCharging()` / `stopCharging()`
-- `rebootAsset()`
-- `bootUpSubAsset()` / `bootDownSubAsset()`
-- `enterManualControl()` / `exitManualControl()`
-- `getCapabilities()`
-- `enableGimbalTracking(boolean)`
-- `changeAcMode(String mode)`
+A returned `CommandResult.error(...)` is answered with `ERROR_CODE_ASSET`, a `notImplemented(...)`
+with `ERROR_CODE_CLIENT`. Prefer returning `error(...)` for expected failures.
 
-Available automatically if your adapter extends `EdgeAdapterServiceImpl` instead of implementing
-`EdgeAdapterService` directly.
+## EdgeAdapterServiceImpl
 
-## Error Handling
-
-Exceptions thrown by your adapter code are caught by the gRPC layer and mapped to error responses:
-
-| Exception Type | gRPC Error Code |
-|----------------|-----------------|
-| `IllegalArgumentException` | `CLIENT_ERROR` |
-| `UnsupportedOperationException` | `CLIENT_ERROR` |
-| `TimeoutException` | `SYSTEM_ERROR` |
-| All other exceptions | `SYSTEM_ERROR` |
-
-You can also return explicit error results using `CommandResult.error(...)` instead of throwing
-exceptions for expected failure conditions.
+If your adapter extends `EdgeAdapterServiceImpl` instead of implementing the interface directly, it
+gets overloads without the `sn` parameter that use the configured serial number
+(`EdgeClientConfig.getSn()`): `openCover()`, `closeCover()`, `startCharging()`, `stopCharging()`,
+`rebootAsset()`, `bootUpSubAsset()`, `bootDownSubAsset()`, `enterManualControl()`,
+`exitManualControl()`, `getCapabilities()`, `enableGimbalTracking(boolean)`, `changeAcMode(String)`.

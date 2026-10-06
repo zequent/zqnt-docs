@@ -23,7 +23,7 @@ finally:
 
 `EdgeAdapterRuntime` connects one for you as `runtime.mission_autonomy`. A scheduler now targets a
 Skill or a single command directly, not a Mission or Task — see
-[Upgrading from 1.3 — Scheduler shape change](../concepts/migration-guide.md#scheduler-shape-change-affects-every-sdk)
+[Upgrading from 1.3 — Schedules](../concepts/migration-guide.md#schedules)
 for the fields.
 
 ---

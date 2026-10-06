@@ -1,134 +1,90 @@
 # Zequent Client SDK (Python) — Mission Autonomy API Reference
 
-> For the conceptual introduction to this model, see
-> [Applications & Skills](../concepts/applications-and-skills.md). For 1.3.x (end of life), see the
-> [1.3 Mission Autonomy reference](client-sdk-mission-autonomy-python-1.3.md).
+> For the conceptual introduction, see [Applications & Skills](../concepts/applications-and-skills.md).
+> Coming from 1.3? See the [Migration guide](../concepts/migration-guide.md); for 1.3.x (end of
+> life), the [1.3 Mission Autonomy reference](client-sdk-mission-autonomy-python-1.3.md).
 
-Exhaustive method reference for `client.mission_autonomy`. Every method is a
-coroutine. Mission/Task methods (`create_mission`, `create_task`, `start_task`, ...) are kept as
-stubs that immediately `raise LegacyOperationRemovedError` — there's no backend RPC left for any
-of them.
+Method reference for `client.mission_autonomy`. For Java, see
+[client-sdk-mission-autonomy.md](client-sdk-mission-autonomy.md); for Go,
+[client-sdk-mission-autonomy-go.md](client-sdk-mission-autonomy-go.md).
 
-## What changed from 1.3
+Every method is a coroutine that works with the generated proto types (`ApplicationProtoDTO`,
+`SkillExecutionProtoDTO`, ...) and returns the DTO on success. Errors:
 
-- Every Mission/Task method now raises `LegacyOperationRemovedError` unconditionally, instead of
-  making a (now-nonexistent) RPC. Route optimization, NFZ expansion, and the task execution
-  lifecycle described in the 1.3.x reference are gone along with them.
-- Scheduler CRUD is unchanged — this SDK never had a `delete_all_schedulers_by_task_id` method to
-  begin with (unlike Java's 1.3.x interface, which does), so there's nothing to remove here.
-- Two new families replace what Mission/Task did: **Application** (capability package admin) and
-  **SkillExecution** (capability execution).
-- **Python's surface is more extensive than Java's** — `get_application_environments` and
-  `promote_application_version` exist here with no Java equivalent (confirmed by reading both
-  interfaces directly — a real difference between the two SDKs, not a doc omission). Everything
-  else lines up 1:1 with the [Java reference](client-sdk-mission-autonomy.md).
+- The platform answered with an error: `client_sdk.exceptions.MissionAutonomyError` (`operation`,
+  `error_code`, `error_message`).
+- The platform refused the credential: `client_sdk.auth.ZequentAuthError`, a `grpc.aio.AioRpcError`
+  with code `UNAUTHENTICATED` or `PERMISSION_DENIED` and a message that says what to do.
+- A transient failure that outlasted every retry: `client_sdk.ZequentRetryExhaustedError`.
 
-## Applications (capability package administration)
+A client credential (`ZQNT_CLIENT_TOKEN`) acts for its own organization: it sees and runs that
+organization's Applications and runs only.
+
+## Applications
 
 | Method | Returns | Purpose |
 | --- | --- | --- |
-| `upsert_application(application, expected_revision=None)` | `ApplicationProtoDTO` | Create or update an Application. `expected_revision` is optimistic-concurrency — the revision you last read, or omitted on first create |
-| `get_application(application_id, version=None)` | `ApplicationProtoDTO` | Get one version, or the current version if `version` is omitted |
-| `list_applications(scope=None, enabled_only=None, page_size=None, page_token=None)` | `tuple[list[ApplicationProtoDTO], str]` | `(applications, next_page_token)`. Unfiltered when called with no arguments |
-| `delete_application(application_id, version=None, expected_revision=None)` | `None` | Delete one version of an Application |
-| `get_application_environments(application_id)` | `list[ApplicationEnvironmentPointerProtoDTO]` | **Python-only.** Which version is deployed to each environment (`DEVELOPMENT`/`STAGING`/`PRODUCTION`) |
-| `promote_application_version(application_id, version, environment)` | `list[ApplicationEnvironmentPointerProtoDTO]` | **Python-only.** Repoint one environment at an already-saved `version` — promotion never mutates or creates a version, only which one is current for that environment |
+| `upsert_application(application, expected_revision=None)` | `ApplicationProtoDTO` | Create or update an Application. `expected_revision` guards against a concurrent update: pass the revision you last read, or omit it on first create |
+| `get_application(application_id, version=None)` | `ApplicationProtoDTO` | One version of an Application; omit `version` for the latest |
+| `list_applications(scope=None, enabled_only=None, page_size=None, page_token=None)` | `tuple[list, str]` | `(applications, next_page_token)`. `scope` is an `ApplicationScopeProtoDTO`; no arguments lists everything |
+| `delete_application(application_id, version=None, expected_revision=None)` | `None` | Delete an Application version |
+| `get_application_environments(application_id)` | `list` | Which version is current in each environment (`STAGING`, `PRODUCTION`) |
+| `promote_application_version(application_id, version, environment)` | `list` | Make an already-saved `version` the current one for `environment` (an `ApplicationEnvironmentProto` value, e.g. `APPLICATION_ENVIRONMENT_PRODUCTION`). Promotion never changes or creates a version |
 
-## SkillExecution — create/execute
+## Running a Skill
 
-| Method | Returns | Purpose |
-| --- | --- | --- |
-| `create_skill_execution(asset_sn, spec, options=None, idempotency_key="", ...)` | `SkillExecutionProtoDTO` | Low-level: create an execution from a raw `spec`/`options` proto. Does not guarantee an atomic plan+start |
-| `execute_skill(asset_sn, spec, options=None, idempotency_key="", ...)` | `SkillExecutionProtoDTO` | Low-level: create, plan, and (if `options.auto_start`) start atomically in one RPC |
-| `create_simple_execution(asset_sn, command_id, parameters=None, idempotency_key="")` | `SkillExecutionProtoDTO` | Convenience: create (don't start) a single ad-hoc command execution |
-| `execute_simple(asset_sn, command_id, parameters=None, idempotency_key="")` | `SkillExecutionProtoDTO` | Convenience: create and atomically start a single ad-hoc command execution |
-| `create_application_execution(asset_sn, application_id, skill_id, application_version=None, parameters=None, idempotency_key="")` | `SkillExecutionProtoDTO` | Convenience: create (don't start) an execution of one named Skill from a deployed Application |
-| `execute_application(asset_sn, application_id, skill_id, application_version=None, parameters=None, idempotency_key="")` | `SkillExecutionProtoDTO` | Convenience: create and atomically start an execution of one named Skill from a deployed Application |
-
-The four convenience methods are what the [Applications & Skills](../concepts/applications-and-skills.md)
-guide's example uses — they're thin wrappers over `create_skill_execution`/`execute_skill` that
-build the `spec` for you, functionally equivalent to constructing a Java `SkillExecutionCommand`
-via its `.simple()`/`.packaged()` static factories. There's no `idempotency_key` auto-generation
-here the way Java's factories default to a random UUID — pass one explicitly if you need
-retry-safety.
-
-`application_version=None` runs the version promoted to Production, or the newest version if none
-is promoted.
-
-`create_skill_execution`/`execute_skill`'s elided params include `organization_id`, which is
-checked against the caller's credential, not just recorded: omit it and it's filled in from the
-credential's organization; assert a *different* organization and the RPC fails with
-`PERMISSION_DENIED` instead of being honoured. `system_admin` callers and platform services without
-an organization may assert any organization. Same rule filters `list_skill_executions` below: a
-caller bound to an organization asking for everything is answered with only that organization's
-executions, regardless of what `organization_id` they pass.
-
-## SkillExecution — query and lifecycle
+Each run is a **Skill execution**. It runs either a named Skill of an Application, or a single
+command.
 
 | Method | Returns | Purpose |
 | --- | --- | --- |
-| `get_skill_execution(execution_id)` | `SkillExecutionProtoDTO` | Get one execution by ID |
-| `list_skill_executions(asset_sn=None, organization_id=None, status=None, application_id=None, skill_id=None, theatre_id=None, page_size=None, page_token=None)` | `tuple[list[SkillExecutionProtoDTO], str]` | `(executions, next_page_token)`. Unfiltered when called with no arguments |
-| `start_skill_execution(execution_id, reason=None, idempotency_key=None)` | `SkillExecutionProtoDTO` | Start an execution created without auto-start |
-| `pause_skill_execution(execution_id, reason=None, idempotency_key=None)` | `SkillExecutionProtoDTO` | Pause a running execution |
-| `resume_skill_execution(execution_id, reason=None, idempotency_key=None)` | `SkillExecutionProtoDTO` | Resume a paused execution |
-| `cancel_skill_execution(execution_id, reason=None, idempotency_key=None)` | `SkillExecutionProtoDTO` | Cancel an execution |
-| `signal_skill_execution(execution_id, node_id=None, event_type=None, data=None, approved=None, idempotency_key=None)` | `SkillExecutionProtoDTO` | Advance an `EVENT_WAIT` node (`event_type` + optional `data`) or resolve a `HUMAN_APPROVAL` node (`approved`) |
+| `execute_application(asset_sn, application_id, skill_id, application_version=None, parameters=None, idempotency_key="")` | `SkillExecutionProtoDTO` | Create and start a run of one Skill from an Application |
+| `create_application_execution(asset_sn, application_id, skill_id, application_version=None, parameters=None, idempotency_key="")` | `SkillExecutionProtoDTO` | Create the same run without starting it; start it with `start_skill_execution` |
+| `execute_simple(asset_sn, command_id, parameters=None, idempotency_key="")` | `SkillExecutionProtoDTO` | Create and start a run of a single command (e.g. `navigation.go_to`) |
+| `create_simple_execution(asset_sn, command_id, parameters=None, idempotency_key="")` | `SkillExecutionProtoDTO` | Create the same run without starting it |
+| `execute_skill(asset_sn, spec, options=None, idempotency_key="", organization_id=None, location_id=None, theatre_id=None)` | `SkillExecutionProtoDTO` | Low level: run a `SkillExecutionSpecProto` you built yourself. Starts the run unless `options.auto_start` is `False` |
+| `create_skill_execution(asset_sn, spec, options=None, idempotency_key="", organization_id=None, location_id=None, theatre_id=None)` | `SkillExecutionProtoDTO` | Low level: create the run without starting it |
+
+- **`asset_sn`**: the asset to run on; required.
+- **`application_version`**: `None` runs the version promoted to Production, or the newest version
+  if none is promoted.
+- **`parameters`**: a `dict` — the Skill's input (`$.input.<field>` in its mappings) or the
+  command's parameters.
+- **`idempotency_key`**: repeating a call with the same asset and key returns the original run
+  instead of starting a second one. Pass one when you may retry.
+- **`organization_id`**: filled in from your credential. Naming a different organization is refused
+  with `PERMISSION_DENIED`.
+
+## Querying and controlling a run
+
+| Method | Returns | Purpose |
+| --- | --- | --- |
+| `get_skill_execution(execution_id)` | `SkillExecutionProtoDTO` | One run: status, progress and the state of each node |
+| `list_skill_executions(asset_sn=None, organization_id=None, status=None, application_id=None, skill_id=None, theatre_id=None, page_size=None, page_token=None)` | `tuple[list, str]` | `(executions, next_page_token)`. `status` is a `SkillExecutionStatusProto` value. You only see your own organization's runs |
+| `start_skill_execution(execution_id, reason=None, idempotency_key=None)` | `SkillExecutionProtoDTO` | Start a run created without starting |
+| `pause_skill_execution(execution_id, reason=None, idempotency_key=None)` | `SkillExecutionProtoDTO` | Pause a running run |
+| `resume_skill_execution(execution_id, reason=None, idempotency_key=None)` | `SkillExecutionProtoDTO` | Resume a paused run |
+| `cancel_skill_execution(execution_id, reason=None, idempotency_key=None)` | `SkillExecutionProtoDTO` | Cancel a run |
+| `signal_skill_execution(execution_id, node_id=None, event_type=None, data=None, approved=None, idempotency_key=None)` | `SkillExecutionProtoDTO` | Resolve a waiting node: an `EVENT_WAIT` node with `event_type` (+ optional `data`), or a `HUMAN_APPROVAL` node with `approved` |
+
+A human-approval rejection makes the run take its FAILURE path; no answer before the node's timeout
+takes its TIMEOUT path — see [Applications & Skills](../concepts/applications-and-skills.md).
 
 ## Execution configuration
 
 | Method | Returns | Purpose |
 | --- | --- | --- |
-| `resolve_execution_config(context, keys=None)` | `dict` | Resolve effective config values for a given asset + context + set of keys |
+| `resolve_execution_config(context, keys=None)` | `dict` | The effective configuration values for a context (an `ExecutionConfigContextProto`: asset, theatre, Skill, ...). `keys` omitted resolves every known key |
 
-## Error handling — this is the one convention that doesn't carry over
+## Schedules
 
-1.3.x's `MissionResponse`/`TaskResponse`/`SchedulerResponse` never raise for a business-level
-failure — `success`/`error` carry it instead (see
-[Mission Autonomy — Error handling](../client-sdk/MISSION_AUTONOMY_PYTHON-1.3.md#error-handling)).
-**Application and SkillExecution methods do not follow that convention.** They return the raw
-payload DTO directly on success — there's no wrapper to carry a failure inline — so a failed RPC
-raises `MissionAutonomyError` instead (mirroring Java's `MissionAutonomyClientException`).
-`Scheduler` methods are unaffected — they still return `SchedulerResponse` with the usual
-`success`/`error` convention, since the CRUD methods themselves didn't change.
-
-## Schedulers — same methods, different `SchedulerDTO` shape
-
-| Method | Returns | Notes |
-| --- | --- | --- |
-| `create_scheduler(scheduler)` | `SchedulerResponse` | |
-| `update_scheduler(scheduler_id, scheduler)` | `SchedulerResponse` | |
-| `get_scheduler(scheduler_id)` | `SchedulerResponse` | |
-| `delete_scheduler(scheduler_id)` | `SchedulerResponse` | |
-| `create_schedulers(schedulers)` | `SchedulerResponse` | Create several in one call |
-| `delete_schedulers(scheduler_ids)` | `SchedulerResponse` | Delete several in one call |
-| `list_schedulers()` | `SchedulerResponse` | Result is in `.schedulers` — no filtering parameter |
-
-The method signatures are identical to 1.3.x, but `SchedulerDTO` itself isn't: `mission_id`/
-`task_id` are gone (`reserved` on the wire, not merely deprecated), replaced with a direct
-capability-execution target —
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `asset_sn` | `str \| None` | Which asset the schedule fires against. Required for `command_id`; optional for an Application schedule, which then picks an asset at firing time (see [Scheduled triggers](../concepts/applications-and-skills.md#scheduled-triggers)) |
-| `command_id` | `str \| None` | Set together with `asset_sn` alone for a single ad-hoc command — exactly one of this or `application_id`+`skill_id` is expected |
-| `application_id` / `skill_id` | `str \| None` | Set together (optionally with `asset_sn`) to schedule a named Skill from a deployed Application instead |
-| `execution_parameters` | `dict \| None` | Unlike Java's `SchedulerDTO` (a JSON string field), this is a plain dict |
-| `auto_start` | `bool \| None` | Whether the resulting execution starts immediately |
-
-Unlike the Java client SDK's `SchedulerDTO.validate()`, nothing in this model enforces the
-`command_id` vs. `application_id`+`skill_id` exclusivity client-side — an invalid combination is
-only caught server-side.
-
-This model has no organization field. Scheduled
-runs have priority 50, and every firing's outcome is recorded on the schedule (visible in the Admin
-Console); `SchedulerDTO` does not carry those firing fields.
+The client also carries scheduler methods (`create_scheduler`, `update_scheduler`, `get_scheduler`,
+`delete_scheduler`, `list_schedulers`, `create_schedulers`, `delete_schedulers`). A client
+credential is refused (`PERMISSION_DENIED`): schedules and event triggers are managed in the Admin
+Console — see [Scheduled triggers](../concepts/applications-and-skills.md#scheduled-triggers).
 
 ## See also
 
 - [Applications & Skills](../concepts/applications-and-skills.md) — narrative introduction and
   runnable examples
-- [Java reference](client-sdk-mission-autonomy.md)
-- [Go — running and controlling executions](../concepts/applications-and-skills.md#go)
-- [1.3 Mission Autonomy reference](client-sdk-mission-autonomy-python-1.3.md) — the end-of-life 1.3
-  Mission/Task/Scheduler interface
+- [Remote Control](client-sdk-remote-control-python.md) — single commands with typed methods

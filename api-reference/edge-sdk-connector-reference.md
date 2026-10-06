@@ -1,32 +1,19 @@
 # Edge SDK — Connector API Reference
 
-> For the conceptual introduction to this model, see
-> [Applications & Skills](../concepts/applications-and-skills.md). For 1.3.x (end of life), see the
-> [1.3 Connector reference](edge-sdk-connector-reference-1.3.md).
+> Coming from 1.3? See the [Migration guide](../concepts/migration-guide.md); for 1.3.x (end of
+> life), the [1.3 Connector reference](edge-sdk-connector-reference-1.3.md).
 
-Exhaustive method reference for `ConnectorService`.
+Method reference for `ConnectorService`, the adapter's access to the platform's system of record:
+pairing, asset records, payloads, media files and the Skill Registry.
 
 All methods return a `CompletableFuture`. A call that fails in transport is retried (up to 5
-attempts) before it fails. For the asset, asset payload, scheduler and organization methods,
-`ConnectorServiceImpl` logs an error response and resolves to `null` (entity methods) or `false`
-(delete methods) rather than throwing.
+attempts) before the future completes exceptionally. When the platform answers with an error, the
+asset, payload and scheduler methods log it and resolve to `null` (or `false` for a delete) rather
+than throwing.
 
-## What changed from 1.3
-
-- **Every Mission and Task method is gone — not deprecated, not stubbed, just gone.** Unlike the
-  client SDK's `MissionAutonomy` interface (which keeps `@Deprecated` stubs that fail loudly),
-  `ConnectorService` has no `getMissionById`/`createMission`/`updateMission`/
-  `deleteMission`/`getTaskById`/`createTask`/`updateTask`/`deleteTask`/`getTaskByFlightId` at all —
-  the methods simply don't exist on the interface. A call site referencing any of them fails to
-  compile, not fails at runtime.
-- **New: pairing with a claim code.** `ensureAsset`, `redeemAssetClaim` and `describeAssetClaim`
-  bind an adapter to the asset the platform already knows, or create it from a one-time claim code
-  issued in the Admin Console. `registerAsset` is deprecated.
-- **New: media files.** `registerMediaFile` records a file the device uploaded to the platform.
-- **New: Skill Registry self-reporting.** Four methods let an adapter push its own command
-  contracts into the platform's persisted Skill Registry directly, instead of only ever being
-  polled indirectly through `EdgeAdapterService#getCapabilities`.
-- Organization is unchanged. Scheduler *methods* are too, but not `SchedulerDTO` itself — see below.
+An adapter calls with its edge credential (`ZQNT_EDGE_TOKEN`). Creating, changing and deleting
+schedules is administration and is refused (`PERMISSION_DENIED`); everything else on this page is
+allowed.
 
 ## Assets
 
@@ -39,7 +26,7 @@ attempts) before it fails. For the asset, asset payload, scheduler and organizat
 | `redeemAssetClaim(code, AssetDTO)` | `AssetDTO` | Trade a one-time claim code for an asset, and return it |
 | `describeAssetClaim(code)` | `String` | The name of the organization a claim code would provision into, without spending the code |
 | `updateAsset(id, AssetDTO)` | `AssetDTO` | Update an existing asset |
-| `deRegisterAsset(id)` | `Boolean` | Delete an asset record. In 2.0.0 the platform deletes by serial number, which this method does not send, so it returns `false` |
+| `deRegisterAsset(id)` | `Boolean` | Delete an asset record |
 | `registerAsset(AssetDTO)` | `AssetDTO` | **Deprecated** — use `ensureAsset` |
 
 **Pairing.** Call `ensureAsset` at startup. Because a claim is single-use, the lookup comes first:
@@ -77,23 +64,29 @@ The platform attributes the file to the execution that was running on the asset,
 organization and Application folder, and records it. Registration is idempotent per source object
 key, so a retried report is harmless. The request's `base` is filled in when you leave it unset.
 
-## Organization
+## Schedules
 
 | Method | Returns | Purpose |
 | --- | --- | --- |
-| `getOrganizationById(id)` | `OrganizationDTO` | Get organization by ID |
+| `getSchedulerById(id)` | `SchedulerDTO` | Read a schedule |
+| `createScheduler` / `updateScheduler` / `deleteScheduler` | — | Refused for an edge credential: schedules are managed in the Admin Console |
 
-## Schedulers — same methods, different `SchedulerDTO` shape
+`SchedulerDTO` (`com.zqnt.utils.missionautonomy.domains`, shared with the Client SDK) describes what
+a schedule runs:
 
-`getSchedulerById`/`createScheduler`/`updateScheduler`/`deleteScheduler` keep the same signatures
-as 1.3, and use the same shared `com.zqnt.utils.missionautonomy.domains.SchedulerDTO` class the
-Client SDK does — which means they're subject to the exact same reshape:
-`missionId`/`taskId` are retired (`reserved` on the wire, not merely deprecated), replaced with a
-direct capability-execution target. See the
-[Client SDK reference — Schedulers](client-sdk-mission-autonomy.md#schedulers--same-methods-different-schedulerdto-shape)
-for the full field-by-field breakdown.
+| Field | Type | Notes |
+| --- | --- | --- |
+| `name`, `cronExpression`, `clientTimeZone`, `active`, `type` | | When and whether it fires |
+| `assetSn` | `String` | The asset it runs on. Optional for an Application schedule, which then picks an asset at firing time |
+| `commandId` | `String` | A single command — or: |
+| `capabilityPackageId` / `capabilityId` | `String` | The Application and Skill to run (`application_id` / `skill_id` on the wire) |
+| `executionParametersJson` | `String` | The run's input, as JSON |
+| `autoStart` | `Boolean` | Whether the run starts when created |
+| `organizationId` | `String` | The organization the schedule belongs to |
 
-## Skill Registry — new in 2.0.x
+See [Scheduled triggers](../concepts/applications-and-skills.md#scheduled-triggers).
+
+## Skill Registry
 
 | Method | Returns | Purpose |
 | --- | --- | --- |
@@ -115,11 +108,10 @@ input/output property was removed or retyped, so an existing authored Skill grap
 previous version may now be invalid. `compatibilityNotes` carries the human-readable reasons (e.g.
 `"required field 'zoom' added"`).
 
-In practice, most adapters won't call these directly — the same live `Capability` snapshot an
-adapter already returns from `EdgeAdapterService#getCapabilities` is what the platform's Console
-aggregates into the registry automatically via `observeSkillContract`; this API exists for an
-adapter (or the Integration Hub, which uses it to mirror configured sinks in) that wants to push a
-contract proactively rather than only being observed passively. See
+In practice, most adapters won't call these directly — the platform records the live `Capability`
+snapshot an adapter returns from `EdgeAdapterService#getCapabilities` into the registry itself.
+This API is for an adapter (or the Integration Hub, which mirrors its configured sinks in) that
+wants to publish a contract proactively. See
 [Edge Adapter Reference — Capability Reporting](edge-sdk-adapter-reference.md#capability-reporting)
 for the live-snapshot side of this.
 

@@ -1,6 +1,8 @@
 # Edge SDK — Live Data Service API Reference
 
-Exhaustive method reference for `LiveDataService`. For a narrative introduction and worked examples,
+> For 1.3.x (end of life), see the [1.3 Live Data reference](edge-sdk-live-data-reference-1.3.md).
+
+Method reference for `LiveDataService`. For a narrative introduction and worked examples,
 see the [Live Data guide](../edge-sdk/edge-sdk-live-data.md).
 
 Every method returns `CompletableFuture<Void>` that completes once the message is queued onto the
@@ -33,17 +35,31 @@ See [Models Reference — TelemetryData](edge-sdk-models.md#telemetrydata) for t
 | `produceNotificationData(NotificationRequestData)` | requestData (POJO) | Send a notification — recommended API |
 | `produceNotification(String deviceSn, ProduceNotificationRequest)` | deviceSn, notificationRequest (Proto) | Send a notification using the raw Proto message directly |
 
-`NotificationRequestData` carries `tid`, `sn`, `timestamp`, `severity`, `eventType`, and exactly one
-of three event fields (a `oneof` in practice — only set one per call):
+`NotificationRequestData` carries `tid`, `sn`, `timestamp`, `severity`, `eventType`, and one event
+— set exactly one per call:
 
-| Event field | Type | Confirmed real-adapter usage |
+| Event field | Type | Use |
 |---|---|---|
-| `assetStatusEvent` | `AssetStatusEventData` (`sn`, `assetId`, `online`, `message`) | Yes — DJI |
-| `taskEvent` | `TaskEventData` (`taskId`, `taskType`, `status`, `progress`, `message`, `externalTaskType`) | Yes — DJI |
-| `missionEvent` | `MissionEventData` (`missionId`, `missionType`, `status`, `message`) | No confirmed usage in any current adapter |
+| `commandExecutionEvent` | `CommandExecutionEventData` | The outcome of a command you accepted — this is what moves a Skill run on |
+| `assetStatusEvent` | `AssetStatusEventData` (`sn`, `assetId`, `online`, `message`) | The asset went online or offline |
+| `missionEvent` | `MissionEventData` (`missionId`, `missionType`, `status`, `message`) | Informational; stored as a notification |
 
-`TaskEventData.externalTaskType` is set when `taskType == TASK_TYPE_EXTERNAL`, carrying the
-edge-device-specific task name.
+`CommandExecutionEventData`:
+
+| Field | Notes |
+|---|---|
+| `externalExecutionId` | The execution id you returned in `CommandResult.accepted(...)` (or the request's transaction id if you returned none) — required, it is how the platform finds the run |
+| `commandId` | The command id, e.g. `mission.waypoint.execute` |
+| `status` | `COMMAND_EXECUTION_STATUS_ACCEPTED`, `_RUNNING`, `_SUCCEEDED`, `_FAILED` or `_CANCELLED` |
+| `occurredAt` | When it happened — required |
+| `progress`, `message` | Optional progress and text |
+| `output` | Optional result, available to later nodes as `$.nodes.<id>.output.<field>` |
+| `error` | Why it failed (with `_FAILED`) |
+| `assetSn` | The asset that ran the command — required |
+
+`externalExecutionId`, `assetSn` and `occurredAt` are required: the platform drops an event without
+them, and the Skill node waits until it times out. A worked example is in the
+[Edge Adapter guide — Custom Commands](../edge-sdk/edge-sdk-adapter.md#custom-commands).
 
 ## Stream Management
 

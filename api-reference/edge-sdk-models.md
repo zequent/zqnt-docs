@@ -1,5 +1,7 @@
 # Edge SDK -- Models Reference
 
+> For 1.3.x (end of life), see the [1.3 Models reference](edge-sdk-models-1.3.md).
+
 This document provides a comprehensive reference for all request, response, and data models used in the Zequent Edge SDK.
 
 ## Table of Contents
@@ -14,7 +16,6 @@ This document provides a comprehensive reference for all request, response, and 
   - [GoToRequest](#gotorequest)
   - [Coordinates](#coordinates)
 - [Manual Control Models](#manual-control-models)
-  - [ManualControlRequest](#manualcontrolrequest)
   - [ManualControlInput](#manualcontrolinput)
 - [Camera and Gimbal Models](#camera-and-gimbal-models)
   - [LookAtRequest](#lookatrequest)
@@ -28,8 +29,6 @@ This document provides a comprehensive reference for all request, response, and 
   - [TelemetryData](#telemetrydata)
   - [AssetDetails](#assetdetails)
   - [SubAssetDetails](#subassetdetails)
-- [Mission Models](#mission-models)
-  - [MissionData](#missiondata)
 - [Configuration Models](#configuration-models)
   - [EdgeClientConfig](#edgeclientconfig)
 
@@ -39,7 +38,7 @@ This document provides a comprehensive reference for all request, response, and 
 
 ### CommandResult
 
-The universal return type for all `EdgeAdapterService` commands.
+The return type of every `EdgeAdapterService` command.
 
 **Package:** `com.zqnt.sdk.edge.adapter.domains`
 
@@ -50,38 +49,30 @@ The universal return type for all `EdgeAdapterService` commands.
 | `tid` | `String` | Transaction ID for tracing |
 | `sn` | `String` | Device serial number |
 | `resultType` | `CommandResultType` | Result classification |
+| `externalExecutionId` | `String` | Your execution id for an accepted command |
 
 **CommandResultType enum:**
 
 | Value | Description |
 |-------|-------------|
-| `SUCCESS` | Command executed successfully |
+| `SUCCESS` | Command completed |
+| `ACCEPTED` | Command started and still running; report its outcome with a command execution event |
 | `ERROR` | Command failed |
 | `NOT_IMPLEMENTED` | Command is not supported by this adapter |
 
 **Factory methods:**
 
 ```java
-// Success
 CommandResult.success("Message", sn)
 CommandResult.success("Message", tid, sn)
-
-// Accepted — still running asynchronously
-CommandResult.success("Message", vendorExecutionId, sn)   // vendor id rides on the transaction id
-
-// Error
+CommandResult.accepted("Message", externalExecutionId, sn)
 CommandResult.error("Error message", sn)
 CommandResult.error("Error message", tid, sn)
-
-// Not implemented (used internally by default methods)
-CommandResult.notImplemented("Not supported", sn)
+CommandResult.notImplemented("Not supported", sn)   // used by the default methods
 ```
 
-**Utility methods:**
-
-```java
-boolean isNotImplemented()  // returns true if resultType == NOT_IMPLEMENTED
-```
+`isNotImplemented()` and `isAccepted()` test the result type. See
+[Edge Adapter reference — How commands arrive](edge-sdk-adapter-reference.md#how-commands-arrive).
 
 ---
 
@@ -112,17 +103,26 @@ CurrentCapabilities.of(sn, AssetTypeEnum.ASSET_TYPE_DOCK, capabilitySet)
 
 ### Capability
 
-Describes a single capability of the adapter.
+Describes one command the asset supports.
 
 **Package:** `com.zqnt.sdk.edge.adapter.domains`
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `command` | `String` | Command name (e.g., "takeOff", "openCover") |
+| `command` | `String` | The command id, e.g. `flight.takeoff`, `mission.waypoint.execute` |
 | `description` | `String` | Human-readable description |
-| `available` | `Boolean` | Whether the capability is currently available |
-| `unavailableReason` | `String` | Reason if not available (null if available) |
-| `metadata` | `Map<String, String>` | Additional metadata key-value pairs |
+| `state` | `CapabilityState` | `CAPABILITY_STATE_AVAILABLE` (default), `_TEMPORARILY_UNAVAILABLE`, `_UNSUPPORTED` or `_REQUIRES_AUTHORIZATION` |
+| `unavailableReason` | `String` | Why it is not available right now |
+| `inputSchema` / `outputSchema` | `Map<String, Object>` | JSON Schema of the parameters and the result |
+| `constraints` | `Map<String, Object>` | Limits on the parameters |
+| `metadata` | `Map<String, String>` | Additional key-value pairs |
+| `targetType` | `CapabilityTargetType` | What the command acts on: `CAPABILITY_TARGET_TYPE_ASSET` (default), `_SUB_ASSET`, `_PAYLOAD`, `_COMPONENT` |
+| `targetRef` | `String` | Which sub-asset, payload or component; arrives as `componentId` in `sendCustomCommand` |
+| `schemaVersion` | `String` | Version of the command's contract; bump it on an incompatible change |
+| `errors` / `events` | `List<CapabilityError>` / `List<CapabilityEvent>` | Errors and events the command can produce |
+| `requirements` | `CapabilityRequirements` | The asset types, payloads and runtime features the command needs |
+| `skillId` | `String` | Groups the command with related ones in the Skill Registry |
+| `source`, `provider` | | Where the contract comes from |
 
 ---
 
@@ -139,6 +139,7 @@ Request to initiate takeoff.
 | `sn` | `String` | Device serial number |
 | `tid` | `String` | Transaction identifier |
 | `coordinates` | `Coordinates` | Takeoff position (latitude, longitude, altitude) |
+| `externalId` | `String` | The platform's id for this command; the default execution id to report against |
 
 ---
 
@@ -167,6 +168,7 @@ Request to navigate to specific coordinates.
 | `sn` | `String` | Device serial number |
 | `tid` | `String` | Transaction identifier |
 | `coordinates` | `Coordinates` | Target position |
+| `externalId` | `String` | The platform's id for this command; the default execution id to report against |
 
 ---
 
@@ -185,19 +187,6 @@ Geographic coordinates.
 ---
 
 ## Manual Control Models
-
-### ManualControlRequest
-
-Request to enter or exit manual control mode.
-
-**Package:** `com.zqnt.sdk.edge.adapter.domains`
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `sn` | `String` | Device serial number |
-| `enable` | `boolean` | `true` to enter manual control, `false` to exit |
-
----
 
 ### ManualControlInput
 
@@ -522,56 +511,23 @@ Telemetry specific to a sub-asset (drone, vehicle). Nested under `TelemetryData.
 
 ---
 
-## Mission Models
-
-### MissionData
-
-Represents a mission returned by the Mission Autonomy Service.
-
-**Package:** `com.zqnt.sdk.edge.adapter.domains`
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `UUID` | Unique mission identifier |
-| `name` | `String` | Mission name |
-
----
-
 ## Configuration Models
 
 ### EdgeClientConfig
 
-The edge adapter configuration interface, mapped from `application.properties` with `@ConfigMapping(prefix = "zequent.edge")`.
+The adapter's identity, a plain builder class (`@Data @Builder`) filled from your configuration —
+see the [Configuration guide](../edge-sdk/edge-sdk-configuration.md#edge-identity-configuration).
 
 **Package:** `com.zqnt.sdk.edge.config`
 
-| Method | Return Type | Property | Default | Description |
-|--------|-------------|----------|---------|-------------|
-| `endpoint()` | `String` | `zequent.edge.endpoint` | -- | Adapter listen address |
-| `sn()` | `String` | `zequent.edge.sn` | -- | Device serial number |
-| `timeout()` | `Duration` | `zequent.edge.timeout` | `30s` | Command timeout |
-| `maxRetries()` | `int` | `zequent.edge.max-retries` | `3` | Max retry attempts |
-| `assetType()` | `AssetTypeEnum` | `zequent.edge.asset-type` | -- | Asset type |
-| `assetVendor()` | `AssetVendor` | `zequent.edge.asset-vendor` | -- | Asset vendor |
-| `assetId()` | `Optional<String>` | `zequent.edge.asset-id` | empty | Platform asset ID |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `endpoint` | `String` | — | The address this adapter is reachable at |
+| `sn` | `String` | — | Device serial number |
+| `timeout` | `Duration` | `30s` | Command timeout |
+| `maxRetries` | `int` | `3` | Max retry attempts |
+| `assetType` | `AssetTypeEnum` | — | Asset type |
+| `assetVendor` | `AssetVendor` | — | Asset vendor |
+| `assetId` | `String` | — | Platform asset ID |
 
-Access these values in your code via the `EdgeClient` bean:
-
-```java
-@Inject
-EdgeClient edgeClient;
-
-String sn = edgeClient.getSn();
-EdgeClientConfig config = edgeClient.getConfig();
-Duration timeout = config.timeout();
-```
-
-Or inject `EdgeClientConfig` directly:
-
-```java
-@Inject
-EdgeClientConfig config;
-
-String sn = config.sn();
-AssetTypeEnum type = config.assetType();
-```
+`EdgeClient` holds it: `edgeClient.getSn()`, `edgeClient.getConfig().getTimeout()`.

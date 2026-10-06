@@ -1,5 +1,7 @@
 # Edge SDK (Python) — Models Reference
 
+> For 1.3.x (end of life), see the [1.3 Models reference](edge-sdk-python-models-1.3.md).
+
 All public dataclasses are exported from the top-level `edge_sdk` package. They are plain `@dataclass` objects (not Pydantic), so construction is cheap and they serialize to/from protobuf via internal `_converters.py` modules you should not need to touch.
 
 For Java, see [edge-sdk-models.md](edge-sdk-models.md).
@@ -39,14 +41,14 @@ Constructors — note these are named `ok`/`fail`, not `success`/`error`:
 
 | Factory                                                                    | Result                                   |
 |-----------------------------------------------------------------------------|-------------------------------------------|
-| `EdgeResponse.ok(tid, sn, message=None, *, external_execution_id=None, ...)` | `success=True`                             |
+| `EdgeResponse.ok(tid, sn, message=None, ..., external_execution_id=None)` | `success=True`                             |
 | `EdgeResponse.fail(tid, sn, error: ErrorMessage, asset_id=None)`            | `success=False`, fills `error`             |
 | `EdgeResponse.not_supported(tid, sn)`                                       | `success=False`, error code `SDK_ERROR` |
 
 ```python
 return EdgeResponse.ok(ctx.tid, ctx.sn, "Takeoff initiated")
 
-return EdgeResponse.fail(ctx.tid, ctx.sn, ErrorMessage(message="Device busy", code=ErrorCode.HARDWARE_ERROR))
+return EdgeResponse.fail(ctx.tid, ctx.sn, ErrorMessage(message="Device busy", code=ErrorCode.ASSET_ERROR))
 ```
 
 Set `external_execution_id` on `ok(...)` when the command you just accepted keeps running asynchronously — use your own vendor execution id if you have one (e.g. a DJI `flightId`); otherwise leave it unset and the platform falls back to its own correlation id.
@@ -225,87 +227,6 @@ class PayloadTelemetry:
 
 ---
 
-## Tasks and missions
-
-Most edge adapters never construct these directly — the platform drives task execution by passing your adapter a `task_id: str`, and you fetch whatever detail you need through `ConnectorClient` (see [Mission Autonomy](../edge-sdk/edge-sdk-python-mission-autonomy.md)). These dataclasses exist if you need the richer, vendor-specific task shape (e.g. mirroring a DJI wayline mission).
-
-### `Task`
-
-```python
-@dataclass
-class Task:
-    status: TaskStatus
-    id: str | None = None
-    mission_id: str | None = None
-    name: str | None = None
-    task_type: TaskType | None = None
-    asset_id: str | None = None
-    sn_number: str | None = None
-    current_progress: int | None = None
-    current_step: str | None = None
-    waypoint_config: WaypointTaskConfig | None = None
-    detect_config: DetectTaskConfig | None = None
-    area_mapping_config: AreaMappingTaskConfig | None = None
-    poi_config: PoiTaskConfig | None = None
-    follow_config: FollowTaskConfig | None = None
-    track_config: TrackTaskConfig | None = None
-    created_at: datetime | None = None
-    modified_at: datetime | None = None
-    # additional fields: description, config, break_reason, external_command_type, modified_from
-```
-
-At most one `*_config` is populated based on `task_type`.
-
-### `Mission`
-
-```python
-@dataclass
-class Mission:
-    name: str
-    description: str
-    status: MissionStatus
-    type: MissionType
-    id: str | None = None
-    tasks: list[Task] = field(default_factory=list)
-    assigned_assets: list[str] = field(default_factory=list)
-    start_date: datetime | None = None
-    end_date: datetime | None = None
-```
-
-### Task config variants (representative fields — each has 10-25 fields; see the SDK source for the full list)
-
-| Class                     | Representative fields                                                                        |
-|---------------------------|-----------------------------------------------------------------------------------------------|
-| `WaypointTaskConfig`      | `flight_id`, `waypoints: list[Waypoint]`, `global_speed`, `rth_altitude`, `rth_mode`          |
-| `DetectTaskConfig`        | `ai_model_id`, `detection_targets`, `min_confidence`, `detection_parameters: list[DetectionParameter]` |
-| `AreaMappingTaskConfig`   | `survey_altitude`, `area_vertices: list[AreaVertex]`, `front_overlap`, `side_overlap`, `flight_pattern` |
-| `PoiTaskConfig`           | `poi_latitude`, `poi_longitude`, `poi_altitude`, `orbit_radius`, `orbit_speed`, `number_of_orbits` |
-| `FollowTaskConfig`        | `target_type`, `follow_distance`, `follow_mode`, `max_speed`, `lost_target_action`            |
-| `TrackTaskConfig`         | `target_type`, `tracking_mode`, `confidence_threshold`, `max_movement_radius`, `lost_target_action` |
-
-### `Waypoint` and `AreaVertex`
-
-```python
-@dataclass
-class Waypoint:
-    latitude: float
-    longitude: float
-    altitude: float | None = None
-    speed: float | None = None
-    fly_through: bool | None = None
-    vehicle_action: VehicleAction | None = None
-    wp_order: int | None = None
-    gimbal_pitch: int | None = None
-
-@dataclass
-class AreaVertex:
-    latitude: float
-    longitude: float
-    order: int | None = None
-```
-
----
-
 ## Detection
 
 ```python
@@ -356,15 +277,16 @@ class MissionEvent:
     message: str | None = None
 
 @dataclass
-class TaskEvent:
-    """Task lifecycle event."""
-    task_id: str
-    task_type: TaskType
-    status: TaskStatus
-    sn: str = ""  # asset serial number - required for multi-asset adapters
-    progress: float | None = None
+class CommandExecutionEvent:
+    """The outcome of a command you accepted."""
+    external_execution_id: str
+    status: CommandExecutionStatus
+    sn: str = ""                      # the asset that ran it - always set it
+    command_id: str | None = None
+    progress: float | None = None     # 0.0 - 1.0, while RUNNING
     message: str | None = None
-    external_task_type: str | None = None
+    output: dict | None = None        # result on SUCCEEDED
+    occurred_at: datetime | None = None  # defaults to publish time
 ```
 
 See [Live Data — Notifications](../edge-sdk/edge-sdk-python-live-data.md#notifications).
@@ -376,11 +298,18 @@ See [Live Data — Notifications](../edge-sdk/edge-sdk-python-live-data.md#notif
 ```python
 @dataclass
 class Capability:
-    command: str       # e.g. "TakeOff", "GoTo"
-    description: str
-    available: bool
+    command_id: str                   # e.g. "flight.takeoff", "mission.waypoint.execute"
+    description: str = ""
+    state: CapabilityState = CapabilityState.AVAILABLE
+    display_name: str | None = None
     unavailable_reason: str | None = None
     metadata: dict[str, str] = field(default_factory=dict)
+    input_schema: dict | None = None  # JSON Schema of the parameters
+    output_schema: dict | None = None
+    target: CapabilityTarget | None = None   # type (ASSET, SUB_ASSET, PAYLOAD, COMPONENT) + target_ref
+    schema_version: str | None = None
+    skill_id: str | None = None
+    source: CapabilitySource = CapabilitySource.EDGE_ADAPTER
 
 @dataclass
 class Capabilities:
@@ -390,7 +319,8 @@ class Capabilities:
     timestamp: datetime | None = None
 ```
 
-Use `EdgeAdapter._auto_capabilities(sn, asset_type)` to construct one based on which methods you've overridden.
+Build it with `EdgeAdapter._auto_capabilities(sn, asset_type)`, and declare extra commands with
+`register_command` — see the [Edge Adapter reference](edge-sdk-python-adapter-reference.md#capabilities-and-command-registration).
 
 ---
 
@@ -400,8 +330,8 @@ Use `EdgeAdapter._auto_capabilities(sn, asset_type)` to construct one based on w
 
 | Enum                          | Values                                                                                          |
 |-------------------------------|---------------------------------------------------------------------------------------------------|
-| `AssetType`                   | `UNKNOWN`, `AIRCRAFT`, `DOCK`, `SENSOR`, `CAMERA`, `OTHER`, `JAMMER`, `CYBER_ATTACK`, `SAPIENT`    |
-| `AssetVendor`                 | `DJI`, `AUTEL`, `ROS`, `MAVLINK`, `RTMP_RTSP`, `SAPIENT`, `BETAFLIGHT`                             |
+| `AssetType`                   | `UNKNOWN`, `AIRCRAFT`, `DOCK`, `SENSOR`, `CAMERA`, `OTHER`, `JAMMER`, `CYBER_ATTACK`, `SAPIENT`, `RNS` |
+| `AssetVendor`                 | `DJI`, `AUTEL`, `ROS`, `MAVLINK`, `RTMP_RTSP`, `SAPIENT`, `BETAFLIGHT`, `RNS`, `ZQNT`, `SIMULATOR` |
 | `AssetConnection`              | `MQTT`, `TCP`, `SERIAL`                                                                            |
 | `LiveStreamType`              | `UNKNOWN`, `RTMP`, `RTSP`, `WEBRTC`                                                                |
 | `AssetMode`                   | `IDLE`, `DEBUGGING`, `REMOTE_DEBUGGING`, `UPGRADING`, `WORKING`, `TO_BE_CALIBRATED`, `OFFLINE`     |
@@ -409,11 +339,11 @@ Use `EdgeAdapter._auto_capabilities(sn, asset_type)` to construct one based on w
 | `ManualControlState`          | `DISCONNECTED`, `CONNECTING`, `CONNECTED`                                                          |
 | `AssetCoverState`             | `CLOSED`, `OPENED`, `HALF_OPEN`, `ABNORMAL`                                                        |
 | `AssetAirConditionerState`    | `IDLE`, `COOL`, `HEAT`, `DEHUMIDIFICATION`, plus `*_EXIT`/`*_PREPARATION` transition states        |
-| `TaskType`                    | `UNSPECIFIED`, `DETECT`, `AREA_MAPPING`, `WAYPOINT`, `POI`, `FOLLOW`, `TRACK`, `COUNTER_DRONE`      |
-| `TaskStatus`                  | `UNKNOWN`, `DRAFT`, `SCHEDULED`, `RUNNING`, `ERROR`, `COMPLETED`, `PREPARED`, `PAUSED`              |
 | `MissionType`                 | `STANDARD`, `REMOTE_OPS`, `DRF`, `MISSION`                                                         |
 | `MissionStatus`               | `UNKNOWN`, `DRAFT`, `ACTIVE`, `INACTIVE`, `ERROR`                                                  |
-| `TaskStatus`                  | `UNKNOWN`, `DRAFT`, `SCHEDULED`, `RUNNING`, `ERROR`, `COMPLETED`, `PREPARED`, `PAUSED`              |
+| `CommandExecutionStatus`      | `UNSPECIFIED`, `ACCEPTED`, `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED`                            |
+| `CapabilityState`             | `UNSPECIFIED`, `AVAILABLE`, `TEMPORARILY_UNAVAILABLE`, `UNSUPPORTED`, `REQUIRES_AUTHORIZATION`      |
+| `CapabilityTargetType`        | `UNSPECIFIED`, `ASSET`, `SUB_ASSET`, `PAYLOAD`, `COMPONENT`                                         |
 | `ErrorCode`                   | `SYSTEM_ERROR`, `CLIENT_ERROR`, `SDK_ERROR`, `SERVICE_ERROR`, `ASSET_ERROR`                         |
 | `Rainfall`                    | `NO`, `LIGHT`, `MODERATE`, `HEAVY`                                                                 |
 | `NetworkType`                 | `NETWORK_4G`, `ETHERNET`                                                                            |

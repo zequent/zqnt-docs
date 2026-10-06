@@ -1,6 +1,6 @@
 # Edge SDK -- Connector Service
 
-The `ConnectorService` interface gives an edge adapter access to the platform's asset registry over gRPC. It covers what an adapter itself needs — pairing and updating its own asset(s), looking up schedulers and organization info, reporting the commands it supports to the Skill Registry, and registering media files it uploaded. The 1.3 Mission and Task methods are gone: work reaches an adapter as commands (see [Edge Adapter — Custom Commands](edge-sdk-adapter.md#custom-commands)).
+The `ConnectorService` interface gives an edge adapter access to the platform's asset registry over gRPC. It covers what an adapter itself needs — pairing and updating its own asset(s), reading schedules, reporting the commands it supports to the Skill Registry, and registering media files it uploaded. The 1.3 Mission and Task methods are gone: work reaches an adapter as commands (see [Edge Adapter — Custom Commands](edge-sdk-adapter.md#custom-commands)).
 
 Full method-by-method reference: [Connector API Reference](../api-reference/edge-sdk-connector-reference.md).
 
@@ -12,7 +12,6 @@ Full method-by-method reference: [Connector API Reference](../api-reference/edge
 - [Skill Registry](#skill-registry)
 - [Media Files](#media-files)
 - [Schedulers](#schedulers)
-- [Organization](#organization)
 - [Capabilities](#capabilities)
 - [Error Handling](#error-handling)
 - [Configuration](#configuration)
@@ -26,7 +25,7 @@ From the edge adapter, you use `ConnectorService` to:
 
 - Make sure your asset exists when the adapter starts — pairing it with a one-time code if the platform doesn't know it yet.
 - Update asset state as it changes.
-- Fetch a scheduler's definition and the organization it belongs to.
+- Read a schedule's definition.
 - Report the commands your adapter supports to the Skill Registry.
 - Register a media file the device uploaded.
 - Store and retrieve asset payloads (arbitrary versioned metadata blobs, e.g. calibration data).
@@ -93,14 +92,13 @@ connectorService.updateAsset("550e8400-e29b-41d4-a716-446655440000", update)
 ### Deregister an Asset
 
 `deRegisterAsset(id)` deletes the asset record. Do not call it on shutdown: a paired asset would have
-to be paired again with a new code. In 2.0.0 the platform deletes by serial number, which this method
-does not send, so it completes with `false`.
+to be paired again with a new code.
 
 ---
 
 ## Asset Payloads
 
-Store arbitrary metadata alongside an asset or sub-asset — for example, a generated flight-plan artifact or calibration data.
+Report the hardware mounted on an asset or sub-asset — a camera, gimbal or sensor, with its slot, model and firmware.
 
 ```java
 connectorService.upsertAssetPayload("YOUR_DEVICE_SN", null, payloadDTO)
@@ -111,31 +109,12 @@ connectorService.upsertAssetPayload("YOUR_DEVICE_SN", null, payloadDTO)
 
 ## Schedulers
 
-Schedulers define when a Skill or a single command runs, and on which asset.
+A schedule defines when a Skill or a single command runs, and on which asset. Schedules are created
+and changed in the Admin Console; an adapter can read one:
 
 ```java
 connectorService.getSchedulerById("scheduler-uuid")
     .thenAccept(scheduler -> log.info("Scheduler: {}", scheduler));
-
-connectorService.createScheduler(schedulerDTO)
-    .thenAccept(created -> log.info("Scheduler created: {}", created.getId()));
-
-connectorService.updateScheduler("scheduler-uuid", updatedScheduler)
-    .thenAccept(updated -> log.info("Scheduler updated"));
-
-connectorService.deleteScheduler("scheduler-uuid")
-    .thenAccept(success -> {
-        if (success) log.info("Scheduler deleted");
-    });
-```
-
----
-
-## Organization
-
-```java
-connectorService.getOrganizationById("org-uuid")
-    .thenAccept(org -> log.info("Organization: {}", org.getName()));
 ```
 
 ---
@@ -177,7 +156,7 @@ persisted Skill Registry — one entry per `(command_id, schema_version)`, which
 | `setSkillContractStatus(id, status)` | Move a contract through `ACTIVE` / `DRAFT` / `DEPRECATED` / `RETIRED` |
 | `setSkillContractPermissions(id, requiredPermissions)` | Replace its required permissions (stored, not yet enforced) |
 
-See the [Connector reference](../api-reference/edge-sdk-connector-reference.md#skill-registry--new-in-20x).
+See the [Connector reference](../api-reference/edge-sdk-connector-reference.md#skill-registry).
 
 ---
 
