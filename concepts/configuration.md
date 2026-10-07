@@ -362,7 +362,7 @@ notification, the header's approval indicator or the execution page.
 
 1. Create a simulated aircraft and take it off **through the platform** (a takeoff command from Remote
    Control or a Skill), so the platform knows its home. See
-   [Test with simulators](/docs/console/simulators).
+   [Practice with simulated devices](/guides/simulators).
 2. Draw a `HARD_BLOCK` zone between the aircraft and its home, and fly the aircraft past it.
 3. Add `route.safety_return.floor_percent` with scope `ORGANIZATION` for your organization and a value
    above the simulated aircraft's current battery, for example `95`.
@@ -375,15 +375,13 @@ Do not do this on a real aircraft in flight: it will be sent home.
 
 ### Send detections to the nearest drone, everything else to any drone
 
-1. Select **New rule** and the template **Nearest available drone**. It already applies only to runs
-   with a target position and asks for an aircraft with at least 30 % battery. Add **At most this far
-   from the target** 5000 m and save. A new rule is added at the top.
-2. Keep **Any Available Asset Fallback** at the bottom for runs without a position.
-3. In **What would happen?**, try "A detection" and "No target position" to see each run answered by
-   the rule you expect.
+Add a **Nearest available drone** rule above **Any Available Asset Fallback**, and keep the fallback
+for runs without a position. Step by step, with the **What would happen?** test:
+[Choose which drone responds](/guides/dispatch).
 
 ## See also
 
 - [No-fly zones and safe returns](airspace-safety.md)
 - [Applications & Skills](applications-and-skills.md)
-- [Manage and automate](/docs/console/manage-and-automate)
+- [Choose which drone responds](/guides/dispatch)
+- [Start a response when something happens](/guides/events)

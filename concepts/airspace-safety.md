@@ -9,7 +9,7 @@ how to change them for one organization or one site.
 ## Where zones live and who checks them
 
 - **Drawn in the console.** Zones are drawn in **Operate → Remote Control** with the **Zone** draw mode
-  and managed under **Plan**. See [Draw a no-fly zone](/docs/console/operate#draw-a-no-fly-zone).
+  and managed under **Plan**. See [Draw a no-fly zone](/guides/airspace#draw-a-no-fly-zone).
 - **Stored per organization.** Every zone belongs to one organization and is stored by the Connector
   service in the platform database. Every flight of that organization respects every active zone of
   that organization. A zone can be filed under a site (theatre); it still applies to every flight of
@@ -259,4 +259,4 @@ variable `ZQNT_SAFETY_RETURN_ENABLED=false`; how often it runs is `ZQNT_SAFETY_R
 
 - [Technical configuration and dispatch rules](configuration.md)
 - [Applications & Skills](applications-and-skills.md)
-- [Operate your fleet: Remote Control](/docs/console/operate#remote-control)
+- [Take remote control](/guides/remote-control)

@@ -87,17 +87,8 @@ password in the response — it is not shown again, so hand it to the user immed
 are `org-admin`, `operator`, `approver`, `viewer` (`system_admin` is granted by direct database
 action only, not through this endpoint).
 
-In the Admin Console, the same is done under **Manage › Access Control** with **Invite user**. An
-org-admin or system_admin can also, per user:
-
-- **Edit roles** — replaces the user's roles and signs them out, so the new roles apply on their next
-  login. Not available for SSO users, whose roles come from the identity provider.
-- **Disable** / **Enable** — a disabled user is signed out and cannot log in. The user keeps their
-  license seat.
-- **Delete** — removes the account and frees its license seat.
-
-Nobody can change or delete their own account, and an org-admin only manages users of their own
-organization.
+In the console, organization administrators invite and manage their own users: see
+[Invite your team](/guides/team).
 
 For an **SSO** organization, you don't create users this way at all — see below.
 
