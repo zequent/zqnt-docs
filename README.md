@@ -16,6 +16,10 @@ This public documentation is for external developers and integration teams. It f
 > [1.3 Java Client SDK Quickstart](client-sdk/QUICKSTART-1.3.md)). To upgrade, see
 > [Upgrading from 1.3](concepts/migration-guide.md).
 
+> **3.0 preview.** The 3.0 Client SDKs are available as preview builds for trying against a 3.0
+> platform; 3.0 is not released yet. Their pages end in `-3.0.md` and are listed under
+> [Client SDK 3.0 (preview)](#client-sdk-30-preview); everything else on this page is 2.0.
+
 ## Start Here
 
 | Goal | Documentation |
@@ -56,6 +60,20 @@ Customer applications normally use the Client SDK and connect to the platform se
 | Java Client SDK | [Quickstart](client-sdk/QUICKSTART.md), [Configuration](client-sdk/CONFIGURATION.md), [Customer Example](client-sdk/CUSTOMER_EXAMPLE.md) |
 | Python Client SDK | [Quickstart](client-sdk/QUICKSTART_PYTHON.md), [Configuration](client-sdk/CONFIGURATION_PYTHON.md), [Customer Example](client-sdk/CUSTOMER_EXAMPLE_PYTHON.md) |
 | Go Client SDK | [Quickstart](client-sdk/QUICKSTART_GO.md), [Connector](client-sdk/CONNECTOR_GO.md) — no built-in retry/circuit-breaker/Stork layer, see the quickstart's "What this SDK deliberately does not do" |
+
+## Client SDK 3.0 (preview)
+
+On a 3.0 platform every asset is commanded the same way: list the asset's capabilities, then run a
+command by its dotted id (`flight.takeoff`, `navigation.go_to`, `dock.open_cover`, …) with a JSON
+object of params — no typed method per command. These pages describe preview builds and change until
+3.0 is released; the 2.0 pages above stay authoritative for 2.0 platforms.
+
+| Goal | Documentation |
+| --- | --- |
+| What changes for an integration, running against 2.x platforms, typed call → command id | [Upgrading to 3.0](concepts/upgrading-to-3.0.md) |
+| Discover capabilities, execute, wait, watch and cancel commands from Java | [Commands (Java)](client-sdk/COMMANDS-3.0.md) |
+| … from Python | [Commands (Python)](client-sdk/COMMANDS_PYTHON-3.0.md) |
+| … from Go | [Commands (Go)](client-sdk/COMMANDS_GO-3.0.md) |
 
 ## Platform Service Images
 
