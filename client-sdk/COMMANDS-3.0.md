@@ -1,6 +1,7 @@
 # Zequent Client SDK (Java) — Commands (3.0 preview)
 
-> **Preview.** This page describes the Zequent **3.0** command API of the Java Client SDK. 3.0 is not
+> **Preview.** This page describes the Zequent **3.0** command, manual-control and telemetry API of
+> the Java Client SDK. 3.0 is not
 > released yet: the API below is available as a preview build and needs a platform that runs 3.0.
 > Names may still change before the release. For the current 2.0 line, see
 > [Remote Control](REMOTE_CONTROL.md) and the [Java Quickstart](QUICKSTART.md).
@@ -23,7 +24,7 @@ push to the 3.0 branch publishes a new preview version; at the time of writing i
     <groupId>com.zqnt.sdk</groupId>
     <artifactId>client-java-sdk</artifactId>
     <!-- preview, not a release -->
-    <version>1.0.0-PR11-fe5e92b-SNAPSHOT</version>
+    <version>1.0.0-PR11-ea1532e-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -227,16 +228,83 @@ commands.executeAndWait("DOCK-1", "dock.open_cover", Map.of(), Duration.ofMinute
 
 ## Manual control (stick input)
 
-The 3.0 contract has a manual-control stream (`StreamManualControl`), but the Java Client SDK does
-not wrap it yet — **coming**. Keep using `zequent.remoteControl().startManualControlInput(sn, assetId)`
-for stick input; it is not deprecated. Entering and leaving manual control are commands on 3.0:
-`flight.manual.enter` and `flight.manual.exit`.
+Stick input goes over one client-streaming session per asset. Put the asset in manual control
+first, then send inputs (roll, pitch, yaw, throttle from -1 to 1, optionally a gimbal pitch) at your
+control rate:
+
+```java
+import com.zqnt.protos.edge.v3.ManualControlInput;
+import com.zqnt.sdk.client.commands.domains.ManualControlStream;
+
+commands.executeAndWait("DRONE-1", "flight.manual.enter", Map.of(), Duration.ofSeconds(30)).join();
+try (ManualControlStream stick = commands.streamManualControl("DRONE-1")) {
+    stick.send(0f, 0.2f, 0f, 0.5f);                       // roll, pitch, yaw, throttle
+    stick.send(ManualControlInput.newBuilder().setThrottle(0.5f).setGimbalPitch(-30f).build());
+}
+commands.executeAndWait("DRONE-1", "flight.manual.exit", Map.of(), Duration.ofSeconds(30)).join();
+```
+
+- `streamManualControl(assetSn)` returns a `ManualControlStream` (`AutoCloseable`). One session
+  controls one asset; the first input names it. Inputs go out in the order they are sent, without a
+  deadline, until the session is closed.
+- `send(roll, pitch, yaw, throttle)` or `send(ManualControlInput)` (`com.zqnt.protos.edge.v3`, with
+  `setGimbalPitch`) sends one input.
+- `close()` ends the session; `done()` then completes with the number of inputs the platform passed
+  on to the asset (`CompletableFuture<Long>`).
+- `done()` fails with a `CommandException` when the platform refuses the session (no adapter
+  reachable for the asset, an asset of another organization) or the adapter drops it; `send` then
+  throws an `IllegalStateException`.
+
+The 2.x stick-input session, `zequent.remoteControl().startManualControlInput(sn, assetId)`, is
+deprecated in the 3.0 SDK (`@Deprecated(since = "3.0")`) and stays for 2.x platforms.
+
+## Live telemetry
+
+`zequent.telemetry()` watches 3.0 telemetry from the live-data service (`LIVE_DATA_SERVICE_HOST` /
+`_PORT`, same client credential):
+
+```java
+import com.zqnt.sdk.client.telemetry.domains.TelemetryWatch;
+import java.util.List;
+
+try (TelemetryWatch watch = zequent.telemetry().watchTelemetry(List.of("DOCK-1"), Duration.ofSeconds(1),
+        sample -> System.out.println(sample.getPosition() + " " + sample.getBatteryPercent()),
+        status -> System.out.println(status.getAsset().getSn() + " " + status.getState()))) {
+    watch.done().get(10, TimeUnit.MINUTES);
+}
+```
+
+`watchTelemetry(assetSns, minInterval, onSample, onSourceStatus)` streams, until the watch is closed:
+
+- **`TelemetrySample`s** (`com.zqnt.protos.telemetry.v3`): the fields every asset shares —
+  `getPosition()`, `getRelativeAltitude()`, `getHeadingDegrees()`, `getHorizontalSpeed()`,
+  `getVerticalSpeed()`, `getBatteryPercent()`, `getObservedAt()` — and everything device-specific in
+  `getDetails()`, under the keys the asset declares in its capabilities' `telemetry_fields`
+  (`Structs.toMap(sample.getDetails())` for a plain map);
+- **`SourceStatus`es**: every watched asset's state first, then each change to
+  `SOURCE_STATE_ONLINE`, `SOURCE_STATE_STALE` or `SOURCE_STATE_NO_DATA` (with `getLastSampleAt()`).
+
+An empty or `null` `assetSns` watches every asset of the caller's organization; a dock's serial also
+brings the samples of its drone. `minInterval` keeps at most one sample per asset per interval
+(`null` = every sample). `watchTelemetry(assetSns, onSample)` is the short form without an interval
+and without source status.
+
+The returned `TelemetryWatch` (`AutoCloseable`) ends with `close()`; `done()` completes then or when
+the platform ends the watch. The platform sends heartbeats on a quiet stream: when neither a sample
+nor a heartbeat arrives within the heartbeat timeout — **35 s by default**, set with
+`ZequentClient.builder()...telemetryHeartbeatTimeoutSeconds(int)` or, with CDI, the property
+`zequent.resilience.telemetry-heartbeat-timeout-seconds` — `done()` fails with a retryable
+`CommandException` of category `ERROR_CATEGORY_SERVICE`. A refused or dropped watch fails `done()`
+too. **A watch does not reconnect**: watch again.
+
+`zequent.liveData().streamTelemetryData(...)` stays the 2.x telemetry stream.
 
 ## Against a 2.x platform
 
-`zequent.commands()` needs a 3.0 platform. A 2.x platform does not serve the 3.0 command service:
-the calls fail with a `CommandException` whose `getStatus()` is `UNIMPLEMENTED` (category
+`zequent.commands()` and `zequent.telemetry()` need a 3.0 platform. A 2.x platform does not serve
+the 3.0 command and telemetry services: the calls fail with a `CommandException` whose `getStatus()` is `UNIMPLEMENTED` (category
 `ERROR_CATEGORY_NOT_FOUND`). The SDK does **not** switch to the 2.x calls on its own. Against 2.x,
-keep using the typed `zequent.remoteControl()` methods, which still work in this SDK and are
-marked `@Deprecated(since = "3.0")`. See
+keep using the typed `zequent.remoteControl()` methods (including `startManualControlInput` for
+stick input) and `zequent.liveData()`; the typed calls still work in this SDK and are marked
+`@Deprecated(since = "3.0")`. See
 [Upgrading to 3.0](../concepts/upgrading-to-3.0.md#running-against-2x-platforms).

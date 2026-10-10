@@ -74,6 +74,7 @@ object of params — no typed method per command. These pages describe preview b
 | Discover capabilities, execute, wait, watch and cancel commands from Java | [Commands (Java)](client-sdk/COMMANDS-3.0.md) |
 | … from Python | [Commands (Python)](client-sdk/COMMANDS_PYTHON-3.0.md) |
 | … from Go | [Commands (Go)](client-sdk/COMMANDS_GO-3.0.md) |
+| Fly an asset by hand (stick input) and watch live telemetry on 3.0 | the "Manual control" and "Live telemetry" sections of the Commands pages |
 
 ## Platform Service Images
 

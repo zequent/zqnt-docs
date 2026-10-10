@@ -1,6 +1,7 @@
 # Zequent Client SDK (Python) — Commands (3.0 preview)
 
-> **Preview.** This page describes the Zequent **3.0** command API of the Python Client SDK. 3.0 is
+> **Preview.** This page describes the Zequent **3.0** command, manual-control and telemetry API of
+> the Python Client SDK. 3.0 is
 > not released yet: the API below is available from a preview branch and needs a platform that runs
 > 3.0. Names may still change before the release. For the current 2.0 line, see
 > [Remote Control (Python)](REMOTE_CONTROL_PYTHON.md) and the
@@ -217,16 +218,80 @@ returned with state `COMMAND_STATE_FAILED` and `result.error` (`category`, `code
 
 ## Manual control (stick input)
 
-The 3.0 contract has a manual-control stream (`StreamManualControl`), but the Python Client SDK does
-not wrap it yet — **coming**. Keep using `client.remote_control.start_manual_control_input(sn)` for
-stick input; it is not deprecated. Entering and leaving manual control are commands on 3.0:
-`flight.manual.enter` and `flight.manual.exit`.
+Stick input goes over one client-streaming session per asset. Put the asset in manual control
+first, then send inputs (roll, pitch, yaw, throttle from -1 to 1, optionally a gimbal pitch) at your
+control rate:
+
+```python
+await client.commands.execute_and_wait("DRONE-1", "flight.manual.enter")
+async with client.commands.stream_manual_control("DRONE-1") as stick:
+    await stick.send(pitch=0.2, throttle=0.5)
+    await stick.send(throttle=0.5, gimbal_pitch=-30.0)
+print("inputs passed on:", stick.accepted_inputs)
+await client.commands.execute_and_wait("DRONE-1", "flight.manual.exit")
+```
+
+- `stream_manual_control(asset_sn)` (not awaited) returns a `ManualControlStream`. One session
+  controls one asset; the first input names it. Inputs go out in the order they are sent, without a
+  deadline, until the session is closed.
+- `await stick.send(roll=0.0, pitch=0.0, yaw=0.0, throttle=0.0, *, gimbal_pitch=None)` sends one input.
+- Leaving the `async with` block normally ends the session and waits for the platform's answer;
+  `stick.accepted_inputs` is then the number of inputs passed on to the asset. Leaving it with an
+  exception aborts the stream.
+- Without `async with`: `await stick.close()` ends the session and returns that number;
+  `stick.cancel()` aborts the stream without waiting for an answer.
+- `send` and `close` raise `CommandError` when the platform refused the session (no adapter
+  reachable for the asset, an asset of another organization) or the adapter dropped it; `send`
+  after `close` raises `RuntimeError`.
+
+The 2.x stick-input session, `client.remote_control.start_manual_control_input(sn)`, is deprecated in
+the 3.0 SDK (it emits a `DeprecationWarning`) and stays for 2.x platforms.
+
+## Live telemetry
+
+`client.telemetry` watches 3.0 telemetry from the live-data service (`LIVE_DATA_SERVICE_HOST` /
+`_PORT`, same client credential):
+
+```python
+from datetime import timedelta
+
+from zqnt_utils.generated.zqnt.telemetry.v3 import telemetry_pb2
+
+async for item in client.telemetry.watch_telemetry(["DOCK-1"], min_interval=timedelta(seconds=1)):
+    if isinstance(item, telemetry_pb2.TelemetrySample):
+        print(item.asset.sn, item.position, item.battery_percent)
+    else:  # SourceStatus
+        print(item.asset.sn, item.state)
+```
+
+`watch_telemetry(asset_sns=None, *, min_interval=None, heartbeat_timeout=timedelta(seconds=35))` is
+an async iterator (not awaited) that yields, until you leave the loop:
+
+- **`TelemetrySample`s** (`zqnt_utils.generated.zqnt.telemetry.v3.telemetry_pb2`): the fields every
+  asset shares — `position`, `relative_altitude`, `heading_degrees`, `horizontal_speed`,
+  `vertical_speed`, `battery_percent`, `observed_at` — and everything device-specific in `details`,
+  under the keys the asset declares in its capabilities' `telemetry_fields` (`to_dict(item.details)`
+  for a plain dict);
+- **`SourceStatus`es**: every watched asset's state first, then each change to
+  `SOURCE_STATE_ONLINE`, `SOURCE_STATE_STALE` or `SOURCE_STATE_NO_DATA` (with `last_sample_at`).
+
+No asset (`None` or empty) watches every asset of the caller's organization; a dock's serial also
+brings the samples of its drone. `min_interval` (seconds or a `timedelta`) keeps at most one sample
+per asset per interval (unset = every sample).
+
+The platform sends heartbeats on a quiet stream: when neither a sample nor a heartbeat arrives within
+`heartbeat_timeout` (**35 s by default**, `client_sdk.telemetry.client.DEFAULT_HEARTBEAT_TIMEOUT`), the
+loop raises a retryable `CommandError` with category `ERROR_CATEGORY_SERVICE`. A refused or dropped
+watch raises `CommandError` too. **A watch does not reconnect**: watch again.
+
+`client.live_data.stream_telemetry(...)` stays the 2.x telemetry stream.
 
 ## Against a 2.x platform
 
-`client.commands` needs a 3.0 platform. A 2.x platform does not serve the 3.0 command service: the
-calls raise `CommandError` with `status` `grpc.StatusCode.UNIMPLEMENTED` (category
+`client.commands` and `client.telemetry` need a 3.0 platform. A 2.x platform does not serve the 3.0
+command and telemetry services: the calls raise `CommandError` with `status` `grpc.StatusCode.UNIMPLEMENTED` (category
 `ERROR_CATEGORY_NOT_FOUND`). The SDK does **not** switch to the 2.x calls on its own. Against 2.x,
-keep using the typed `client.remote_control` methods: they still work in this SDK and emit a
-`DeprecationWarning` naming the command id to use on 3.0. See
+keep using the typed `client.remote_control` methods (including `start_manual_control_input` for
+stick input) and `client.live_data`; the typed calls still work in this SDK and emit a
+`DeprecationWarning` naming what to use on 3.0. See
 [Upgrading to 3.0](../concepts/upgrading-to-3.0.md#running-against-2x-platforms).

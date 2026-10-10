@@ -1,7 +1,7 @@
 # Zequent Client SDK (Go) — Commands (3.0 preview)
 
-> **Preview.** This page describes the Zequent **3.0** command API of the Go Client SDK, package
-> `control`. 3.0 is not released yet: the API below is available from a preview branch and needs a
+> **Preview.** This page describes the Zequent **3.0** command and manual-control API (package
+> `control`) and telemetry API (package `telemetry`) of the Go Client SDK. 3.0 is not released yet: the API below is available from a preview branch and needs a
 > platform that runs 3.0. Names may still change before the release. For the current 2.0 line, see
 > the [Go Quickstart](QUICKSTART_GO.md).
 
@@ -232,17 +232,103 @@ so a retried command runs once.
 
 ## Manual control (stick input)
 
-The 3.0 contract has a manual-control stream (`StreamManualControl`), but package `control` does not
-wrap it yet — **coming**. The 2.x stream, `remotecontrol.Client.OpenManualControlInputStream`, is
-still in the module. Entering and leaving manual control are commands on 3.0: `flight.manual.enter`
-and `flight.manual.exit`.
+Stick input goes over one client-streaming session per asset. Put the asset in manual control
+first, then send inputs (roll, pitch, yaw, throttle from -1 to 1, optionally a gimbal pitch) at your
+control rate:
+
+```go
+import (
+    edgev3 "github.com/zequent/zqnt-utils-golang/v2/gen/zqnt/edge/v3"
+    "google.golang.org/protobuf/proto"
+)
+
+if _, err := assets.ExecuteAndWait(ctx, "DRONE-1", "flight.manual.enter", nil); err != nil {
+    log.Fatal(err)
+}
+stick, err := assets.StreamManualControl(ctx, "DRONE-1")
+if err != nil {
+    log.Fatal(err)
+}
+err = stick.Send(&edgev3.ManualControlInput{Pitch: 0.2, Throttle: 0.5})
+err = stick.Send(&edgev3.ManualControlInput{Throttle: 0.5, GimbalPitch: proto.Float32(-30)})
+accepted, err := stick.Close()
+```
+
+- `StreamManualControl(ctx, sn)` returns a `*control.ManualControl`. One session controls one asset;
+  the first input names it. Inputs go out in the order they are sent until `Close`, or until `ctx`
+  ends, which aborts the stream.
+- `Send(*edgev3.ManualControlInput)` sends one input. `Send` and `Close` may be called from different
+  goroutines.
+- `Close()` ends the session and returns `(int64, error)`: the number of inputs the platform passed
+  on to the asset. An error in the platform's answer is a `*control.CommandError`; calling `Close`
+  again returns the same answer.
+- When the platform refuses the session (no adapter reachable for the asset, an asset of another
+  organization) or the adapter drops it, `Send` and `Close` return that error with its gRPC status
+  (`status.Code(err)`). `Send` after `Close` returns `control.ErrManualControlClosed`.
+
+The 2.x stream, `remotecontrol.Client.OpenManualControlInputStream`, is in the deprecated
+`remotecontrol` package and stays for 2.x platforms.
+
+## Live telemetry
+
+Package `telemetry` watches 3.0 telemetry from the live-data service (`LIVE_DATA_SERVICE_*`, same
+client credential):
+
+```go
+import "github.com/zequent/zqnt-client-sdk-go/v3/telemetry"
+
+conn, err := cfg.Dial(cfg.LiveData)
+if err != nil {
+    log.Fatal(err)
+}
+watch, err := telemetry.New(conn).WatchTelemetry(ctx, []string{"DOCK-1"}, telemetry.WithMinInterval(time.Second))
+if err != nil {
+    log.Fatal(err)
+}
+defer watch.Close()
+for {
+    item, err := watch.Recv()
+    if err != nil {
+        log.Fatal(err) // io.EOF, telemetry.ErrSilent or the gRPC error that ended the watch
+    }
+    if sample := item.GetSample(); sample != nil {
+        fmt.Println(sample.GetAsset().GetSn(), sample.GetPosition(), sample.GetBatteryPercent(), sample.GetDetails().AsMap())
+    } else {
+        fmt.Println(item.GetSourceStatus().GetAsset().GetSn(), item.GetSourceStatus().GetState())
+    }
+}
+```
+
+`telemetry.New(conn).WatchTelemetry(ctx, sns, opts...)` returns a `*telemetry.Watch`; its `Recv()`
+returns the next `*telemetryv3.WatchTelemetryResponse` with either `GetSample()` or
+`GetSourceStatus()` set (heartbeats are skipped):
+
+- **`TelemetrySample`** (`github.com/zequent/zqnt-utils-golang/v2/gen/zqnt/telemetry/v3`): the fields
+  every asset shares — `GetPosition()`, `GetRelativeAltitude()`, `GetHeadingDegrees()`,
+  `GetHorizontalSpeed()`, `GetVerticalSpeed()`, `GetBatteryPercent()`, `GetObservedAt()` — and
+  everything device-specific in `GetDetails()`, under the keys the asset declares in its
+  capabilities' `telemetry_fields`;
+- **`SourceStatus`**: every watched asset's state first, then each change to `SOURCE_STATE_ONLINE`,
+  `SOURCE_STATE_STALE` or `SOURCE_STATE_NO_DATA` (with `GetLastSampleAt()`).
+
+No asset (`nil` or empty `sns`) watches every asset of the caller's organization; a dock's serial
+also brings the samples of its drone. Options: `telemetry.WithMinInterval(d)` keeps at most one
+sample per asset per interval (without it every sample comes); `telemetry.WithHeartbeatTimeout(d)`
+replaces `telemetry.DefaultHeartbeatTimeout` (**35 s**).
+
+The platform sends heartbeats on a quiet stream: when neither a sample nor a heartbeat arrives
+within the heartbeat timeout, `Recv` returns `telemetry.ErrSilent`. It returns `io.EOF` when the
+platform ended the watch, or the gRPC error that ended it. `Close()` (or ending `ctx`) ends the
+watch. **A watch does not reconnect**: watch again.
+
+`livedata.Client.StreamTelemetry` stays the 2.x telemetry stream.
 
 ## Against a 2.x platform
 
-Package `control` needs a 3.0 platform. A 2.x platform does not serve the 3.0 command service: the
-calls fail with `status.Code(err) == codes.Unimplemented`. The SDK does **not** switch to the 2.x
-calls on its own. Against 2.x, keep using package `remotecontrol` — still in the `/v3` module and
-marked deprecated. See [Upgrading to 3.0](../concepts/upgrading-to-3.0.md#running-against-2x-platforms).
+Packages `control` and `telemetry` need a 3.0 platform. A 2.x platform does not serve the 3.0
+command and telemetry services: the calls fail with `status.Code(err) == codes.Unimplemented`. The SDK does **not** switch to the 2.x
+calls on its own. Against 2.x, keep using package `remotecontrol` (still in the `/v3` module and
+marked deprecated) and package `livedata`. See [Upgrading to 3.0](../concepts/upgrading-to-3.0.md#running-against-2x-platforms).
 
 ## Runnable example
 

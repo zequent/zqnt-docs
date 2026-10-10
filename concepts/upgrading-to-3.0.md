@@ -20,9 +20,44 @@ result. Every SDK has one way to run any of them:
 | Run and wait for the outcome | `executeAndWait(assetSn, commandId, params, wait)` | `execute_and_wait(asset_sn, command_id, params, ...)` | `ExecuteAndWait(ctx, sn, commandID, params, ...)` |
 | Follow a run / an asset | `watchCommand(id, onEvent)` / `watchAsset(assetSn, onEvent)` | `watch_command(id)` / `watch_asset(asset_sn)` | `WatchCommand(ctx, id)` / `WatchAsset(ctx, sn)` |
 | Cancel a run | `cancelCommand(id, reason)` | `cancel_command(id, reason)` | `CancelCommand(ctx, id, reason)` |
+| Stick input | `streamManualControl(assetSn)` | `stream_manual_control(asset_sn)` | `StreamManualControl(ctx, sn)` |
+| Live telemetry | `zequent.telemetry().watchTelemetry(assetSns, minInterval, onSample, onSourceStatus)` | `client.telemetry.watch_telemetry(asset_sns, min_interval=...)` | `telemetry.New(conn).WatchTelemetry(ctx, sns, ...)` |
 | Guide | [Commands (Java)](../client-sdk/COMMANDS-3.0.md) | [Commands (Python)](../client-sdk/COMMANDS_PYTHON-3.0.md) | [Commands (Go)](../client-sdk/COMMANDS_GO-3.0.md) |
 
 A command a new adapter adds is usable the moment the adapter publishes it — no new SDK release.
+
+### Manual control
+
+Stick input goes over one client-streaming session per asset (`StreamManualControl`): enter manual
+control with the command `flight.manual.enter`, open the session, send roll, pitch, yaw and throttle
+(-1..1, optionally a gimbal pitch) at your control rate, close it — the close answers with the number
+of inputs passed on to the asset — and leave with `flight.manual.exit`.
+
+| 2.x | 3.0 |
+| --- | --- |
+| Java `remoteControl().startManualControlInput(sn, assetId)` (deprecated in the 3.0 SDK) | `commands().streamManualControl(assetSn)` → `ManualControlStream`: `send(...)`, `close()`, `done()` |
+| Python `remote_control.start_manual_control_input(sn)` (deprecated in the 3.0 SDK) | `commands.stream_manual_control(asset_sn)` → `ManualControlStream`: `async with`, `send(...)`, `close()`, `cancel()` |
+| Go `remotecontrol.Client.OpenManualControlInputStream(ctx)` (package deprecated) | `control.Client.StreamManualControl(ctx, sn)` → `Send(...)`, `Close()`; `Send` after `Close` is `control.ErrManualControlClosed` |
+
+### Live telemetry
+
+3.0 telemetry is one stream of **samples** and **source status** from live-data. A
+`TelemetrySample` has the fields every asset shares (position, relative altitude, heading, speeds,
+battery); everything device-specific is in its `details`, under the keys the asset declares in its
+capabilities' `telemetry_fields`. A `SourceStatus` reports each watched asset as online, stale or
+without data — first for every watched asset, then on each change. No asset watches every asset of
+the caller's organization; a dock's serial also brings its drone's samples. A minimum interval keeps
+at most one sample per asset per interval.
+
+The platform sends heartbeats on a quiet stream; every SDK ends the watch with an error when neither
+a sample nor a heartbeat arrives within **35 s** by default (configurable). **No SDK reconnects a
+telemetry watch on its own** — watch again.
+
+| 2.x | 3.0 |
+| --- | --- |
+| Java `liveData().streamTelemetryData(...)` | `telemetry().watchTelemetry(assetSns, minInterval, onSample, onSourceStatus)` → `TelemetryWatch` |
+| Python `live_data.stream_telemetry(...)` | `async for item in telemetry.watch_telemetry(asset_sns, min_interval=...)` |
+| Go `livedata.Client.StreamTelemetry(ctx, sn, frequencyMs, durationSeconds)` | `telemetry.New(conn).WatchTelemetry(ctx, sns, telemetry.WithMinInterval(...))` → `Recv()` |
 
 Every command run has a **command execution id** and a state: `ACCEPTED` / `RUNNING` while underway,
 then one of `SUCCEEDED`, `FAILED`, `REJECTED` (refused before it started), `CANCELLED` or
@@ -49,12 +84,8 @@ with `executeAndWait` instead.
 
 - Configuration, environment variables and the `ZQNT_CLIENT_TOKEN` client credential. The 3.0
   command service is served by remote-control next to the 2.x service, on the same host and port.
-- Connector, Mission Autonomy (Applications, Skill executions, schedulers) and Live Data keep their
-  2.x contracts in the 3.0 SDKs.
-- Manual stick input: the 3.0 contract has a manual-control stream (`StreamManualControl`), but none
-  of the Client SDKs wraps it yet — **coming**. Keep using the 2.x stick-input session
-  (Java `remoteControl().startManualControlInput(sn, assetId)`, Python
-  `remote_control.start_manual_control_input(sn)`, Go `remotecontrol.Client.OpenManualControlInputStream`).
+- Connector and Mission Autonomy (Applications, Skill executions, schedulers) keep their 2.x
+  contracts in the 3.0 SDKs. The 2.x Live Data client stays next to the new telemetry watch.
 - `navigation.go_to`'s `altitude` is metres above the **takeoff point** (left out = 40 m), as in 2.x.
 - **Leave a param out when you have no value.** The platform reads a missing coordinate as "not
   given"; sending `0` means latitude 0 / longitude 0 / ground level. Java and Python drop `null` /
@@ -64,7 +95,7 @@ with `executeAndWait` instead.
 
 | SDK | Preview |
 | --- | --- |
-| Java | `com.zqnt.sdk:client-java-sdk` preview builds on GitHub Packages, `1.0.0-PR11-<sha>-SNAPSHOT` (at the time of writing `1.0.0-PR11-fe5e92b-SNAPSHOT`); it pulls a `zqnt-utils-java` preview build. See [Commands (Java)](../client-sdk/COMMANDS-3.0.md#step-1-add-the-preview-dependency). |
+| Java | `com.zqnt.sdk:client-java-sdk` preview builds on GitHub Packages, `1.0.0-PR11-<sha>-SNAPSHOT` (at the time of writing `1.0.0-PR11-ea1532e-SNAPSHOT`); it pulls a `zqnt-utils-java` preview build. See [Commands (Java)](../client-sdk/COMMANDS-3.0.md#step-1-add-the-preview-dependency). |
 | Python | Git branch `feature/v3-agentic` of `zqnt-client-sdk-python` **and** of `zqnt-utils-python`, under `[tool.uv.sources]`. See [Commands (Python)](../client-sdk/COMMANDS_PYTHON-3.0.md#step-1-add-the-preview-dependency). |
 | Go | New module path **`github.com/zequent/zqnt-client-sdk-go/v3`** (`/v3`, lower-case owner): `go get github.com/zequent/zqnt-client-sdk-go/v3@feature/v3-agentic`. Its generated types come from the private module `github.com/zequent/zqnt-utils-golang/v2`. See [Commands (Go)](../client-sdk/COMMANDS_GO-3.0.md#step-1-add-the-preview-module). |
 
@@ -73,8 +104,8 @@ Preview builds are for trying 3.0 against a 3.0 platform, not for production. Ea
 
 ## Running against 2.x platforms
 
-The 3.0 command API needs a platform that runs 3.0. A 2.x platform does not serve it, and every call
-fails with the gRPC status `UNIMPLEMENTED`:
+The 3.0 command, manual-control and telemetry APIs need a platform that runs 3.0. A 2.x platform
+does not serve them, and every call fails with the gRPC status `UNIMPLEMENTED`:
 
 | SDK | How it shows |
 | --- | --- |
@@ -85,10 +116,10 @@ fails with the gRPC status `UNIMPLEMENTED`:
 The Client SDKs **do not switch to the 2.x calls on their own**. The 2.x typed calls are still in
 the 3.0 SDKs and keep working against 2.x platforms — deprecated, not removed:
 
-- Java: the typed `remoteControl()` methods and `getCapabilities` / `sendCustomCommand` are
-  `@Deprecated(since = "3.0")`; `startManualControlInput` is not deprecated.
-- Python: the typed `client.remote_control` methods emit a `DeprecationWarning` that names the
-  command id to use on 3.0; `start_manual_control_input` is not deprecated.
+- Java: the typed `remoteControl()` methods, `startManualControlInput` and `getCapabilities` /
+  `sendCustomCommand` are `@Deprecated(since = "3.0")`.
+- Python: the typed `client.remote_control` methods and `start_manual_control_input` emit a
+  `DeprecationWarning` that names what to use on 3.0.
 - Go: package `remotecontrol` is deprecated and stays in the `/v3` module.
 
 So an application that has to talk to both 2.x and 3.0 platforms decides per platform which API to
