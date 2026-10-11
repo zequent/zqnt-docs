@@ -15,11 +15,12 @@ Platform: [Upgrading the platform to 3.0](../concepts/upgrading-platform-to-3.0.
 
 ## Step 1: Add the preview dependency
 
-The SDK (`edge-python-sdk`, version line `3.0.0`) is not on PyPI. Its generated types and helpers
-now come from **`zqnt-api`** (`zqnt-api-python`, public, Apache 2.0), which replaces `zqnt-utils`;
-modules move from `zqnt_utils.…` to `zqnt_api.…` (for example
-`zqnt_api.generated.zqnt.telemetry.v3`). The SDK preview lives on the `feature/public-api-split`
-branch, `zqnt-api` on `main` (its `3.0.0` line):
+The SDK (`edge-python-sdk`, version line `3.0.0`) is not on PyPI. From 3.0 both Python SDKs live in
+one repository, `zequent/zqnt-sdk-python`: the Edge SDK in its `edge/` directory, the Client SDK in
+`client/`. Its generated types and helpers now come from **`zqnt-api`** (directory `python/` of
+`zequent/zqnt-api`, public, Apache 2.0), which replaces `zqnt-utils`; modules move from
+`zqnt_utils.…` to `zqnt_api.…` (for example `zqnt_api.generated.zqnt.telemetry.v3`). The preview
+lives on the `feature/v3-agentic` branch:
 
 ```toml
 [project]
@@ -28,13 +29,15 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-# preview branches, not releases
-edge-python-sdk = { git = "https://github.com/zequent/zqnt-edge-sdk-python", branch = "feature/public-api-split" }
-zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", branch = "main" }
+# preview branch, not a release
+edge-python-sdk = { git = "https://github.com/zequent/zqnt-sdk-python", subdirectory = "edge", branch = "feature/v3-agentic" }
+zqnt-api = { git = "https://github.com/zequent/zqnt-api", subdirectory = "python", rev = "390b5e2f0fa6faa16bf175ce63a3a0481879e9cb" }
 ```
 
-uv allows one source per package in a dependency graph, so pin `zqnt-api` to the same ref the SDK
-uses. Run `uv lock --upgrade-package edge-python-sdk --upgrade-package zqnt-api` to pick up later
+The SDK pins its `zqnt-api` revision itself, and uv takes that pin over, so the `zqnt-api` line is only
+needed when your code imports `zqnt_api` directly. uv allows one source per package in a dependency
+graph: keep it on exactly the revision the SDK pins (see `[tool.uv.sources]` in the SDK's
+`pyproject.toml`). Run `uv lock --upgrade-package edge-python-sdk --upgrade-package zqnt-api` to pick up later
 preview commits, and move both to the `v3.0.0` tags once they are out; do not run a preview in
 production. Configuration and authentication (`ZQNT_EDGE_TOKEN`, `ZQNT_PLATFORM_PUBLIC_KEY`,
 `ZQNT_EDGE_AUTH_DISABLED`) are unchanged from 2.0 — see

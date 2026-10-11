@@ -50,8 +50,8 @@ A 3.0 platform serves **both**:
 
 | What | 2.0 | 3.0 |
 | --- | --- | --- |
-| Packages with the generated contracts | `zqnt-utils-java`, `zqnt-utils` (Python), `github.com/zequent/zqnt-utils-golang/v2` (private) — internal platform libraries | **`com.zqnt:zqnt-api-java`**, **`zqnt-api`** (`zqnt-api-python`), **`github.com/zequent/zqnt-api-go/v3`** — public, Apache 2.0, version line `3.0.0` |
-| Go module paths | `…/zqnt-edge-sdk-go/v2`, `…/zqnt-client-sdk-go/v2` (`github.com/Zequent/…`) | **`github.com/zequent/zqnt-edge-sdk-go/v3`**, **`github.com/zequent/zqnt-client-sdk-go/v3`** (`/v3`, lower-case owner) |
+| Packages with the generated contracts | `zqnt-utils-java`, `zqnt-utils` (Python), `github.com/zequent/zqnt-utils-golang/v2` (private) — internal platform libraries | the public Zequent API, repository `zequent/zqnt-api`: **`com.zqnt:zqnt-api`** (Java), **`zqnt-api`** (Python, `subdirectory = "python"`), **`github.com/zequent/zqnt-api/go/v3`** (Go) — Apache 2.0, version line `3.0.0` |
+| SDK repositories and coordinates | one repository per SDK and language: `com.zqnt.sdk:edge-java-sdk` / `client-java-sdk`, `zqnt-edge-sdk-python` / `zqnt-client-sdk-python`, `…/zqnt-edge-sdk-go/v2` / `…/zqnt-client-sdk-go/v2` (`github.com/Zequent/…`) | one repository per language, Edge and Client SDK side by side: **`com.zqnt:zqnt-sdk-java-edge`** / **`com.zqnt:zqnt-sdk-java-client`** (`zequent/zqnt-sdk-java`), `edge-python-sdk` / `zqnt-client-sdk` from **`zequent/zqnt-sdk-python`** (`subdirectory = "edge"` / `"client"`), **`github.com/zequent/zqnt-sdk-go/v3/edge`** / **`…/v3/client`** (`/v3`, lower-case owner) |
 | SDK versions | `2.0.x` | `3.0.0` for every SDK and API package |
 | Commands from Client SDKs | one typed method per command | `executeCommand` by command id; the typed 2.x methods are removed from the 3.0 Client SDKs (the 2.0 SDKs keep working against a 3.0 platform) |
 | Commands in adapters | one method per command | a command registry; the typed methods are deprecated (adapters that implement them keep working) |
@@ -78,13 +78,19 @@ A 3.0 platform serves **both**:
 What the package change means in practice:
 
 - **Java:** replace the `com.zqnt:zqnt-utils-java` dependency (and its repository) with
-  `com.zqnt:zqnt-api-java`. The Java packages (`com.zqnt.utils.*`, `com.zqnt.protos.*`) are the same,
-  so no import changes. The SDKs depend on it already; only code that used `zqnt-utils-java`
-  directly needs the change.
-- **Python:** replace `zqnt-utils` with `zqnt-api` and the module prefix `zqnt_utils` with
-  `zqnt_api` (for example `zqnt_api.generated.zqnt.telemetry.v3`).
-- **Go:** change import paths to `github.com/zequent/zqnt-api-go/v3/gen/...` (same package paths
-  below `gen/`) and the SDK modules to `/v3`. The modules are public: no `GOPRIVATE` needed for them.
+  `com.zqnt:zqnt-api` from `https://maven.pkg.github.com/Zequent/zqnt-api`, and the SDK artifacts with
+  `com.zqnt:zqnt-sdk-java-edge` / `com.zqnt:zqnt-sdk-java-client` from
+  `https://maven.pkg.github.com/Zequent/zqnt-sdk-java`. The Java packages (`com.zqnt.utils.*`,
+  `com.zqnt.protos.*`, `com.zqnt.sdk.*`) are the same, so no import changes. The SDKs depend on
+  `zqnt-api` already; only code that used `zqnt-utils-java` directly needs that change. Do not keep an
+  old and a new artifact on one classpath (duplicate classes).
+- **Python:** replace `zqnt-utils` with `zqnt-api` (git `https://github.com/zequent/zqnt-api`,
+  `subdirectory = "python"`) and the module prefix `zqnt_utils` with `zqnt_api` (for example
+  `zqnt_api.generated.zqnt.telemetry.v3`); take the SDKs from `https://github.com/zequent/zqnt-sdk-python`
+  with `subdirectory = "edge"` or `"client"`.
+- **Go:** change import paths to `github.com/zequent/zqnt-api/go/v3/gen/...` (same package paths
+  below `gen/`) and the SDK packages to `github.com/zequent/zqnt-sdk-go/v3/edge/...` and
+  `.../v3/client/...`. The modules are public: no `GOPRIVATE` needed for them.
 
 Also new on 3.0: calls that name no organization are counted and logged (metric
 `zqnt_tenancy_organization_fallback_total`); setting `zqnt.tenancy.organization-fallback=refuse`
@@ -97,8 +103,8 @@ refuses them instead of placing them in the default organization (default: `warn
   mission-autonomy → adapter, and the v3 telemetry and capability paths span live-data,
   remote-control and connector; mixing 2.x and 3.0 core services is not supported.
 - **The console with admin-console**, as with every release (the console is admin-console's client).
-- **An SDK with its API package.** A 3.0 SDK needs the `zqnt-api-*` 3.0 package (Python: pinned to
-  the same ref, uv allows one source per package); do not mix it with `zqnt-utils-*` in one
+- **An SDK with its API package.** A 3.0 SDK needs the `zqnt-api` 3.0 package (Python: pinned to
+  the same revision, uv allows one source per package); do not mix it with `zqnt-utils-*` in one
   application.
 
 Adapters and client applications do **not** have to move with the platform — see "What keeps

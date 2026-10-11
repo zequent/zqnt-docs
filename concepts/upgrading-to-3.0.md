@@ -103,20 +103,28 @@ with `executeAndWait` instead.
 
 ## Installing the 3.0 SDK previews
 
-Every 3.0 SDK is versioned `3.0.0` and takes its generated contracts from the public **Zequent API**
-packages (Apache 2.0), which replace the `zqnt-utils-*` packages of 2.x:
+From 3.0 the Edge and Client SDK of each language live in one repository — `zequent/zqnt-sdk-java`,
+`zequent/zqnt-sdk-python`, `zequent/zqnt-sdk-go` — and every SDK is versioned `3.0.0`. They take their
+generated contracts from the public **Zequent API** (`zequent/zqnt-api`, Apache 2.0), which replaces
+the `zqnt-utils-*` packages of 2.x:
 
-| Language | 2.x | 3.0 |
+| Package | 2.x | 3.0 |
 | --- | --- | --- |
-| Java | `com.zqnt:zqnt-utils-java` | `com.zqnt:zqnt-api-java` — same Java packages, no import changes |
-| Python | `zqnt-utils` (`zqnt_utils.…`) | `zqnt-api` (`zqnt_api.…`, e.g. `zqnt_api.generated.zqnt.telemetry.v3`) |
-| Go | `github.com/zequent/zqnt-utils-golang/v2` (private) | `github.com/zequent/zqnt-api-go/v3` (public), same package paths below `gen/` |
+| Java Client SDK | `com.zqnt.sdk:client-java-sdk` (`Zequent/zqnt-client-sdk-java`) | `com.zqnt:zqnt-sdk-java-client` (`Zequent/zqnt-sdk-java`) — same Java packages |
+| Java Edge SDK | `com.zqnt.sdk:edge-java-sdk` (`Zequent/zqnt-edge-sdk-java`) | `com.zqnt:zqnt-sdk-java-edge` (`Zequent/zqnt-sdk-java`) — same Java packages |
+| Java contracts | `com.zqnt:zqnt-utils-java` | `com.zqnt:zqnt-api` (`Zequent/zqnt-api`) — same Java packages, no import changes |
+| Python Client SDK | `zqnt-client-sdk` from `zqnt-client-sdk-python` | `zqnt-client-sdk` from `zqnt-sdk-python`, `subdirectory = "client"` — same modules |
+| Python Edge SDK | `edge-python-sdk` from `zqnt-edge-sdk-python` | `edge-python-sdk` from `zqnt-sdk-python`, `subdirectory = "edge"` — same modules |
+| Python contracts | `zqnt-utils` (`zqnt_utils.…`) | `zqnt-api` from `zqnt-api`, `subdirectory = "python"` (`zqnt_api.…`, e.g. `zqnt_api.generated.zqnt.telemetry.v3`) |
+| Go Client SDK | `github.com/Zequent/zqnt-client-sdk-go/v2` | `github.com/zequent/zqnt-sdk-go/v3/client/...` |
+| Go Edge SDK | `github.com/Zequent/zqnt-edge-sdk-go/v2` | `github.com/zequent/zqnt-sdk-go/v3/edge/...` (package still `edgesdk`) |
+| Go contracts | `github.com/zequent/zqnt-utils-golang/v2` (private) | `github.com/zequent/zqnt-api/go/v3` (public), same package paths below `gen/` |
 
 | SDK | Preview |
 | --- | --- |
-| Java | `com.zqnt.sdk:client-java-sdk` preview builds on GitHub Packages, `3.0.0-PR<n>-<sha>-SNAPSHOT` (at the time of writing `3.0.0-PR14-64e3ad0-SNAPSHOT`); it pulls a `zqnt-api-java` 3.0.0 preview build. See [Commands (Java)](../client-sdk/COMMANDS-3.0.md#step-1-add-the-preview-dependency). |
-| Python | Git branch `feature/v3-agentic` of `zqnt-client-sdk-python` and `main` of `zqnt-api-python` (the `3.0.0` line), under `[tool.uv.sources]`. See [Commands (Python)](../client-sdk/COMMANDS_PYTHON-3.0.md#step-1-add-the-preview-dependency). |
-| Go | New module path **`github.com/zequent/zqnt-client-sdk-go/v3`** (`/v3`, lower-case owner): `go get github.com/zequent/zqnt-client-sdk-go/v3@feature/v3-agentic`. Its generated types come from the public module `github.com/zequent/zqnt-api-go/v3`. See [Commands (Go)](../client-sdk/COMMANDS_GO-3.0.md#step-1-add-the-preview-module). |
+| Java | `com.zqnt:zqnt-sdk-java-client` preview builds on GitHub Packages (`https://maven.pkg.github.com/Zequent/zqnt-sdk-java`), `3.0.0-PR<n>-<sha>-SNAPSHOT` (at the time of writing `3.0.0-PR13-f96c80a-SNAPSHOT`); it pulls a `com.zqnt:zqnt-api` 3.0.0 preview build from `https://maven.pkg.github.com/Zequent/zqnt-api`. See [Commands (Java)](../client-sdk/COMMANDS-3.0.md#step-1-add-the-preview-dependency). |
+| Python | Git branch `feature/v3-agentic` of `zqnt-sdk-python`, `subdirectory = "client"`, under `[tool.uv.sources]`; it brings `zqnt-api` at the revision it pins. See [Commands (Python)](../client-sdk/COMMANDS_PYTHON-3.0.md#step-1-add-the-preview-dependency). |
+| Go | Module **`github.com/zequent/zqnt-sdk-go/v3`** (`/v3`, lower-case owner): `go get github.com/zequent/zqnt-sdk-go/v3@feature/v3-agentic`. Its generated types come from the public module `github.com/zequent/zqnt-api/go/v3`. See [Commands (Go)](../client-sdk/COMMANDS_GO-3.0.md#step-1-add-the-preview-module). |
 
 Preview builds are for trying 3.0 against a 3.0 platform, not for production. Each moves to a
 `3.0.0` release once 3.0 ships.
@@ -205,12 +213,13 @@ capability's default, and a **target** for a sub-asset, payload or component.
 
 ## Go: module path
 
-Go callers change their import paths once — the client module moves to `/v3` (lower-case owner) and
-the generated types move to `zqnt-api-go/v3`, with the same package paths below `gen/`:
+Go callers change their import paths once — the client packages move into the `client/` tree of the
+`github.com/zequent/zqnt-sdk-go/v3` module (lower-case owner) and the generated types move to
+`github.com/zequent/zqnt-api/go/v3`, with the same package paths below `gen/`:
 
 ```bash
 grep -rl zqnt-client-sdk-go/v2 --include='*.go' . | xargs sed -i \
-  -e 's#github.com/Zequent/zqnt-client-sdk-go/v2/gen/#github.com/zequent/zqnt-api-go/v3/gen/#g' \
-  -e 's#github.com/Zequent/zqnt-client-sdk-go/v2/#github.com/zequent/zqnt-client-sdk-go/v3/#g'
-go get github.com/zequent/zqnt-client-sdk-go/v3@feature/v3-agentic && go mod tidy
+  -e 's#github.com/Zequent/zqnt-client-sdk-go/v2/gen/#github.com/zequent/zqnt-api/go/v3/gen/#g' \
+  -e 's#github.com/Zequent/zqnt-client-sdk-go/v2/#github.com/zequent/zqnt-sdk-go/v3/client/#g'
+go get github.com/zequent/zqnt-sdk-go/v3@feature/v3-agentic && go mod tidy
 ```

@@ -16,14 +16,16 @@ Java: [Adapters on 3.0 (Java)](edge-sdk-adapter-3.0.md) · Python:
 
 ## Step 1: Add the preview module
 
-The 3.0 SDK is a new major module, **`github.com/zequent/zqnt-edge-sdk-go/v3`** (`/v3`, lower-case
-owner). Its generated types and the telemetry mapping come from the public module
-**`github.com/zequent/zqnt-api-go/v3`** (Apache 2.0), which replaces `zqnt-utils-golang`; the
+From 3.0 the Go SDKs are one module, **`github.com/zequent/zqnt-sdk-go/v3`** (`/v3`, lower-case
+owner). The Edge SDK is its `edge/` tree: package `edgesdk` at `github.com/zequent/zqnt-sdk-go/v3/edge`,
+with `edge/adapter`, `edge/conformance` and the other packages below it; the Client SDK is the
+`client/` tree. Its generated types and the telemetry mapping come from the public module
+**`github.com/zequent/zqnt-api/go/v3`** (Apache 2.0), which replaces `zqnt-utils-golang`; the
 packages below `gen/` keep their paths.
 
 ```bash
 # preview branch, not a release
-go get github.com/zequent/zqnt-edge-sdk-go/v3@feature/public-api-split
+go get github.com/zequent/zqnt-sdk-go/v3@feature/v3-agentic
 ```
 
 Go resolves the branch to a pseudo-version; run `go get` again to pick up later preview commits and
@@ -33,11 +35,11 @@ Moving an adapter from 2.x:
 
 ```bash
 grep -rl zqnt-edge-sdk-go/v2 --include='*.go' . | xargs sed -i \
-  's#github.com/Zequent/zqnt-edge-sdk-go/v2#github.com/zequent/zqnt-edge-sdk-go/v3#g'
-go get github.com/zequent/zqnt-edge-sdk-go/v3@feature/public-api-split && go mod tidy
+  's#github.com/Zequent/zqnt-edge-sdk-go/v2#github.com/zequent/zqnt-sdk-go/v3/edge#g'
+go get github.com/zequent/zqnt-sdk-go/v3@feature/v3-agentic && go mod tidy
 ```
 
-Imports of generated types move to `github.com/zequent/zqnt-api-go/v3/gen/...`. Authentication
+Imports of generated types move to `github.com/zequent/zqnt-api/go/v3/gen/...`. Authentication
 (`ZQNT_EDGE_TOKEN` / `WithEdgeToken`, `ZQNT_PLATFORM_PUBLIC_KEY` / `WithPlatformPublicKey`,
 `ZQNT_EDGE_AUTH_DISABLED` / `WithoutPlatformAuth()`) is unchanged from 2.0.
 
@@ -51,8 +53,8 @@ package main
 import (
     "context"
 
-    "github.com/zequent/zqnt-edge-sdk-go/v3/adapter"
-    "github.com/zequent/zqnt-edge-sdk-go/v3/adapter/domains"
+    "github.com/zequent/zqnt-sdk-go/v3/edge/adapter"
+    "github.com/zequent/zqnt-sdk-go/v3/edge/adapter/domains"
 )
 
 var altitudeInput = map[string]any{
@@ -226,7 +228,7 @@ are long-lived and reconnect with backoff; an item sent while a stream waits for
 gets `livedata.ErrReconnecting`.
 
 **Standard keys.** The platform's telemetry catalog
-(`github.com/zequent/zqnt-api-go/v3/telemetry`) has 64 detail keys — listed in
+(`github.com/zequent/zqnt-api/go/v3/telemetry`) has 64 detail keys — listed in
 [The telemetry catalog](edge-sdk-adapter-3.0.md#the-telemetry-catalog) — as constants
 (`telemetry.DockCoverState`, `telemetry.DroneGear`, …) with `telemetry.Fields()` and
 `telemetry.Field(key)`. `domains.StandardTelemetryField(key)` turns one into a `domains.TelemetryField`
@@ -249,7 +251,7 @@ removed in 3.0.
 ## Step 6: Check the adapter with the conformance kit
 
 ```go
-import "github.com/zequent/zqnt-edge-sdk-go/v3/conformance"
+import "github.com/zequent/zqnt-sdk-go/v3/edge/conformance"
 
 func TestConformance(t *testing.T) {
     recorder := &conformance.Recorder{}

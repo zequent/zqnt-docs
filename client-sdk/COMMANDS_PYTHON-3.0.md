@@ -17,9 +17,11 @@ Upgrading an integration: [Upgrading to 3.0](../concepts/upgrading-to-3.0.md).
 
 ## Step 1: Add the preview dependency
 
-The SDK is not on PyPI. The 3.0 preview lives on the `feature/v3-agentic` branch of the SDK
-and on `main` (the `3.0.0` line) of `zqnt-api` (`zqnt-api-python`), the public Zequent API package it depends on, which replaces
-`zqnt-utils` on 3.0 (modules `zqnt_api.…` instead of `zqnt_utils.…`).
+The SDK is not on PyPI. From 3.0 both Python SDKs live in one repository, `zequent/zqnt-sdk-python`:
+the Client SDK (`zqnt-client-sdk`) in its `client/` directory, the Edge SDK in `edge/`. The 3.0 preview
+lives on its `feature/v3-agentic` branch. The SDK depends on **`zqnt-api`**, the public Zequent API
+package (directory `python/` of `zequent/zqnt-api`), which replaces `zqnt-utils` on 3.0 (modules
+`zqnt_api.…` instead of `zqnt_utils.…`).
 
 `pyproject.toml` (uv-managed projects):
 
@@ -30,13 +32,16 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-# preview branches, not releases
-zqnt-client-sdk = { git = "https://github.com/zequent/zqnt-client-sdk-python", branch = "feature/v3-agentic" }
-zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", branch = "main" }
+# preview branch, not a release
+zqnt-client-sdk = { git = "https://github.com/zequent/zqnt-sdk-python", subdirectory = "client", branch = "feature/v3-agentic" }
+zqnt-api = { git = "https://github.com/zequent/zqnt-api", subdirectory = "python", rev = "390b5e2f0fa6faa16bf175ce63a3a0481879e9cb" }
 ```
 
 then `uv sync` (and `uv lock --upgrade-package zqnt-client-sdk --upgrade-package zqnt-api` to pick
-up later preview commits). Move both to the `v3.0.0` release tags once they are out; do not run a
+up later preview commits). The SDK pins its `zqnt-api` revision itself, and uv takes that pin over, so the `zqnt-api` line is only
+needed when your code imports `zqnt_api` directly. uv allows one source per package in a dependency
+graph: keep it on exactly the revision the SDK pins (see `[tool.uv.sources]` in the SDK's
+`pyproject.toml`). Move to the `v3.0.0` release tags once they are out; do not run a
 preview in production.
 
 Configuration is unchanged from 2.0: the same environment variables and the same

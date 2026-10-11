@@ -16,31 +16,33 @@ Python: [Adapters on 3.0 (Python)](edge-sdk-python-adapter-3.0.md) · Go:
 
 ## Step 1: Add the preview dependency
 
-The 3.0 preview is published to GitHub Packages as a `-SNAPSHOT` build. Every push to the preview
-branch publishes a new version `3.0.0-PR<n>-<sha>-SNAPSHOT`; at the time of writing:
+The 3.0 Java SDKs live in one repository, `zequent/zqnt-sdk-java`; the Edge SDK is the artifact
+**`com.zqnt:zqnt-sdk-java-edge`** (it replaces `com.zqnt.sdk:edge-java-sdk` of 2.x). The preview is
+published to GitHub Packages as a `-SNAPSHOT` build; every pull request into the 3.0 branch publishes a
+new version `3.0.0-PR<n>-<sha>-SNAPSHOT`. At the time of writing:
 
 ```xml
 <dependency>
-    <groupId>com.zqnt.sdk</groupId>
-    <artifactId>edge-java-sdk</artifactId>
+    <groupId>com.zqnt</groupId>
+    <artifactId>zqnt-sdk-java-edge</artifactId>
     <!-- preview, not a release -->
-    <version>3.0.0-PR9-bce04b5-SNAPSHOT</version>
+    <version>3.0.0-PR13-f96c80a-SNAPSHOT</version>
 </dependency>
 ```
 
-The SDK's generated types and shared classes now come from **`com.zqnt:zqnt-api-java`** (public,
-Apache 2.0), which replaces `zqnt-utils-java`. The Java packages are unchanged
+The SDK's generated types and shared classes now come from **`com.zqnt:zqnt-api`** (repository
+`zequent/zqnt-api`, public, Apache 2.0), which replaces `zqnt-utils-java`; the SDK pulls it in. The Java packages are unchanged
 (`com.zqnt.utils.*`, `com.zqnt.protos.*`), so no import changes. Both are on GitHub Packages; your
 `~/.m2/settings.xml` needs a token with package read access for:
 
 ```xml
 <repository>
-    <id>zqnt-edge-sdk-repo</id>
-    <url>https://maven.pkg.github.com/Zequent/zqnt-edge-sdk-java</url>
+    <id>zqnt-sdk-java</id>
+    <url>https://maven.pkg.github.com/Zequent/zqnt-sdk-java</url>
 </repository>
 <repository>
-    <id>zqnt-api-repo</id>
-    <url>https://maven.pkg.github.com/Zequent/zqnt-api-java</url>
+    <id>zqnt-api</id>
+    <url>https://maven.pkg.github.com/Zequent/zqnt-api</url>
 </repository>
 ```
 
@@ -92,8 +94,8 @@ public class AcmeDrone extends RegistryEdgeAdapter {
 ```
 
 - **Ids.** Reuse the platform's ids for shared actions (`flight.takeoff`, `navigation.go_to`,
-  `dock.open_cover`, … — the command catalog, `COMMAND_CATALOG.md` next to the v3 contracts in the
-  public `zqnt-api-java` repository). A device-specific command goes under
+  `dock.open_cover`, … — the command catalog, `proto/v3/COMMAND_CATALOG.md` in the
+  public `zequent/zqnt-api` repository). A device-specific command goes under
   `vendor.<vendor>.<name>`.
 - **Handler.** A `CommandHandler` gets a `CommandRequest`: `sn()`, `targetRef()` (sub-asset, payload
   or component; `null` for the asset itself), `commandId()`, `params()` and `commandExecutionId()`
@@ -278,7 +280,7 @@ telemetry.publish(TelemetrySample.newBuilder()
 `observed_at` defaults to now. Altitude in `position` is above sea level, `relative_altitude` above
 the takeoff point.
 
-**Standard keys.** `TelemetrySampleMapper` (in `zqnt-api-java`) holds the platform's **telemetry
+**Standard keys.** `TelemetrySampleMapper` (in `zqnt-api`) holds the platform's **telemetry
 catalog**: 64 detail keys with their type, unit and allowed values — the ones listed in
 [The telemetry catalog](#the-telemetry-catalog) below. `TelemetrySampleMapper.telemetryFields()`
 returns their `TelemetryField` descriptions; declare the ones your asset sends with
@@ -306,7 +308,7 @@ alerts.
 Each key's type follows its 2.x field: numbers, booleans and strings. Enumerations (`dock.mode`,
 `dock.cover_state`, `drone.mode`, …) are strings — the value's 2.x name without its enum prefix —
 and their `TelemetryField` lists the `allowed_values`. The
-same catalog is in `zqnt_api.telemetry` (Python) and `github.com/zequent/zqnt-api-go/v3/telemetry`
+same catalog is in `zqnt_api.telemetry` (Python) and `github.com/zequent/zqnt-api/go/v3/telemetry`
 (Go).
 
 ## Pairing with a claim code

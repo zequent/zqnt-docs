@@ -16,29 +16,32 @@ Upgrading an integration: [Upgrading to 3.0](../concepts/upgrading-to-3.0.md).
 
 ## Step 1: Add the preview dependency
 
-The 3.0 preview is published to GitHub Packages as a `-SNAPSHOT` build of the Java Client SDK. Every
-push to the 3.0 branch publishes a new preview version; at the time of writing it is:
+The 3.0 Java SDKs live in one repository, `zequent/zqnt-sdk-java`; the Client SDK is the artifact
+**`com.zqnt:zqnt-sdk-java-client`** (it replaces `com.zqnt.sdk:client-java-sdk` of 2.x). The preview is
+published to GitHub Packages as a `-SNAPSHOT` build; every pull request into the 3.0 branch publishes a
+new version `3.0.0-PR<n>-<sha>-SNAPSHOT`. At the time of writing it is:
 
 ```xml
 <dependency>
-    <groupId>com.zqnt.sdk</groupId>
-    <artifactId>client-java-sdk</artifactId>
+    <groupId>com.zqnt</groupId>
+    <artifactId>zqnt-sdk-java-client</artifactId>
     <!-- preview, not a release -->
-    <version>3.0.0-PR14-64e3ad0-SNAPSHOT</version>
+    <version>3.0.0-PR13-f96c80a-SNAPSHOT</version>
 </dependency>
 ```
 
-The SDK's own repository and the `zqnt-api-java` package it depends on (the public 3.0 contracts, a preview build as well)
-are both on GitHub Packages, so your `~/.m2/settings.xml` needs a token with package read access for:
+The SDK's repository and the **`com.zqnt:zqnt-api`** package it depends on (the public 3.0 contracts from
+`zequent/zqnt-api`, a preview build as well; the SDK pulls it in) are both on GitHub Packages, so your
+`~/.m2/settings.xml` needs a token with package read access for:
 
 ```xml
 <repository>
-    <id>zqnt-client-sdk-repo</id>
-    <url>https://maven.pkg.github.com/Zequent/zqnt-client-sdk-java</url>
+    <id>zqnt-sdk-java</id>
+    <url>https://maven.pkg.github.com/Zequent/zqnt-sdk-java</url>
 </repository>
 <repository>
-    <id>zqnt-api-repo</id>
-    <url>https://maven.pkg.github.com/Zequent/zqnt-api-java</url>
+    <id>zqnt-api</id>
+    <url>https://maven.pkg.github.com/Zequent/zqnt-api</url>
 </repository>
 ```
 
