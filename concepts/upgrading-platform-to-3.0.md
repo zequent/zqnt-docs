@@ -32,7 +32,7 @@ A 3.0 platform serves **both**:
   `SendCustomCommand`, which every 2.0 Edge SDK routes to the adapter's handler for that id. The
   platform remembers such an asset for 10 minutes, so a 2.0 adapter costs one extra round trip per
   10 minutes, not per command; an adapter upgraded to 3.0 is picked up without restarting the
-  platform. Capabilities fall back to the v2 `GetCapabilities` the same way, and 2.0 telemetry
+  platform. The exception is creating assets with `registerAsset` — see Breaking changes. Capabilities fall back to the v2 `GetCapabilities` the same way, and 2.0 telemetry
   keeps arriving over the v2 ingest.
 - **3.0 adapters against a 2.x platform.** The 3.0 Edge SDKs serve v2 next to v3 from the same
   registrations, and every call they make into the platform (capability reports, command events,
@@ -56,7 +56,24 @@ A 3.0 platform serves **both**:
 | Commands from Client SDKs | one typed method per command | `executeCommand` by command id; the typed 2.x methods are removed from the 3.0 Client SDKs (the 2.0 SDKs keep working against a 3.0 platform) |
 | Commands in adapters | one method per command | a command registry; the typed methods are deprecated (adapters that implement them keep working) |
 | Human approvals | any credential could decide a `HUMAN_APPROVAL` node | only a **signed-in user** can; service, edge, Integration Hub and Client SDK credentials are refused. The decision records who decided and when |
-| Pairing assets | claim codes, plus the legacy paths: the Java Edge SDK's `registerAsset` and binding by organization UUID | **planned:** claim codes only — `registerAsset` and the organization-UUID bind are to be removed (not done in the preview yet). Move devices to [claim-code pairing](../edge-sdk/edge-sdk-connector.md) now |
+| Pairing assets | claim codes, plus the legacy paths: the Edge SDKs' `registerAsset` (Java) / `RegisterAsset` (Go) and binding a DJI dock by typing the organization UUID | **claim codes only.** `registerAsset`/`RegisterAsset` are removed from the 3.0 Edge SDKs (use `ensureAsset`/`EnsureAsset` with a claim code), an edge credential can no longer call the 2.x `ConnectorService/RegisterAsset`, and a DJI dock binds only with a claim code from the console. See [Pairing after the upgrade](#pairing-after-the-upgrade) |
+
+### Pairing after the upgrade
+
+- **Assets that already exist stay as they are.** Pairing only matters when an asset is created;
+  a device whose asset exists keeps working, whichever way it was paired.
+- **A new device** is paired with a one-time claim code created in the console:
+  the adapter sets `ZQNT_CLAIM_CODE` and calls `ensureAsset` / `ensure_asset` / `EnsureAsset`, or
+  the operator types the code into the DJI dock. The claim decides the organization. Or create the
+  asset in the console first; the adapter then binds to it by serial number.
+- **A DJI dock that has to be bound again** (reset, new dock) needs a claim code; typing the
+  organization UUID is refused. Re-binding a dock whose asset exists keeps it in its organization.
+- **A 2.0 adapter that still creates assets with `registerAsset`** gets `PERMISSION_DENIED` from a
+  3.0 platform: pair its devices with claim codes, or create their assets in the console, before
+  the platform moves to 3.0.
+- **The simulator** creates its devices' assets in the organization of its own edge credential:
+  give it an edge credential issued for one organization (`ZQNT_EDGE_TOKEN`) and set
+  `ORGANIZATION_ID` to that organization. A device requested for another organization is refused.
 
 What the package change means in practice:
 
@@ -90,7 +107,7 @@ working".
 ## Recommended upgrade order
 
 1. **Pair every device with a claim code** while still on 2.0, so nothing depends on the legacy
-   pairing paths that 3.0 plans to remove.
+   pairing paths that 3.0 removes.
 2. **Move human approvals to signed-in users.** Any integration that approves `HUMAN_APPROVAL` nodes
    with a client credential has to sign in as a user before the platform moves to 3.0.
 3. **Upgrade the platform**: all core services and the console together. 2.0 adapters and 2.0
