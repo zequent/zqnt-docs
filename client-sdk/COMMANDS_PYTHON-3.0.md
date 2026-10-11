@@ -17,9 +17,9 @@ Upgrading an integration: [Upgrading to 3.0](../concepts/upgrading-to-3.0.md).
 
 ## Step 1: Add the preview dependency
 
-The SDK is not on PyPI. The 3.0 preview lives on the `feature/v3-agentic` branch of the SDK and of
-`zqnt-utils`, the Zequent package it depends on. Both repositories are private: you need GitHub
-access to them.
+The SDK is not on PyPI. The 3.0 preview lives on the `feature/public-api-split` branch of the SDK
+and on `main` (the `3.0.0` line) of `zqnt-api` (`zqnt-api-python`), the public Zequent API package it depends on, which replaces
+`zqnt-utils` on 3.0 (modules `zqnt_api.…` instead of `zqnt_utils.…`).
 
 `pyproject.toml` (uv-managed projects):
 
@@ -31,11 +31,11 @@ dependencies = [
 
 [tool.uv.sources]
 # preview branches, not releases
-zqnt-client-sdk = { git = "https://github.com/zequent/zqnt-client-sdk-python", branch = "feature/v3-agentic" }
-zqnt-utils = { git = "https://github.com/zequent/zqnt-utils-python", branch = "feature/v3-agentic" }
+zqnt-client-sdk = { git = "https://github.com/zequent/zqnt-client-sdk-python", branch = "feature/public-api-split" }
+zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", branch = "main" }
 ```
 
-then `uv sync` (and `uv lock --upgrade-package zqnt-client-sdk --upgrade-package zqnt-utils` to pick
+then `uv sync` (and `uv lock --upgrade-package zqnt-client-sdk --upgrade-package zqnt-api` to pick
 up later preview commits). Move both to the `v3.0.0` release tags once they are out; do not run a
 preview in production.
 
@@ -63,7 +63,7 @@ asyncio.run(main())
 ```
 
 `await client.commands.list_capabilities(asset_sn)` returns the asset's `CapabilitySet` (the
-generated `zqnt_utils.generated.zqnt.capability.v3.capability_pb2` message): one `Capability` per
+generated `zqnt_api.generated.zqnt.capability.v3.capability_pb2` message): one `Capability` per
 command in `capabilities`, with
 
 - `command_id` — the dotted id you execute, and `display_name` / `description`;
@@ -255,7 +255,7 @@ the 3.0 SDK (it emits a `DeprecationWarning`) and stays for 2.x platforms.
 ```python
 from datetime import timedelta
 
-from zqnt_utils.generated.zqnt.telemetry.v3 import telemetry_pb2
+from zqnt_api.generated.zqnt.telemetry.v3 import telemetry_pb2
 
 async for item in client.telemetry.watch_telemetry(["DOCK-1"], min_interval=timedelta(seconds=1)):
     if isinstance(item, telemetry_pb2.TelemetrySample):
@@ -267,7 +267,7 @@ async for item in client.telemetry.watch_telemetry(["DOCK-1"], min_interval=time
 `watch_telemetry(asset_sns=None, *, min_interval=None, heartbeat_timeout=timedelta(seconds=35))` is
 an async iterator (not awaited) that yields, until you leave the loop:
 
-- **`TelemetrySample`s** (`zqnt_utils.generated.zqnt.telemetry.v3.telemetry_pb2`): the fields every
+- **`TelemetrySample`s** (`zqnt_api.generated.zqnt.telemetry.v3.telemetry_pb2`): the fields every
   asset shares — `position`, `relative_altitude`, `heading_degrees`, `horizontal_speed`,
   `vertical_speed`, `battery_percent`, `observed_at` — and everything device-specific in `details`,
   under the keys the asset declares in its capabilities' `telemetry_fields` (`to_dict(item.details)`

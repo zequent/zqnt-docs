@@ -16,9 +16,9 @@ This public documentation is for external developers and integration teams. It f
 > [1.3 Java Client SDK Quickstart](client-sdk/QUICKSTART-1.3.md)). To upgrade, see
 > [Upgrading from 1.3](concepts/migration-guide.md).
 
-> **3.0 preview.** The 3.0 Client SDKs are available as preview builds for trying against a 3.0
+> **3.0 preview.** The 3.0 Client and Edge SDKs are available as preview builds for trying against a 3.0
 > platform; 3.0 is not released yet. Their pages end in `-3.0.md` and are listed under
-> [Client SDK 3.0 (preview)](#client-sdk-30-preview); everything else on this page is 2.0.
+> [3.0 (preview)](#30-preview); everything else on this page is 2.0.
 
 ## Start Here
 
@@ -61,7 +61,7 @@ Customer applications normally use the Client SDK and connect to the platform se
 | Python Client SDK | [Quickstart](client-sdk/QUICKSTART_PYTHON.md), [Configuration](client-sdk/CONFIGURATION_PYTHON.md), [Customer Example](client-sdk/CUSTOMER_EXAMPLE_PYTHON.md) |
 | Go Client SDK | [Quickstart](client-sdk/QUICKSTART_GO.md), [Connector](client-sdk/CONNECTOR_GO.md) — no built-in retry/circuit-breaker/Stork layer, see the quickstart's "What this SDK deliberately does not do" |
 
-## Client SDK 3.0 (preview)
+## 3.0 (preview)
 
 On a 3.0 platform every asset is commanded the same way: list the asset's capabilities, then run a
 command by its dotted id (`flight.takeoff`, `navigation.go_to`, `dock.open_cover`, …) with a JSON
@@ -75,6 +75,8 @@ object of params — no typed method per command. These pages describe preview b
 | … from Python | [Commands (Python)](client-sdk/COMMANDS_PYTHON-3.0.md) |
 | … from Go | [Commands (Go)](client-sdk/COMMANDS_GO-3.0.md) |
 | Fly an asset by hand (stick input) and watch live telemetry on 3.0 | the "Manual control" and "Live telemetry" sections of the Commands pages |
+| Plan the move of an installation (platform, adapters, clients) to 3.0: breaking changes, what keeps working, upgrade order | [Upgrading the platform to 3.0](concepts/upgrading-platform-to-3.0.md) |
+| Build an adapter on the 3.0 Edge SDK: command registry, v3 commands and events, telemetry catalog, conformance kit | [Java](edge-sdk/edge-sdk-adapter-3.0.md) · [Python](edge-sdk/edge-sdk-python-adapter-3.0.md) · [Go](edge-sdk/edge-sdk-go-adapter-3.0.md) |
 
 ## Platform Service Images
 

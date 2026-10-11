@@ -17,13 +17,12 @@ Upgrading an integration: [Upgrading to 3.0](../concepts/upgrading-to-3.0.md).
 
 The 3.0 Go Client SDK is a new major module, **`github.com/zequent/zqnt-client-sdk-go/v3`** — note
 `/v3` and the lower-case owner. Its generated message types come from
-`github.com/zequent/zqnt-utils-golang/v2/gen/...` (the 3.0 types under `gen/zqnt/<domain>/v3`). Both
-modules are private: you need GitHub access to them.
+the public module `github.com/zequent/zqnt-api-go/v3/gen/...` (the 3.0 types under
+`gen/zqnt/<domain>/v3`), which replaces the private `zqnt-utils-golang` on 3.0.
 
 ```bash
-go env -w GOPRIVATE="github.com/zequent/*"
 # preview branch, not a release
-go get github.com/zequent/zqnt-client-sdk-go/v3@feature/v3-agentic
+go get github.com/zequent/zqnt-client-sdk-go/v3@feature/public-api-split
 ```
 
 Go resolves the branch to a pseudo-version; run the `go get` again to pick up later preview commits.
@@ -71,7 +70,7 @@ for _, capability := range set.GetCapabilities() {
 ```
 
 `ListCapabilities(ctx, sn, opts...)` returns the asset's `*capabilityv3.CapabilitySet`
-(`github.com/zequent/zqnt-utils-golang/v2/gen/zqnt/capability/v3`): one `Capability` per command,
+(`github.com/zequent/zqnt-api-go/v3/gen/zqnt/capability/v3`): one `Capability` per command,
 with
 
 - `GetCommandId()` — the dotted id you execute, and `GetDisplayName()` / `GetDescription()`;
@@ -238,7 +237,7 @@ control rate:
 
 ```go
 import (
-    edgev3 "github.com/zequent/zqnt-utils-golang/v2/gen/zqnt/edge/v3"
+    edgev3 "github.com/zequent/zqnt-api-go/v3/gen/zqnt/edge/v3"
     "google.golang.org/protobuf/proto"
 )
 
@@ -303,7 +302,7 @@ for {
 returns the next `*telemetryv3.WatchTelemetryResponse` with either `GetSample()` or
 `GetSourceStatus()` set (heartbeats are skipped):
 
-- **`TelemetrySample`** (`github.com/zequent/zqnt-utils-golang/v2/gen/zqnt/telemetry/v3`): the fields
+- **`TelemetrySample`** (`github.com/zequent/zqnt-api-go/v3/gen/zqnt/telemetry/v3`): the fields
   every asset shares — `GetPosition()`, `GetRelativeAltitude()`, `GetHeadingDegrees()`,
   `GetHorizontalSpeed()`, `GetVerticalSpeed()`, `GetBatteryPercent()`, `GetObservedAt()` — and
   everything device-specific in `GetDetails()`, under the keys the asset declares in its
