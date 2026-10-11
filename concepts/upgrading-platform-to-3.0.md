@@ -53,7 +53,7 @@ A 3.0 platform serves **both**:
 | Packages with the generated contracts | `zqnt-utils-java`, `zqnt-utils` (Python), `github.com/zequent/zqnt-utils-golang/v2` (private) — internal platform libraries | **`com.zqnt:zqnt-api-java`**, **`zqnt-api`** (`zqnt-api-python`), **`github.com/zequent/zqnt-api-go/v3`** — public, Apache 2.0, version line `3.0.0` |
 | Go module paths | `…/zqnt-edge-sdk-go/v2`, `…/zqnt-client-sdk-go/v2` (`github.com/Zequent/…`) | **`github.com/zequent/zqnt-edge-sdk-go/v3`**, **`github.com/zequent/zqnt-client-sdk-go/v3`** (`/v3`, lower-case owner) |
 | SDK versions | `2.0.x` | `3.0.0` for every SDK and API package |
-| Commands from Client SDKs | one typed method per command | `executeCommand` by command id; the typed 2.x methods are deprecated (still there, and they still work against 2.x platforms) |
+| Commands from Client SDKs | one typed method per command | `executeCommand` by command id; the typed 2.x methods are removed from the 3.0 Client SDKs (the 2.0 SDKs keep working against a 3.0 platform) |
 | Commands in adapters | one method per command | a command registry; the typed methods are deprecated (adapters that implement them keep working) |
 | Human approvals | any credential could decide a `HUMAN_APPROVAL` node | only a **signed-in user** can; service, edge, Integration Hub and Client SDK credentials are refused. The decision records who decided and when |
 | Pairing assets | claim codes, plus the legacy paths: the Java Edge SDK's `registerAsset` and binding by organization UUID | **planned:** claim codes only — `registerAsset` and the organization-UUID bind are to be removed (not done in the preview yet). Move devices to [claim-code pairing](../edge-sdk/edge-sdk-connector.md) now |
@@ -100,7 +100,7 @@ working".
 5. **Upgrade client applications** to the 3.0 Client SDKs and move from typed calls to commands by id
    ([Upgrading to 3.0](upgrading-to-3.0.md)).
 
-Step 4 can also come first: 3.0 adapters work against a 2.x platform. 3.0 Client SDKs keep their
-2.x calls (deprecated), which work against a 2.x platform, but do **not** switch to them on their
-own: their v3 calls — commands by id, manual control, the telemetry watch — fail with
-`UNIMPLEMENTED` until the platform runs 3.0.
+Step 4 can also come first: 3.0 adapters work against a 2.x platform. 3.0 Client SDKs have no 2.x
+command calls: their calls — commands by id, manual control, the telemetry, detection and alert
+watches — fail with `UNIMPLEMENTED` until the platform runs 3.0, so client applications move after
+the platform.

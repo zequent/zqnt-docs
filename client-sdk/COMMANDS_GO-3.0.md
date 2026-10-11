@@ -22,7 +22,7 @@ the public module `github.com/zequent/zqnt-api-go/v3/gen/...` (the 3.0 types und
 
 ```bash
 # preview branch, not a release
-go get github.com/zequent/zqnt-client-sdk-go/v3@feature/public-api-split
+go get github.com/zequent/zqnt-client-sdk-go/v3@feature/v3-agentic
 ```
 
 Go resolves the branch to a pseudo-version; run the `go get` again to pick up later preview commits.
@@ -265,9 +265,6 @@ accepted, err := stick.Close()
   organization) or the adapter drops it, `Send` and `Close` return that error with its gRPC status
   (`status.Code(err)`). `Send` after `Close` returns `control.ErrManualControlClosed`.
 
-The 2.x stream, `remotecontrol.Client.OpenManualControlInputStream`, is in the deprecated
-`remotecontrol` package and stays for 2.x platforms.
-
 ## Live telemetry
 
 Package `telemetry` watches 3.0 telemetry from the live-data service (`LIVE_DATA_SERVICE_*`, same
@@ -298,7 +295,7 @@ for {
 }
 ```
 
-`telemetry.New(conn).WatchTelemetry(ctx, sns, opts...)` returns a `*telemetry.Watch`; its `Recv()`
+`telemetry.New(conn).WatchTelemetry(ctx, sns, opts...)` returns a `*telemetry.Watch[*telemetryv3.WatchTelemetryResponse]`; its `Recv()`
 returns the next `*telemetryv3.WatchTelemetryResponse` with either `GetSample()` or
 `GetSourceStatus()` set (heartbeats are skipped):
 
@@ -320,14 +317,21 @@ within the heartbeat timeout, `Recv` returns `telemetry.ErrSilent`. It returns `
 platform ended the watch, or the gRPC error that ended it. `Close()` (or ending `ctx`) ends the
 watch. **A watch does not reconnect**: watch again.
 
-`livedata.Client.StreamTelemetry` stays the 2.x telemetry stream.
+### Detections and alerts
+
+`WatchDetections(ctx, sns, opts...)` returns a `*telemetry.Watch[*telemetryv3.WatchDetectionsResponse]`
+whose `Recv()` gives the `DetectionBatch`es of the watched assets (`GetBatch()`);
+`WatchAlerts(ctx, sns, opts...)` a `*telemetry.Watch[*telemetryv3.WatchAlertsResponse]` with their
+`Alert`s (`GetAlert()`: `GetSeverity()`, a stable `GetCode()` such as `dock.rain`, `GetMessage()`,
+`GetDetails()`). `telemetry.WithMinSeverity(s)` leaves out alerts below `s`. Heartbeats, `ErrSilent`,
+`Close()` and "no reconnect" work as for `WatchTelemetry`.
 
 ## Against a 2.x platform
 
 Packages `control` and `telemetry` need a 3.0 platform. A 2.x platform does not serve the 3.0
-command and telemetry services: the calls fail with `status.Code(err) == codes.Unimplemented`. The SDK does **not** switch to the 2.x
-calls on its own. Against 2.x, keep using package `remotecontrol` (still in the `/v3` module and
-marked deprecated) and package `livedata`. See [Upgrading to 3.0](../concepts/upgrading-to-3.0.md#running-against-2x-platforms).
+command and telemetry services: the calls fail with `status.Code(err) == codes.Unimplemented`. The `/v3` module has no 2.x command or
+live-data packages: an application that still has to command a 2.x platform stays on the `/v2`
+module for it. See [Upgrading to 3.0](../concepts/upgrading-to-3.0.md#running-against-2x-platforms).
 
 ## Runnable example
 

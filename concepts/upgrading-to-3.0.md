@@ -12,8 +12,8 @@ Edge SDKs: [Java](../edge-sdk/edge-sdk-adapter-3.0.md) · [Python](../edge-sdk/e
 
 ## What changes
 
-In 2.x, the Client SDKs had one typed method per command (`takeoff`, `goTo`, `openCover`, …). In
-3.0 every action on an asset is a **capability** with a dotted **command id** (`flight.takeoff`,
+In 2.x, the Client SDKs had one typed method per command (`takeoff`, `goTo`, `openCover`, …). The 3.0 SDKs
+have none of them: every action on an asset is a **capability** with a dotted **command id** (`flight.takeoff`,
 `navigation.go_to`, `dock.open_cover`, `vendor.<vendor>.<name>`) and JSON Schemas for its params and
 result. Every SDK has one way to run any of them:
 
@@ -40,9 +40,9 @@ of inputs passed on to the asset — and leave with `flight.manual.exit`.
 
 | 2.x | 3.0 |
 | --- | --- |
-| Java `remoteControl().startManualControlInput(sn, assetId)` (deprecated in the 3.0 SDK) | `commands().streamManualControl(assetSn)` → `ManualControlStream`: `send(...)`, `close()`, `done()` |
-| Python `remote_control.start_manual_control_input(sn)` (deprecated in the 3.0 SDK) | `commands.stream_manual_control(asset_sn)` → `ManualControlStream`: `async with`, `send(...)`, `close()`, `cancel()` |
-| Go `remotecontrol.Client.OpenManualControlInputStream(ctx)` (package deprecated) | `control.Client.StreamManualControl(ctx, sn)` → `Send(...)`, `Close()`; `Send` after `Close` is `control.ErrManualControlClosed` |
+| Java `remoteControl().startManualControlInput(sn, assetId)` | `commands().streamManualControl(assetSn)` → `ManualControlStream`: `send(...)`, `close()`, `done()` |
+| Python `remote_control.start_manual_control_input(sn)` | `commands.stream_manual_control(asset_sn)` → `ManualControlStream`: `async with`, `send(...)`, `close()`, `cancel()` |
+| Go `remotecontrol.Client.OpenManualControlInputStream(ctx)` | `control.Client.StreamManualControl(ctx, sn)` → `Send(...)`, `Close()`; `Send` after `Close` is `control.ErrManualControlClosed` |
 
 ### Live telemetry
 
@@ -63,6 +63,10 @@ telemetry watch on its own** — watch again.
 | Java `liveData().streamTelemetryData(...)` | `telemetry().watchTelemetry(assetSns, minInterval, onSample, onSourceStatus)` → `TelemetryWatch` |
 | Python `live_data.stream_telemetry(...)` | `async for item in telemetry.watch_telemetry(asset_sns, min_interval=...)` |
 | Go `livedata.Client.StreamTelemetry(ctx, sn, frequencyMs, durationSeconds)` | `telemetry.New(conn).WatchTelemetry(ctx, sns, telemetry.WithMinInterval(...))` → `Recv()` |
+| Java `liveData().streamNotifications(...)` | `telemetry().watchAlerts(assetSns, minSeverity, onAlert)` |
+| Python `live_data.stream_notifications(...)` | `async for alert in telemetry.watch_alerts(asset_sns, min_severity=...)` |
+| Go `livedata.Client.StreamNotifications(...)` / `StreamDetections(...)` | `WatchAlerts(ctx, sns, telemetry.WithMinSeverity(...))` / `WatchDetections(ctx, sns)` |
+| Java `liveData().startLiveStream` / `stopLiveStream`, Python `live_data.start_live_stream` / `stop_live_stream`, Go `StartLiveStream` / `StopLiveStream` | the commands `stream.start` / `stream.stop` (params from the asset's capability) |
 
 Every command run has a **command execution id** and a state: `ACCEPTED` / `RUNNING` while underway,
 then one of `SUCCEEDED`, `FAILED`, `REJECTED` (refused before it started), `CANCELLED` or
@@ -90,7 +94,8 @@ with `executeAndWait` instead.
 - Configuration, environment variables and the `ZQNT_CLIENT_TOKEN` client credential. The 3.0
   command service is served by remote-control next to the 2.x service, on the same host and port.
 - Connector and Mission Autonomy (Applications, Skill executions, schedulers) keep their 2.x
-  contracts in the 3.0 SDKs. The 2.x Live Data client stays next to the new telemetry watch.
+  contracts in the 3.0 SDKs. The 2.x Remote Control and Live Data clients are gone: commands,
+  telemetry, detections and alerts are 3.0 calls.
 - `navigation.go_to`'s `altitude` is metres above the **takeoff point** (left out = 40 m), as in 2.x.
 - **Leave a param out when you have no value.** The platform reads a missing coordinate as "not
   given"; sending `0` means latitude 0 / longitude 0 / ground level. Java and Python drop `null` /
@@ -109,9 +114,9 @@ packages (Apache 2.0), which replace the `zqnt-utils-*` packages of 2.x:
 
 | SDK | Preview |
 | --- | --- |
-| Java | `com.zqnt.sdk:client-java-sdk` preview builds on GitHub Packages, `3.0.0-PR<n>-<sha>-SNAPSHOT` (at the time of writing `3.0.0-PR12-869caa4-SNAPSHOT`); it pulls a `zqnt-api-java` 3.0.0 preview build. See [Commands (Java)](../client-sdk/COMMANDS-3.0.md#step-1-add-the-preview-dependency). |
-| Python | Git branch `feature/public-api-split` of `zqnt-client-sdk-python` and `main` of `zqnt-api-python` (the `3.0.0` line), under `[tool.uv.sources]`. See [Commands (Python)](../client-sdk/COMMANDS_PYTHON-3.0.md#step-1-add-the-preview-dependency). |
-| Go | New module path **`github.com/zequent/zqnt-client-sdk-go/v3`** (`/v3`, lower-case owner): `go get github.com/zequent/zqnt-client-sdk-go/v3@feature/public-api-split`. Its generated types come from the public module `github.com/zequent/zqnt-api-go/v3`. See [Commands (Go)](../client-sdk/COMMANDS_GO-3.0.md#step-1-add-the-preview-module). |
+| Java | `com.zqnt.sdk:client-java-sdk` preview builds on GitHub Packages, `3.0.0-PR<n>-<sha>-SNAPSHOT` (at the time of writing `3.0.0-PR14-64e3ad0-SNAPSHOT`); it pulls a `zqnt-api-java` 3.0.0 preview build. See [Commands (Java)](../client-sdk/COMMANDS-3.0.md#step-1-add-the-preview-dependency). |
+| Python | Git branch `feature/v3-agentic` of `zqnt-client-sdk-python` and `main` of `zqnt-api-python` (the `3.0.0` line), under `[tool.uv.sources]`. See [Commands (Python)](../client-sdk/COMMANDS_PYTHON-3.0.md#step-1-add-the-preview-dependency). |
+| Go | New module path **`github.com/zequent/zqnt-client-sdk-go/v3`** (`/v3`, lower-case owner): `go get github.com/zequent/zqnt-client-sdk-go/v3@feature/v3-agentic`. Its generated types come from the public module `github.com/zequent/zqnt-api-go/v3`. See [Commands (Go)](../client-sdk/COMMANDS_GO-3.0.md#step-1-add-the-preview-module). |
 
 Preview builds are for trying 3.0 against a 3.0 platform, not for production. Each moves to a
 `3.0.0` release once 3.0 ships.
@@ -127,18 +132,12 @@ does not serve them, and every call fails with the gRPC status `UNIMPLEMENTED`:
 | Python | `CommandError`, `status` = `grpc.StatusCode.UNIMPLEMENTED`, category `ERROR_CATEGORY_NOT_FOUND` |
 | Go | `status.Code(err) == codes.Unimplemented` |
 
-The Client SDKs **do not switch to the 2.x calls on their own**. The 2.x typed calls are still in
-the 3.0 SDKs and keep working against 2.x platforms — deprecated, not removed:
-
-- Java: the typed `remoteControl()` methods, `startManualControlInput` and `getCapabilities` /
-  `sendCustomCommand` are `@Deprecated(since = "3.0")`.
-- Python: the typed `client.remote_control` methods and `start_manual_control_input` emit a
-  `DeprecationWarning` that names what to use on 3.0.
-- Go: package `remotecontrol` is deprecated and stays in the `/v3` module.
-
-So an application that has to talk to both 2.x and 3.0 platforms decides per platform which API to
-use — for example from configuration, or by treating `UNIMPLEMENTED` from `listCapabilities` as
-"this platform is still on 2.x":
+The 3.0 Client SDKs **have no 2.x command calls**: the typed per-command methods, the 2.x
+manual-control session and the 2.x Live Data client (Java `remoteControl()` / `liveData()`, Python
+`client.remote_control` / `client.live_data`, Go packages `remotecontrol` / `livedata`) are removed.
+An application that has to command both 2.x and 3.0 platforms keeps the 2.0 SDK for the 2.x ones
+and decides per platform which SDK to use — for example from configuration, or by treating
+`UNIMPLEMENTED` from `listCapabilities` as "this platform is still on 2.x":
 
 ```java
 boolean platformServes3(ZequentClient zequent, String assetSn) {
@@ -147,7 +146,7 @@ boolean platformServes3(ZequentClient zequent, String assetSn) {
         return true;
     } catch (CompletionException failure) {
         CommandException error = CommandException.from(failure);
-        if (error.getStatus() == io.grpc.Status.Code.UNIMPLEMENTED) return false; // 2.x: use remoteControl()
+        if (error.getStatus() == io.grpc.Status.Code.UNIMPLEMENTED) return false; // 2.x: use the 2.0 SDK
         throw error;
     }
 }
@@ -158,6 +157,7 @@ Moving the platform itself to 3.0 is a separate upgrade: see
 
 ## Typed call → command id
 
+The 2.x typed calls are removed in the 3.0 SDKs; this table is the migration aid.
 `listCapabilities` on an asset is authoritative for the commands and params it accepts. These are
 the ids and params of the built-in commands the Zequent adapters share:
 
@@ -212,5 +212,5 @@ the generated types move to `zqnt-api-go/v3`, with the same package paths below 
 grep -rl zqnt-client-sdk-go/v2 --include='*.go' . | xargs sed -i \
   -e 's#github.com/Zequent/zqnt-client-sdk-go/v2/gen/#github.com/zequent/zqnt-api-go/v3/gen/#g' \
   -e 's#github.com/Zequent/zqnt-client-sdk-go/v2/#github.com/zequent/zqnt-client-sdk-go/v3/#g'
-go get github.com/zequent/zqnt-client-sdk-go/v3@feature/public-api-split && go mod tidy
+go get github.com/zequent/zqnt-client-sdk-go/v3@feature/v3-agentic && go mod tidy
 ```

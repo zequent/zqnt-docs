@@ -17,7 +17,7 @@ Upgrading an integration: [Upgrading to 3.0](../concepts/upgrading-to-3.0.md).
 
 ## Step 1: Add the preview dependency
 
-The SDK is not on PyPI. The 3.0 preview lives on the `feature/public-api-split` branch of the SDK
+The SDK is not on PyPI. The 3.0 preview lives on the `feature/v3-agentic` branch of the SDK
 and on `main` (the `3.0.0` line) of `zqnt-api` (`zqnt-api-python`), the public Zequent API package it depends on, which replaces
 `zqnt-utils` on 3.0 (modules `zqnt_api.…` instead of `zqnt_utils.…`).
 
@@ -31,7 +31,7 @@ dependencies = [
 
 [tool.uv.sources]
 # preview branches, not releases
-zqnt-client-sdk = { git = "https://github.com/zequent/zqnt-client-sdk-python", branch = "feature/public-api-split" }
+zqnt-client-sdk = { git = "https://github.com/zequent/zqnt-client-sdk-python", branch = "feature/v3-agentic" }
 zqnt-api = { git = "https://github.com/zequent/zqnt-api-python", branch = "main" }
 ```
 
@@ -244,9 +244,6 @@ await client.commands.execute_and_wait("DRONE-1", "flight.manual.exit")
   reachable for the asset, an asset of another organization) or the adapter dropped it; `send`
   after `close` raises `RuntimeError`.
 
-The 2.x stick-input session, `client.remote_control.start_manual_control_input(sn)`, is deprecated in
-the 3.0 SDK (it emits a `DeprecationWarning`) and stays for 2.x platforms.
-
 ## Live telemetry
 
 `client.telemetry` watches 3.0 telemetry from the live-data service (`LIVE_DATA_SERVICE_HOST` /
@@ -284,14 +281,19 @@ The platform sends heartbeats on a quiet stream: when neither a sample nor a hea
 loop raises a retryable `CommandError` with category `ERROR_CATEGORY_SERVICE`. A refused or dropped
 watch raises `CommandError` too. **A watch does not reconnect**: watch again.
 
-`client.live_data.stream_telemetry(...)` stays the 2.x telemetry stream.
+### Detections and alerts
+
+`watch_detections(asset_sns=None, *, heartbeat_timeout=...)` yields the `DetectionBatch`es of the
+watched assets (AI detections with the stream they came from); `watch_alerts(asset_sns=None, *,
+min_severity=ALERT_SEVERITY_UNSPECIFIED, heartbeat_timeout=...)` yields their `Alert`s (`severity`,
+a stable `code` such as `dock.rain`, `message`, `details`) from `min_severity` up. Both are async
+iterators with the same heartbeat timeout and errors as `watch_telemetry`, and do not reconnect
+either.
 
 ## Against a 2.x platform
 
 `client.commands` and `client.telemetry` need a 3.0 platform. A 2.x platform does not serve the 3.0
 command and telemetry services: the calls raise `CommandError` with `status` `grpc.StatusCode.UNIMPLEMENTED` (category
-`ERROR_CATEGORY_NOT_FOUND`). The SDK does **not** switch to the 2.x calls on its own. Against 2.x,
-keep using the typed `client.remote_control` methods (including `start_manual_control_input` for
-stick input) and `client.live_data`; the typed calls still work in this SDK and emit a
-`DeprecationWarning` naming what to use on 3.0. See
+`ERROR_CATEGORY_NOT_FOUND`). The 3.0 SDK has no 2.x command or live-data calls: an
+application that still has to command a 2.x platform stays on the 2.0 SDK for it. See
 [Upgrading to 3.0](../concepts/upgrading-to-3.0.md#running-against-2x-platforms).

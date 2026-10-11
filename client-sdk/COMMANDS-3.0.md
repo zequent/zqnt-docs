@@ -24,7 +24,7 @@ push to the 3.0 branch publishes a new preview version; at the time of writing i
     <groupId>com.zqnt.sdk</groupId>
     <artifactId>client-java-sdk</artifactId>
     <!-- preview, not a release -->
-    <version>3.0.0-PR12-869caa4-SNAPSHOT</version>
+    <version>3.0.0-PR14-64e3ad0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -255,9 +255,6 @@ commands.executeAndWait("DRONE-1", "flight.manual.exit", Map.of(), Duration.ofSe
   reachable for the asset, an asset of another organization) or the adapter drops it; `send` then
   throws an `IllegalStateException`.
 
-The 2.x stick-input session, `zequent.remoteControl().startManualControlInput(sn, assetId)`, is
-deprecated in the 3.0 SDK (`@Deprecated(since = "3.0")`) and stays for 2.x platforms.
-
 ## Live telemetry
 
 `zequent.telemetry()` watches 3.0 telemetry from the live-data service (`LIVE_DATA_SERVICE_HOST` /
@@ -297,14 +294,18 @@ nor a heartbeat arrives within the heartbeat timeout — **35 s by default**, se
 `CommandException` of category `ERROR_CATEGORY_SERVICE`. A refused or dropped watch fails `done()`
 too. **A watch does not reconnect**: watch again.
 
-`zequent.liveData().streamTelemetryData(...)` stays the 2.x telemetry stream.
+### Detections and alerts
+
+`watchDetections(assetSns, onBatch)` streams the `DetectionBatch`es of the watched assets (AI
+detections with the stream they came from); `watchAlerts(assetSns, minSeverity, onAlert)` streams
+their `Alert`s (`getSeverity()`, a stable `getCode()` such as `dock.rain`, `getMessage()`,
+`getDetails()`), from `minSeverity` up (`null` = every severity). Both return a `TelemetryWatch` with
+the same heartbeat timeout, `close()` and `done()` as `watchTelemetry`, and do not reconnect either.
 
 ## Against a 2.x platform
 
 `zequent.commands()` and `zequent.telemetry()` need a 3.0 platform. A 2.x platform does not serve
 the 3.0 command and telemetry services: the calls fail with a `CommandException` whose `getStatus()` is `UNIMPLEMENTED` (category
-`ERROR_CATEGORY_NOT_FOUND`). The SDK does **not** switch to the 2.x calls on its own. Against 2.x,
-keep using the typed `zequent.remoteControl()` methods (including `startManualControlInput` for
-stick input) and `zequent.liveData()`; the typed calls still work in this SDK and are marked
-`@Deprecated(since = "3.0")`. See
+`ERROR_CATEGORY_NOT_FOUND`). The 3.0 SDK has no 2.x command or live-data calls: an
+application that still has to command a 2.x platform stays on the 2.0 SDK for it. See
 [Upgrading to 3.0](../concepts/upgrading-to-3.0.md#running-against-2x-platforms).
