@@ -24,11 +24,11 @@ push to the 3.0 branch publishes a new preview version; at the time of writing i
     <groupId>com.zqnt.sdk</groupId>
     <artifactId>client-java-sdk</artifactId>
     <!-- preview, not a release -->
-    <version>1.0.0-PR11-ea1532e-SNAPSHOT</version>
+    <version>3.0.0-PR12-869caa4-SNAPSHOT</version>
 </dependency>
 ```
 
-The SDK's own repository and the `zqnt-utils-java` package it depends on (a preview build as well)
+The SDK's own repository and the `zqnt-api-java` package it depends on (the public 3.0 contracts)
 are both on GitHub Packages, so your `~/.m2/settings.xml` needs a token with package read access for:
 
 ```xml
@@ -37,8 +37,8 @@ are both on GitHub Packages, so your `~/.m2/settings.xml` needs a token with pac
     <url>https://maven.pkg.github.com/Zequent/zqnt-client-sdk-java</url>
 </repository>
 <repository>
-    <id>zqnt-utils-repo</id>
-    <url>https://maven.pkg.github.com/Zequent/zqnt-utils-java</url>
+    <id>zqnt-api-repo</id>
+    <url>https://maven.pkg.github.com/Zequent/zqnt-api-java</url>
 </repository>
 ```
 
