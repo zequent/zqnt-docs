@@ -122,10 +122,17 @@ implement the typed methods keep working.
 ### Command risk (`CommandSafety`)
 
 The 3.0 contract rates every command with a `CommandSafety` (`COMMAND_RISK_OBSERVE`, `_ADJUST`,
-`_MOVE`, `_CRITICAL`, plus reversibility and an undo command). The 3.0 SDK previews **do not let
-an adapter set it**: the platform rates a command by the command catalog, and an id that is not in
-the catalog — every `vendor.*` command — counts as **critical** (a client must give a reason to run
-it; approvals and agent policy treat it accordingly).
+`_MOVE`, `_CRITICAL`, plus reversibility and an undo command). A standard id is advertised with
+the command catalog's rating (`CommandCatalog.safety(id)`: `flight.takeoff` MOVE, `flight.land`
+CRITICAL, `camera.take_photo` OBSERVE, ...). Set your own on the capability the registration returns:
+
+```java
+registerCommand("vendor.acme.spray", sprayInput, Map.of(), this::spray)
+        .setSafety(CommandSafety.newBuilder().setRisk(CommandRisk.COMMAND_RISK_CRITICAL).build());
+```
+
+A `vendor.*` command that moves or affects the asset must declare its own risk. An id outside the catalog
+that declares none counts as **critical** (a client must give a reason to run it).
 
 ## Step 3: Serve both contracts
 
@@ -252,9 +259,9 @@ returns their `TelemetryField` descriptions; declare the ones your asset sends w
 `commands().declareTelemetryField(...)`, so their type and unit are the platform's. Use your own
 `vendor.<vendor>.<name>` keys for everything else.
 
-**On a 2.x platform** the Java SDK sends only the shared fields (position, altitudes, heading,
-speeds, battery) over v2: a sample's `details` and all alerts are dropped. The Python and Go SDKs
-map catalog keys onto their v2 fields; the Java preview does not yet.
+**On a 2.x platform** a sample goes over v2 `ProduceTelemetry` through `TelemetrySampleMapper`:
+**catalog keys in `details` land in their v2 fields, other keys are dropped**, and so are all
+alerts.
 
 ### The telemetry catalog
 

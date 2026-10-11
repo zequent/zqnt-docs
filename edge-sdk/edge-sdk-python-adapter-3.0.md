@@ -115,9 +115,22 @@ still works and is served under its dotted id, but warns with a `DeprecationWarn
 ### Command risk (`CommandSafety`)
 
 The 3.0 contract rates every command with a `CommandSafety` (`COMMAND_RISK_OBSERVE`, `_ADJUST`,
-`_MOVE`, `_CRITICAL`, plus reversibility and an undo command). The 3.0 SDK previews **do not let an
-adapter set it**: the platform rates a command by its command catalog, and an id outside the
-catalog — every `vendor.*` command — counts as **critical** (a client must give a reason to run it).
+`_MOVE`, `_CRITICAL`, plus reversibility and an undo command). A standard id is advertised with
+the command catalog's rating (`edge_sdk.adapter.commands.catalog_safety(id)`: `flight.takeoff` MOVE,
+`flight.land` CRITICAL, ...). Declare your own at registration:
+
+```python
+from edge_sdk import CommandRisk, CommandSafety
+
+self.register_command("vendor.acme.spray", self._spray, safety=CommandRisk.CRITICAL)
+self.register_command(
+    "dock.open_cover", self._open_cover,
+    safety=CommandSafety(risk=CommandRisk.MOVE, preconditions=("no aircraft above the dock",)),
+)
+```
+
+A `vendor.*` command that moves or affects the asset must declare its own risk. An id outside the catalog
+that declares none counts as **critical** (a client must give a reason to run it).
 
 ## Step 3: Serve and connect
 

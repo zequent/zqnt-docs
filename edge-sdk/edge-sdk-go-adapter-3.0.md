@@ -112,9 +112,18 @@ methods are deprecated in favour of the registry.
 ### Command risk (`CommandSafety`)
 
 The 3.0 contract rates every command with a `CommandSafety` (`COMMAND_RISK_OBSERVE`, `_ADJUST`,
-`_MOVE`, `_CRITICAL`, plus reversibility and an undo command). The 3.0 SDK previews **do not let an
-adapter set it**: the platform rates a command by its command catalog, and an id outside the
-catalog — every `vendor.*` command — counts as **critical** (a client must give a reason to run it).
+`_MOVE`, `_CRITICAL`, plus reversibility and an undo command). A standard id is advertised with
+the command catalog's rating (`domains.CatalogSafety(id)`: `flight.takeoff` MOVE, `flight.land`
+CRITICAL, ...). Declare your own at registration:
+
+```go
+d.MustRegisterCommand("vendor.acme.spray", sprayInput, nil, d.spray,
+    adapter.WithRisk(domains.CommandRiskCritical))
+// or adapter.WithSafety(domains.CommandSafety{Risk: ..., UndoCommandID: ..., Preconditions: ...})
+```
+
+A `vendor.*` command that moves or affects the asset must declare its own risk. An id outside the catalog
+that declares none counts as **critical** (a client must give a reason to run it).
 
 ## Step 3: Serve and connect
 
@@ -205,9 +214,13 @@ their v2 fields, other keys are dropped.** The v2 telemetry API (`ProduceTelemet
 
 ## Pairing
 
-The Go SDK has no claim-code helpers (no `ensureAsset` / `redeemAssetClaim` equivalent). Provision
-Go-adapter assets in the console, or pair them with a claim code from a tool built on the Java or
-Python SDK. The platform's organization-UUID bind is **planned** to be removed in 3.0.
+`client.EnsureAsset(ctx, asset)` binds to an asset the platform already knows and redeems a
+one-time **claim code** (`edgesdk.WithClaimCode`, default `ZQNT_CLAIM_CODE`, minted in the console)
+only for an unknown serial. The claim decides the organization. `Connector().RedeemAssetClaim(ctx,
+code, asset)` and `Connector().DescribeAssetClaim(ctx, code)` (the organization's name, without
+spending the code) are there for custom flows. A refused code returns `(nil, nil)` without saying
+why. `RegisterAsset` is deprecated, and the platform's organization-UUID bind is **planned** to be
+removed in 3.0.
 
 ## Step 6: Check the adapter with the conformance kit
 
