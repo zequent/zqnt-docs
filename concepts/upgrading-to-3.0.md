@@ -95,7 +95,7 @@ with `executeAndWait` instead.
 
 | SDK | Preview |
 | --- | --- |
-| Java | `com.zqnt.sdk:client-java-sdk` preview builds on GitHub Packages, `3.0.0-PR<n>-<sha>-SNAPSHOT` (at the time of writing `3.0.0-PR12-869caa4-SNAPSHOT`); it pulls `zqnt-api-java` 3.0.0. See [Commands (Java)](../client-sdk/COMMANDS-3.0.md#step-1-add-the-preview-dependency). |
+| Java | `com.zqnt.sdk:client-java-sdk` preview builds on GitHub Packages, `3.0.0-PR<n>-<sha>-SNAPSHOT` (at the time of writing `3.0.0-PR12-869caa4-SNAPSHOT`); it pulls a `zqnt-api-java` 3.0.0 preview build. See [Commands (Java)](../client-sdk/COMMANDS-3.0.md#step-1-add-the-preview-dependency). |
 | Python | Git branch `feature/v3-agentic` of `zqnt-client-sdk-python` **and** of `zqnt-utils-python`, under `[tool.uv.sources]`. See [Commands (Python)](../client-sdk/COMMANDS_PYTHON-3.0.md#step-1-add-the-preview-dependency). |
 | Go | New module path **`github.com/zequent/zqnt-client-sdk-go/v3`** (`/v3`, lower-case owner): `go get github.com/zequent/zqnt-client-sdk-go/v3@feature/v3-agentic`. Its generated types come from the private module `github.com/zequent/zqnt-utils-golang/v2`. See [Commands (Go)](../client-sdk/COMMANDS_GO-3.0.md#step-1-add-the-preview-module). |
 

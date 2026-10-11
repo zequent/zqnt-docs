@@ -28,7 +28,7 @@ push to the 3.0 branch publishes a new preview version; at the time of writing i
 </dependency>
 ```
 
-The SDK's own repository and the `zqnt-api-java` package it depends on (the public 3.0 contracts)
+The SDK's own repository and the `zqnt-api-java` package it depends on (the public 3.0 contracts, a preview build as well)
 are both on GitHub Packages, so your `~/.m2/settings.xml` needs a token with package read access for:
 
 ```xml
