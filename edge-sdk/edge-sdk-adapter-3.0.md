@@ -134,6 +134,32 @@ registerCommand("vendor.acme.spray", sprayInput, Map.of(), this::spray)
 A `vendor.*` command that moves or affects the asset must declare its own risk. An id outside the catalog
 that declares none counts as **critical** (a client must give a reason to run it).
 
+### Payloads
+
+A device mounted on the asset (camera, gimbal, speaker, spotlight, sprayer, sensor) is reported with
+the capabilities. Set the asset's payloads on the registry, and target a payload's commands at its
+`ref`:
+
+```java
+commands().setPayloads("SN-1", List.of(Payload.newBuilder()
+        .setRef("speaker-1").setKind("speaker").setVendor("Acme").setModel("S2").setSlotIndex(0)
+        .build()));
+
+Capability play = registerCommand("speaker.audio.play", playInput, Map.of(), this::play);
+play.setTargetType(CapabilityTargetType.CAPABILITY_TARGET_TYPE_PAYLOAD);
+play.setTargetRef("speaker-1");
+commands().changed();
+```
+
+`setPayloads` reports again when the snapshot changed. An adapter that implements
+`getCapabilities` itself sets `CurrentCapabilities.setPayloads(...)`. A report is a full snapshot: a payload missing from the next report is detached. The platform keeps
+the payloads on the asset (the console's payload list) and stores one mounted on a sub-asset (a
+drone of a dock) on that sub-asset. `kind` is free text (`camera`, `speaker`, `spotlight`,
+`sprayer`, `sensor`, ...); `metadata` carries anything else, `library_version` is stored as such.
+The
+conformance kit flags a payload without `ref`, two with the same one, and a command targeting a
+payload that is not reported.
+
 ## Step 3: Serve both contracts
 
 Serve `EdgeAdapterGrpcServiceImpl` (v2) and `EdgeAdapterV3GrpcServiceImpl` (v3) from the same

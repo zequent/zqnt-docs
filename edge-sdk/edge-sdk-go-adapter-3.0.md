@@ -125,6 +125,30 @@ d.MustRegisterCommand("vendor.acme.spray", sprayInput, nil, d.spray,
 A `vendor.*` command that moves or affects the asset must declare its own risk. An id outside the catalog
 that declares none counts as **critical** (a client must give a reason to run it).
 
+### Payloads
+
+A device mounted on the asset (camera, gimbal, speaker, spotlight, sprayer, sensor) is reported with
+the capabilities. Set the asset's payloads on the registry, and target a payload's commands at its
+`Ref`:
+
+```go
+slot := int32(0)
+_ = d.SetPayloads("SN-1", []domains.Payload{
+	{Ref: "speaker-1", Kind: "speaker", Vendor: "Acme", Model: "S2", SlotIndex: &slot},
+})
+d.MustRegisterCommand("speaker.audio.play", playInput, nil, d.play,
+	adapter.WithTarget(domains.CapabilityTargetPayload, "speaker-1"))
+```
+
+`SetPayloads` reports again when the snapshot changed; `MountedOn` names the sub-asset carrying
+the payload (empty: the asset itself). A report is a full snapshot: a payload missing from the next report is detached. The platform keeps
+the payloads on the asset (the console's payload list) and stores one mounted on a sub-asset (a
+drone of a dock) on that sub-asset. `kind` is free text (`camera`, `speaker`, `spotlight`,
+`sprayer`, `sensor`, ...); `metadata` carries anything else, `library_version` is stored as such.
+The conformance kit
+(`Report.Payloads`) flags a payload without `Ref`, two with the same one, and a command targeting a
+payload that is not reported.
+
 ## Step 3: Serve and connect
 
 ```go

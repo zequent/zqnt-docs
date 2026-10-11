@@ -132,6 +132,33 @@ self.register_command(
 A `vendor.*` command that moves or affects the asset must declare its own risk. An id outside the catalog
 that declares none counts as **critical** (a client must give a reason to run it).
 
+### Payloads
+
+A device mounted on the asset (camera, gimbal, speaker, spotlight, sprayer, sensor) is reported with
+the capabilities. Set the asset's payloads on the adapter, and target a payload's commands at its
+`ref`:
+
+```python
+from edge_sdk import Payload
+from edge_sdk.models.common import CapabilityTarget, CapabilityTargetType
+
+self.set_payloads("SN-1", [Payload(ref="speaker-1", kind="speaker", vendor="Acme", model="S2", slot_index=0)])
+self.register_command(
+    "speaker.audio.play",
+    self._play,
+    target=CapabilityTarget(type=CapabilityTargetType.PAYLOAD, target_ref="speaker-1"),
+)
+```
+
+`set_payloads` reports again when the snapshot changed; `mounted_on` names the sub-asset carrying
+the payload (`None`: the asset itself). A report is a full snapshot: a payload missing from the next report is detached. The platform keeps
+the payloads on the asset (the console's payload list) and stores one mounted on a sub-asset (a
+drone of a dock) on that sub-asset. `kind` is free text (`camera`, `speaker`, `spotlight`,
+`sprayer`, `sensor`, ...); `metadata` carries anything else, `library_version` is stored as such.
+The conformance kit
+flags a payload without `ref`, two with the same one, and a command targeting a payload that is not
+reported.
+
 ## Step 3: Serve and connect
 
 `EdgeServer` serves `zqnt.edge.v3.EdgeAdapterService` (`ExecuteCommand`) and the v2 service side by
