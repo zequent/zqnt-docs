@@ -28,10 +28,11 @@ platform's own `docker-compose.local.yml` stack.
   dedicated database (standalone deployment) or `zequent_db` with `DATABASE_SCHEMA` set (see
   [docker-compose.local.yml](#docker-composelocalyml) below); either way it's a schema of its own,
   never mixed with `zequent_db`'s own asset/telemetry tables
-- Optionally: the platform's Connector Service and Mission Autonomy Service, if you want configured
-  connectors to appear as Skill-invocable capabilities (see [Skills & Capabilities
+- Optionally: the platform's Connector Service and Mission Autonomy Service, if you want bridges to
+  appear as steps of Skills and Applications (see [Skills & Capabilities
   integration](#skills--capabilities-integration) below). This needs an integration credential for
-  Integration Hub, see [Zequent Platform Integration](#backend----zequent-platform-integration-optional)
+  Integration Hub, see [Zequent Platform Integration](#backend----zequent-platform-integration-optional).
+  Integration Hub is a platform service, not an asset: there is no asset to create for it.
 
 ---
 
@@ -79,14 +80,13 @@ integration described below.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `ZQNT_PLATFORM_ENABLED` | `false` | Master switch for the platform bridge |
-| `ZQNT_EDGE_TOKEN` | -- | Integration Hub's credential for its calls to the platform: an edge credential with the **integration** scope, issued by a `system_admin` in the Admin Console (Credentials) or with `core/scripts/mint-edge-credential.py --integration`. The platform refuses Integration Hub's calls without it. Bound to an organization, Integration Hub can only start runs in that organization |
+| `ZQNT_EDGE_TOKEN` | -- | Integration Hub's credential for its calls to the platform: a credential of kind **integration** (integration scope), issued by a `system_admin` in the Admin Console (Credentials) or with `core/scripts/mint-edge-credential.py --integration`. The platform refuses Integration Hub's calls without it. Without an organization it publishes the bridges of every organization; bound to an organization, it publishes only that organization's bridges and starts runs only in that organization |
 | `ZQNT_PLATFORM_PUBLIC_KEY` (alias `SERVICE_AUTH_PUBLIC_KEY`) | -- | The platform's service public key. Integration Hub verifies the platform's calls into it (`SendCustomCommand`, `GetCapabilities`) with it and refuses everything else |
 | `ZQNT_CONNECTOR_HOST` / `ZQNT_CONNECTOR_PORT` | `connector-service` / `8010` | Connector Service gRPC endpoint |
 | `ZQNT_MISSION_AUTONOMY_HOST` / `ZQNT_MISSION_AUTONOMY_PORT` | `mission-autonomy-service` / `8004` | Mission Autonomy Service gRPC endpoint |
 | `ZQNT_PLATFORM_LISTEN_ADDR` | `:9095` | Address this backend's own inbound gRPC server (for `SendCustomCommand`) binds to |
 | `ZQNT_PLATFORM_ADVERTISED_ENDPOINT` | `integration-hub-backend:9095` | What other platform services should dial to reach the above — matters if you rename the container or run behind a different hostname |
-| `ZQNT_ASSET_SN` | `integration-hub` | The serial number Integration Hub registers itself under as its own logical asset |
-| `ZQNT_ASSET_NAME` | `Integration Hub` | Display name for that asset |
+| `ZQNT_INTEGRATION_HUB_ID` | `integration-hub` | The provider id every bridge capability names. Mission Autonomy routes a bridge step to this backend by it. It is not an asset |
 | `ZQNT_REDIS_URL` | `redis://localhost:6379` | Same Redis instance the platform's Java services use — required for `SendCustomCommand` dispatch to actually reach this backend (see [Skills & Capabilities integration](#skills--capabilities-integration)'s discovery-registration note) |
 | `ZQNT_REDIS_PASSWORD` | -- | Redis password; when set it replaces any password in `ZQNT_REDIS_URL`, so the secret can be kept out of the URL |
 
@@ -147,26 +147,39 @@ locally, none of which are part of this platform's own compose file).
 See [Applications & Skills](../concepts/applications-and-skills.md) for the platform-side model
 this integration plugs into.
 
-When `ZQNT_PLATFORM_ENABLED=true`, Integration Hub's backend does three things on startup (and
-again whenever a sink-role connector is created or updated, so this stays current without a
+When `ZQNT_PLATFORM_ENABLED=true`, Integration Hub's backend does two things on startup (and again
+whenever a bridge is created, changed, started, stopped or deleted, so this stays current without a
 restart):
 
-1. **Registers itself as its own logical asset** (serial number `ZQNT_ASSET_SN`) via Connector
-   Service's `RegisterAsset` — the same mechanism every edge adapter uses.
-2. **Mirrors every sink-role connector into the Skill Registry** via Connector Service's
-   `ObserveSkillContract` RPC (`command_id` = `integration-hub.<connectorID>`) — this is what makes a configured sink
-   selectable as an execution step in the Admin Console's Skill graph editor, the same way a DJI
-   dock's or a mavlink drone's custom commands are.
-3. **Runs a small inbound gRPC server implementing the platform's standard `EdgeAdapterService`
-   contract**, the same one every edge adapter implements — but only `SendCustomCommand` is real;
-   every other method (takeoff, go-to, manual control, ...) returns `NOT_IMPLEMENTED`, since
-   Integration Hub doesn't drive hardware. When a Skill execution step invokes
-   `integration-hub.<connectorID>`, this server resolves the connector ID, builds that connector's
-   configured Sink, and writes the step's parameters through it.
+1. **Publishes every enabled bridge as a capability of the bridge's organization** via Connector
+   Service's `zqnt.integration.v3.IntegrationCapabilityService/PublishCapabilities`. Each publish is
+   the complete set: a bridge missing from it is withdrawn, and publishing it again brings it back.
+   A bridge's command id is `integration.bridge.<bridgeId>`. This is what makes a bridge selectable
+   as a step in the Admin Console's Skill and Application graph editors.
+2. **Runs a small inbound gRPC server implementing the platform's standard `EdgeAdapterService`
+   contract**, the same one every edge adapter implements, but only `SendCustomCommand` and
+   `GetCapabilities` are real: every other method (takeoff, go-to, manual control, ...) returns
+   `NOT_IMPLEMENTED`, since Integration Hub doesn't drive hardware. When a step invokes
+   `integration.bridge.<bridgeId>`, this server runs that bridge once: with parameters it writes them
+   through the bridge's sink, without parameters it reads the bridge's source and returns what came
+   through, so a Skill can branch on the answer.
 
-This means: **a Skill can trigger any MQTT or Kafka sink you've configured in Integration Hub as
-one of its execution steps**, using the exact same "invoke a capability" mechanism it already uses
-for edge-adapter custom commands — no new platform-side plumbing was needed to support this.
+### Bridges belong to an organization
+
+- An organization sees and runs only its own bridges. A system admin sees every organization's.
+- A bridge without an organization is visible to system admins only and runs for no organization.
+  Give it an owner before using it in a Skill or Application.
+- Mission Autonomy signs every bridge step with the run's organization, and Integration Hub refuses
+  a bridge of another organization. A run whose organization has not published the bridge is
+  refused before it starts.
+
+### Applications of nothing but bridges run without an asset
+
+A Skill or Application whose steps are all bridges (and platform-run steps that need no asset, such
+as `route.plan_path`, human approvals, waits and conditions) runs without an asset: the platform
+selects none, holds none and never refuses it because a drone is busy. It does not appear under any
+asset in the execution history. An Application that also has a device step (a takeoff, a photo, an
+`EVENT_WAIT` on an asset's event) is given an asset as before.
 
 ### The reverse direction: a Source triggering a Skill
 
@@ -190,26 +203,21 @@ Integration Hub also has a fourth, purpose-built connector type for the opposite
 
 ### Starting an Application from a bridge
 
-A bridge can also start an Application through an **Event Trigger** of type `INTEGRATION`. The trigger names the bridge (`bridgeId`), a condition over the bridge's mapped payload (`telemetry_field`, `comparison_operator`, `comparison_value`), the target Application and Skill, and a cooldown. Wiring it this way keeps the target, condition and cooldown in one place that can be edited, instead of an `applicationId`/`skillId` inside the bridge's connector JSON. The trigger does not need to name an asset: when it fires with none, the platform picks one by policy (see [Which asset an execution runs on](../concepts/applications-and-skills.md#which-asset-an-execution-runs-on)), so a fire panel can report a zone and the nearest capable drone answers. See [Event triggers](../concepts/applications-and-skills.md#event-triggers).
+A bridge can also start an Application through an **Event Trigger** of type `INTEGRATION`. The trigger names the bridge (`bridgeId`), a condition over the bridge's mapped payload (`telemetry_field`, `comparison_operator`, `comparison_value`), the target Application and Skill, and a cooldown. Wiring it this way keeps the target, condition and cooldown in one place that can be edited, instead of an `applicationId`/`skillId` inside the bridge's connector JSON. The trigger does not need to name an asset: an Application of nothing but bridges runs without one, and any other is given one by policy (see [Which asset an execution runs on](../concepts/applications-and-skills.md#which-asset-an-execution-runs-on)), so a fire panel can report a zone and the nearest capable drone answers. The run belongs to the bridge's organization. See [Event triggers](../concepts/applications-and-skills.md#event-triggers).
 
 ### How a Skill actually reaches this backend
 
-`SendCustomCommand` dispatch (Skill execution → this backend's inbound gRPC server) goes through
-mission-autonomy's `GrpcEndpointRouter`, which resolves an asset SN to a gRPC endpoint via two
-Redis lookups: `zqnt:edge-vendor:{sn}` (SN → vendor) and `zqnt:edge-endpoints:{vendor}` (vendor →
-`{endpoint, online}`). This backend writes both directly on startup (`platform/redis_registration.go`,
-using the `ZQNT_REDIS_URL` above) — registered under the `ASSET_VENDOR_ZQNT` value added to
-`AssetVendor` in `asset.proto` specifically for non-hardware bridge assets like this one (every
-other member names a real hardware vendor). Without this Redis registration a Skill can list this
-backend's mirrored SkillContracts but never actually invoke one — found live-testing, not something
-this doc is speculating about.
+A bridge step goes from Mission Autonomy to this backend's inbound gRPC server by the provider id
+the bridge's capability names (`ZQNT_INTEGRATION_HUB_ID`). Mission Autonomy's `GrpcEndpointRouter`
+resolves it with two Redis lookups: `zqnt:edge-vendor:{id}` (id → routing vendor) and
+`zqnt:edge-endpoints:{vendor}` (vendor → `{endpoint, online}`). This backend writes both on startup
+(`platform/redis_registration.go`, using `ZQNT_REDIS_URL` above). Without this registration a Skill
+can list the bridges but never run one.
 
 ### Known limitations (current state)
 
-- Asset/SkillContract registration retries only on the next full restart if Connector Service is
-  unreachable at boot — there's no background retry loop yet.
-- No theft/collision handling beyond what Connector Service's own SkillContract versioning already
-  does.
+- If Connector Service is unreachable at startup, the bridges are published again only on the next
+  change to a bridge or the next restart; there is no background retry loop yet.
 
 ---
 
