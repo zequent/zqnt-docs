@@ -168,7 +168,10 @@ restart):
 
 - An organization sees and runs only its own bridges. A system admin sees every organization's.
 - A bridge without an organization is visible to system admins only and runs for no organization.
-  Give it an owner before using it in a Skill or Application.
+  A bridge a `system_admin` creates has none, because a `system_admin` belongs to no organization.
+  Give it an owner before using it in a Skill or Application, or create it signed in as a user of
+  the organization that will run it.
+- Only a started (enabled) bridge is published. A new bridge is created stopped.
 - Mission Autonomy signs every bridge step with the run's organization, and Integration Hub refuses
   a bridge of another organization. A run whose organization has not published the bridge is
   refused before it starts.
