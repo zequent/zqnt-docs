@@ -34,7 +34,9 @@ You don't need to write any of this by hand — the graph editor validates each 
 
 ## Which asset an execution runs on
 
-An explicit asset serial number on the request always wins. When the request names none, the platform resolves one from the Application, most specific first, and each step runs only if the one before it found nothing:
+A run whose steps need no asset has none. That is a run of nothing but [Integration Hub](../integrations/integration-hub.md#applications-of-nothing-but-bridges-run-without-an-asset) bridges and platform-run steps such as `route.plan_path`, approvals, waits and conditions. No asset is selected or held for it, it is never refused because an asset is busy, and an asset named on the request is ignored. Its idempotency key is unique within its organization. Its safety checks that are about an asset (telemetry, capabilities, launch limits) do not apply; the organization's risk and schema-drift rules do.
+
+For every other run, an explicit asset serial number on the request always wins. When the request names none, the platform resolves one from the Application, most specific first, and each step runs only if the one before it found nothing:
 
 1. **Asset scope** — an `ASSET` scope entry pins the Application to one known asset.
 2. **Theatre scope** — a `THEATRE` scope entry picks among that theatre's assigned assets (online, highest battery).
