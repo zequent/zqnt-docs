@@ -105,6 +105,7 @@ push URL for you, and hands back a playback URL you can put straight into a play
 
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/api/admin-console/streams` | Every stream of your organization that is live right now |
 | `GET` | `/api/admin-console/streams/{sn}` | Current state: is it live, which camera, playback URL |
 | `POST` | `/api/admin-console/streams/{sn}/start` | Start the stream |
 | `POST` | `/api/admin-console/streams/{sn}/stop` | Stop the stream |
@@ -144,9 +145,32 @@ already be running — started automatically, or by another operator.
 Every endpoint needs a signed-in console user. Reading the state is open to any of them; start,
 stop, lens and zoom need the **operator** role.
 
-When the Admin Console API knows the media server's API (`LIVE_STREAM_MEDIA_SERVER_API_URL`),
-`live` reflects whether video is really arriving there, not just whether the device accepted the
-start command.
+When the platform knows the media server's API (`LIVE_STREAM_MEDIA_SERVER_API_URL`, set on the
+Live Data service), `live` reflects whether video is really arriving there, not just whether the
+device accepted the start command.
+
+### Which streams are live
+
+`GET /api/admin-console/streams` lists every stream the media server is receiving for your
+organization right now, whatever started it — the console, a Skill, your application or the device
+on its own. You only see assets on sites you may read.
+
+```json
+[
+  {
+    "assetSn": "1581F5BMD227T00A1234",
+    "assetName": "Dock North — aircraft",
+    "path": "live/1581F5BMD227T00A1234/drone",
+    "since": "2026-10-16T18:55:00Z",
+    "viewers": 2
+  }
+]
+```
+
+For a docked aircraft the asset is the aircraft itself. `viewers` counts every session reading the
+stream (browsers, recorders, the AI adapter). The answer is `503` when the platform has no current
+answer from the media server — no `LIVE_STREAM_MEDIA_SERVER_API_URL`, or the media server is not
+reachable; retry later.
 
 ## Option B — the Client SDK
 
@@ -244,6 +268,29 @@ resp, err := liveDataClient.StartLiveStream(ctx, &devicecontrol.LiveStreamStartC
 })
 ```
 
+### Which streams are live
+
+The same list as `GET /api/admin-console/streams`, for the organization your client credential
+belongs to: the publishing asset, the media server `path`, `since` and `viewers`. When the platform
+has no current answer from the media server the call fails with `UNAVAILABLE`, which is safe to
+retry.
+
+```java
+List<LiveStream> live = zequent.liveStreams().listLiveStreams().get();
+```
+
+```python
+for stream in await client.live_streams.list_live_streams():
+    print(stream.asset.sn, stream.path, stream.since.ToDatetime(), stream.viewers)
+```
+
+```go
+live, err := streams.New(conn).ListLiveStreams(ctx)
+if status.Code(err) == codes.Unavailable {
+    // no current answer from the media server; retry later
+}
+```
+
 ### The start response does not contain a playback URL
 
 Over the SDK, a successful start returns success, `tid`, `sn` and a message — **not** a playback
@@ -294,7 +341,7 @@ string.
 | --- | --- | --- |
 | `LIVE_STREAM_SERVER_URL` | Admin Console API | RTMP base the device publishes to, e.g. `rtmp://media.example.com/live` |
 | `LIVE_WHEP_BASE_URL` | Admin Console API | HTTP base your player pulls from, e.g. `https://media.example.com` |
-| `LIVE_STREAM_MEDIA_SERVER_API_URL` | Admin Console API | Optional. The media server's API, used to check that a stream is really live |
+| `LIVE_STREAM_MEDIA_SERVER_API_URL` | Live Data service | Optional. The media server's API, used to check that a stream is really live and to list live streams |
 | `LIVE_STREAM_AUTO_START_ENABLED` | Admin Console API | `true` for platform auto-start mode (default `false`) |
 | `LIVE_STREAM_AUTH_ENABLED` | Admin Console API | `true` when the media server authenticates (default `false`) — see below |
 | `LIVE_STREAM_AUTH_HOOK_SECRET` | Admin Console API | Secret the media server must send to the authentication hook |
