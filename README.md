@@ -76,6 +76,7 @@ object of params — no typed method per command. These pages describe preview b
 | … from Go | [Commands (Go)](client-sdk/COMMANDS_GO-3.0.md) |
 | Fly an asset by hand (stick input) and watch live telemetry on 3.0 | the "Manual control" and "Live telemetry" sections of the Commands pages |
 | Plan the move of an installation (platform, adapters, clients) to 3.0: breaking changes, what keeps working, upgrade order | [Upgrading the platform to 3.0](concepts/upgrading-platform-to-3.0.md) |
+| Keep the platform's secrets in OpenBao, sign people in through Keycloak, rotate keys, back up, connect an organization's Microsoft Entra ID (3.0) | [Secrets and sign-in](admin/secrets-and-sign-in.md) |
 | Build an adapter on the 3.0 Edge SDK: command registry, v3 commands and events, telemetry catalog, conformance kit | [Java](edge-sdk/edge-sdk-adapter-3.0.md) · [Python](edge-sdk/edge-sdk-python-adapter-3.0.md) · [Go](edge-sdk/edge-sdk-go-adapter-3.0.md) |
 
 ## Platform Service Images

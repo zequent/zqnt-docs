@@ -96,6 +96,14 @@ Also new on 3.0: calls that name no organization are counted and logged (metric
 `zqnt_tenancy_organization_fallback_total`); setting `zqnt.tenancy.organization-fallback=refuse`
 refuses them instead of placing them in the default organization (default: `warn`).
 
+## Secrets and sign-in
+
+3.0 can keep every secret of the platform in OpenBao and sign every person in through Keycloak,
+with single sign-on per organization (for example Microsoft Entra ID). Both are optional in the
+preview. Password users move into Keycloak with their existing passwords; people who signed in
+through their organization's single sign-on on 2.0 keep their accounts. See
+[Secrets and sign-in](../admin/secrets-and-sign-in.md).
+
 ## What must be upgraded together
 
 - **The core services** — connector, live-data, remote-control, mission-autonomy and admin-console —
