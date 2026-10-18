@@ -98,6 +98,24 @@ The interface also carries scheduler methods (`createScheduler`, `updateSchedule
 (`PERMISSION_DENIED`): schedules and event triggers are managed in the Admin Console — see
 [Scheduled triggers](../concepts/applications-and-skills.md#scheduled-triggers).
 
+## Simulating an Application (3.0 preview)
+
+On a 3.0 platform, `zequent.simulations()` (`com.zqnt.sdk.client.simulation.application.Simulations`)
+runs an Application on a virtual fleet with mock data, and nothing reaches a device. It uses the
+same Mission Autonomy connection. Types are the generated `com.zqnt.protos.application_simulation.v3`
+messages; every future fails with a `CommandException` carrying the gRPC status. Guide and examples:
+[Simulating an Application](../client-sdk/SIMULATION-3.0.md).
+
+| Method | Returns | Purpose |
+| --- | --- | --- |
+| `startSimulation(StartSimulationRequest)` | `StartSimulationResponse` | Start a simulated run; completes once it is running, with `executionId` and `status`. A request without `context.idempotencyKey` gets a new one |
+| `simulationTrace(String executionId)` | `SimulationTrace` | The path the run took so far, or in full once it has ended |
+| `cancelSimulation(String executionId)` | `SimulationStatus` | Stop a simulated run; `CANCELLING` while its commands stop |
+| `awaitSimulation(String executionId, Duration interval, Duration timeout)` | `SimulationTrace` | Poll the trace until `SUCCEEDED`, `FAILED`, `CANCELLED` or `TIMED_OUT`. `timeout` `null` waits without a limit; when it elapses first the future fails with category `TIMEOUT` and the run keeps going |
+| `simulate(StartSimulationRequest, Duration interval, Duration timeout)` | `SimulationTrace` | `startSimulation`, then `awaitSimulation` |
+
+`Simulations.isFinal(SimulationStatus)` says whether a status is final.
+
 ## See also
 
 - [Applications & Skills](../concepts/applications-and-skills.md) — narrative introduction and

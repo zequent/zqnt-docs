@@ -81,6 +81,23 @@ takes its TIMEOUT path — see [Applications & Skills](../concepts/applications-
 | --- | --- | --- |
 | `ResolveExecutionConfig(ctx, execContext *execution.ExecutionConfigContextProto, keys []string)` | `*execution.ResolvedExecutionConfigProtoDTO` | The effective configuration values for a context (asset, theatre, ...) and where each came from. `keys` empty resolves every known key |
 
+## Simulating an Application (3.0 preview)
+
+On a 3.0 platform, package `simulation` of the 3.0 Go SDK
+(`github.com/zequent/zqnt-sdk-go/v3/client/simulation`, `simulation.New(conn)` on a connection to
+mission-autonomy, e.g. `cfg.Dial(cfg.MissionAutonomy)`) runs an Application on a virtual fleet with
+mock data, and nothing reaches a device. Types are the generated
+`github.com/zequent/zqnt-api/go/v3/gen/zqnt/application_simulation/v3` messages; errors keep their
+gRPC status. Guide and examples: [Simulating an Application](../client-sdk/SIMULATION-3.0.md).
+
+| Method | Returns | Purpose |
+| --- | --- | --- |
+| `StartSimulation(ctx, req *simulationv3.StartSimulationRequest)` | `*simulationv3.StartSimulationResponse` | Start a simulated run; returns once it is running, with its execution id and status. A request without `context.idempotency_key` gets a new one; `req` is not changed |
+| `SimulationTrace(ctx, executionID string)` | `*simulationv3.SimulationTrace` | The path the run took so far, or in full once it has ended |
+| `CancelSimulation(ctx, executionID string)` | `simulationv3.SimulationStatus` | Stop a simulated run; `CANCELLING` while its commands stop |
+| `WaitForSimulation(ctx, executionID string, interval, timeout time.Duration)` | `*simulationv3.SimulationTrace` | Poll the trace until the run has ended (`simulation.Final`). `timeout` `0` = no limit beyond `ctx`; when it elapses first the error matches `simulation.ErrWaitTimedOut` and the run keeps going |
+| `Simulate(ctx, req, interval, timeout time.Duration)` | `*simulationv3.SimulationTrace` | `StartSimulation`, then `WaitForSimulation` |
+
 ## Example
 
 ```go
