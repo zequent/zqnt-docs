@@ -45,13 +45,15 @@ signing key is kept in any service: tokens and credentials are signed inside Ope
 | `infrastructure/terrain` | `bearer-token` | mission-autonomy |
 | `infrastructure/simulator-control` | `token` | admin-console |
 | `infrastructure/grafana` | `admin-password` | admin-console |
-| `platform/peppers/webhook-tokens`, `platform/peppers/claim-codes`, `platform/peppers/stream-keys` | `value` | the core services |
+| `platform/peppers/webhook-tokens`, `platform/peppers/claim-codes`, `platform/peppers/stream-keys`, `platform/peppers/agent-pseudonyms` | `value` | the core services |
 | `platform/admin-console/keycloak` | `client-secret` | admin-console (client `zqnt-admin-console`) |
 | `platform/edge-adapter-dji/cloud-api` | `app-key`, `app-id`, `app-license` | the DJI adapter |
 | `organizations/<organization id>/integration/<id>` | the connection's credentials | the Integration Hub |
 
 The peppers are the server-side keys under which webhook tokens, asset claim codes and operator
-stream keys are stored as HMAC-SHA-256 hashes. No stored token, code or key can be read back.
+stream keys are stored as HMAC-SHA-256 hashes. No stored token, code or key can be read back. The
+`agent-pseudonyms` pepper keys the placeholders that replace people's names and e-mail addresses in
+what the AI assistant sees when an organization does not share names with the model.
 
 ### Signing and encryption keys (Transit, mount `zqnt-transit/`)
 

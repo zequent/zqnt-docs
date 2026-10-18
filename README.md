@@ -158,6 +158,7 @@ See [Client SDK Configuration](client-sdk/CONFIGURATION.md) for the full `.env` 
 4. **Edge credentials** — one per adapter and for the simulator (`<NAME>_EDGE_TOKEN` in `.env.customer`), issued after the platform is up in the Admin Console (Edge credentials) or offline with `core/scripts/mint-edge-credential.py`. The compose file passes the service public key to every adapter as `ZQNT_PLATFORM_PUBLIC_KEY` and keeps the platform's private keys and passwords away from them.
 5. **Stream-auth hook secret** — `LIVE_STREAM_AUTH_HOOK_SECRET`, the same value in your media server's `authHTTPAddress` (only with a media server that authenticates).
 6. **Stream-key pepper** — `LIVE_STREAM_KEYS_PEPPER`, optional, set once and never changed.
+7. **AI assistant pepper** — `ZQNT_PEPPER_AGENT_PSEUDONYMS` (`openssl rand -hex 32`), required by the admin console; set once.
 
 `LICENSING_PUBLIC_KEY` (needed on 1.3) is no longer needed: the services trust the Zequent license hub's key compiled into them.
 
