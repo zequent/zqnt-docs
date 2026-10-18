@@ -10,7 +10,7 @@
 #
 # Start it with the env file used for interpolation as well, so the required
 # secrets below (POSTGRES_PASSWORD, REDIS_PASSWORD, SERVICE_AUTH_PRIVATE_KEY,
-# SERVICE_AUTH_PUBLIC_KEY, the three peppers) are checked before anything starts. Each edge
+# SERVICE_AUTH_PUBLIC_KEY, the four peppers) are checked before anything starts. Each edge
 # adapter / the simulator also needs its own edge credential
 # (<NAME>_EDGE_TOKEN in .env.customer), issued once the platform is up:
 #
@@ -70,6 +70,7 @@ x-public-env: &public-env
     LIVE_STREAM_KEYS_PEPPER: ""
     ZQNT_PEPPER_WEBHOOK_TOKENS: ""
     ZQNT_PEPPER_CLAIM_CODES: ""
+    ZQNT_PEPPER_AGENT_PSEUDONYMS: ""
     ZQNT_PLATFORM_PUBLIC_KEY: ${SERVICE_AUTH_PUBLIC_KEY:?set SERVICE_AUTH_PUBLIC_KEY in .env.customer and start with --env-file .env.customer}
     # The service-key set admin-console publishes; tokens naming a key id are
     # checked against it, tokens without one against ZQNT_PLATFORM_PUBLIC_KEY.
@@ -162,9 +163,11 @@ services:
     image: ghcr.io/zequent/admin-console-service:1.3.2
     environment:
       <<: *zequent-environment
-      # Operator stream keys are stored as HMAC under this; admin-console refuses
-      # to start without it.
+      # Operator stream keys are stored as HMAC under this, and the AI assistant's
+      # placeholders for people are keyed by the other; admin-console refuses to
+      # start without them.
       LIVE_STREAM_KEYS_PEPPER: ${LIVE_STREAM_KEYS_PEPPER:?set LIVE_STREAM_KEYS_PEPPER in .env.customer and start with --env-file .env.customer}
+      ZQNT_PEPPER_AGENT_PSEUDONYMS: ${ZQNT_PEPPER_AGENT_PSEUDONYMS:?set ZQNT_PEPPER_AGENT_PSEUDONYMS in .env.customer and start with --env-file .env.customer}
     pull_policy: always
     depends_on:
       - connector-service
@@ -276,6 +279,7 @@ services:
       SEED_PEPPER_WEBHOOK_TOKENS: ${ZQNT_PEPPER_WEBHOOK_TOKENS:-}
       SEED_PEPPER_CLAIM_CODES: ${ZQNT_PEPPER_CLAIM_CODES:-}
       SEED_PEPPER_STREAM_KEYS: ${LIVE_STREAM_KEYS_PEPPER:-}
+      SEED_PEPPER_AGENT_PSEUDONYMS: ${ZQNT_PEPPER_AGENT_PSEUDONYMS:-}
       SEED_DJI_APP_KEY: ${DJI_APP_KEY:-}
       SEED_DJI_APP_ID: ${DJI_APP_ID:-}
       SEED_DJI_APP_LICENSE: ${DJI_APP_LICENSE:-}
@@ -529,7 +533,7 @@ configs:
         echo "openbao-init: seeded $$path"
       }
 
-      for pepper in webhook-tokens claim-codes stream-keys; do
+      for pepper in webhook-tokens claim-codes stream-keys agent-pseudonyms; do
         variable=SEED_PEPPER_$$(echo "$$pepper" | tr 'a-z-' 'A-Z_')
         eval "[ -n \"\$${$$variable:-}\" ]" || eval "$$variable=\$$(head -c 32 /dev/urandom | base64 | tr -d '\\n')"
         seed "platform/peppers/$$pepper" "value=$$variable"
