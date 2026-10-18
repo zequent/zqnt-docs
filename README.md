@@ -75,6 +75,7 @@ object of params — no typed method per command. These pages describe preview b
 | … from Python | [Commands (Python)](client-sdk/COMMANDS_PYTHON-3.0.md) |
 | … from Go | [Commands (Go)](client-sdk/COMMANDS_GO-3.0.md) |
 | Fly an asset by hand (stick input) and watch live telemetry on 3.0 | the "Manual control" and "Live telemetry" sections of the Commands pages |
+| Simulate an Application before it flies — scenarios per node, a virtual fleet, fast-forward — and read which way it went through its graph, from Java, Python or Go; "Simulator first" for the AI assistant's versions | [Simulating an Application](client-sdk/SIMULATION-3.0.md) · [concept](concepts/applications-and-skills.md#simulating-an-application-30-preview) |
 | Plan the move of an installation (platform, adapters, clients) to 3.0: breaking changes, what keeps working, upgrade order | [Upgrading the platform to 3.0](concepts/upgrading-platform-to-3.0.md) |
 | Decide which commands wait for a person's approval — per risk level and per operator, AI agent and automation, as system default, per organization and per site; hard guards, loosening safeguards (3.0) | [Approval rules](concepts/approval-rules-3.0.md) |
 | Keep the platform's secrets in OpenBao, sign people in through Keycloak, rotate keys, back up, connect an organization's Microsoft Entra ID (3.0) | [Secrets and sign-in](admin/secrets-and-sign-in.md) |

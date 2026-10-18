@@ -175,6 +175,94 @@ On an execution's page, **Live View** shows the asset on a map and marks the ste
 
 A Human Approval node parks the execution. The status stays `RUNNING`, and the platform publishes a `BLOCKED` event. Who may decide depends on the node's **approval group**. Without a group, any signed-in user can approve or reject. With a group, only users who hold a role of that exact name, or a system admin, can decide; the platform refuses anyone else, and the console shows them **Waiting for approval by `<group>`** instead of the buttons. The group is matched against the platform roles (`org-admin`, `operator`, `approver`, `viewer`), exactly and without the usual role ladder: a group of `approver` lets approvers decide, not org-admins. Any other name means only a system admin can decide. Decide from the toast (it stays until someone decides), the header's "Approval needed" indicator, or the execution page; the toast closes everywhere once one person has decided. If the node has a timeout and nobody answers, it follows its `TIMEOUT` edges, or its failure edges when it has none. A failed node whose failure branch ran to completion no longer marks the whole execution failed.
 
+## Simulating an Application (3.0 preview)
+
+> **Preview.** Simulations are part of Zequent **3.0**, which is not released yet; they need a
+> platform that runs 3.0.
+
+A simulation runs an Application before it flies, with mock data instead of devices. It is not the
+fleet simulator: no simulated device is started, and no adapter is involved.
+
+- **Same engine.** The run goes through the platform's own execution engine: graph, mappings,
+  branches, joins, approvals, FAILURE and TIMEOUT edges, asset selection, policies, sites and safety
+  rules all behave as in a real run. Only the last step of dispatch differs: no command leaves the
+  platform. Each command is answered from its published contract — an output generated from its
+  output schema, completing on the reply or later, as the contract says — or from your scenario.
+- **Nothing reaches a device.** A simulated run never holds, commands or changes a real asset, and
+  never takes an asset over from another run.
+- **Scenarios per node.** By default every command succeeds after 10 seconds of simulated time,
+  and every approval is approved. For a node, or for every node sending one command, you can set
+  instead: success, failure with an error code (for example `flight.not_airborne`, which takes the node's
+  FAILURE edges), timeout (the command never answers, so the node takes its TIMEOUT edges), a delay,
+  fixed output values that drive a branch (for example a battery of 18 %), and for a Human Approval
+  approve, reject (a FAILURE) or no answer (a TIMEOUT). An Event Wait's scenario says when its event
+  arrives and with which payload; an AI node answers from its scenario or from its output schema, and
+  the AI assistant is never asked.
+- **A virtual fleet.** The platform chooses the run's asset from the simulation's own fleet: assets
+  you make up (type, published commands, position, battery, site, online), or copies of your
+  organization's real assets as the platform last heard of them — nothing is sent to the original.
+  Without a fleet, the simulation uses a copy of every aircraft and dock of the organization. Each
+  virtual asset runs under a serial number of its own, `VIRTUAL-<run>-<sn>`. An Application pinned to
+  a real asset runs on that asset's copy.
+- **Fast-forward or real time.** By default waits, timeouts and command durations are skipped: a
+  30-minute flight is simulated in moments, and the trace still shows the flight's own timings. A
+  simulation can run in real time instead, and can be cancelled while it runs.
+- **Marked as a simulation.** A simulated run is kept with the real ones and marked as a simulation
+  in the history and the audit log (mode `SIMULATION`). It is left out of execution statistics and
+  does not count against license limits. In the Admin Console API, the executions list filters by
+  mode: `GET /api/admin-console/applications/executions?mode=SIMULATION` (or `LIVE`; without `mode`
+  both).
+
+**Permissions.** Starting and cancelling a simulation need `executions:simulate`, reading its trace
+`executions:read`. A person needs them organization-wide or for the site of the run: the operator
+and organization admin roles have both, viewers and approvers can read traces. A client credential
+has both for its own organization. Every call acts only on your organization's Applications and
+runs; another organization's Application or run is not found.
+
+**Starting one.** From your own code through the Client SDK — see
+[Simulating an Application](../client-sdk/SIMULATION-3.0.md) for Java, Python and Go. The Admin
+Console API offers the same as `POST /api/admin-console/applications/executions/simulations`
+(permission `executions:simulate`; a request without simulation settings uses the defaults above).
+
+### Reading the trace
+
+The trace is the path the run took through its graph, in the order its nodes started. Read it while
+the run is going or once it has ended; for a simulation every timing in it is simulated time. For
+each node it shows:
+
+- its status and attempt, and the asset that performed it — or the asset it was dispatched to, and
+  why;
+- what went in (the command's parameters after mapping) and what came out, or the error;
+- when it started, relative to the run's start, and how long it took;
+- **why the run went on**: each edge taken, with its type (normal, success, failure, timeout,
+  compensation) and a reason in words such as `condition true`, `failed: flight.not_airborne` or
+  `timed out`;
+- for a simulation, **what decided its outcome**: your scenario, or an output generated from the
+  command's output schema.
+
+Nodes that never ran — the branches not taken — are listed separately, and the trace also names the
+asset the platform chose and the fleet under the serial numbers the run used. The Admin Console API
+serves the trace of any run, live or simulated, as `GET
+/api/admin-console/applications/executions/{id}/trace` (permission `executions:read`). The scenario,
+clock and outcome details of a simulation are kept for seven days.
+
+### Simulator first for the AI assistant
+
+An organization can require that Application versions the AI assistant built prove themselves in a
+simulation before they run on a real asset. An organization admin switches this on under **Manage →
+AI Assistant → Simulator first** (permission `agent:configure`); it applies to the whole organization
+and is off until someone switches it on. While it is on, a version the assistant saved or changed
+runs on a real asset only after one run of that version succeeded as a simulation or on an asset of
+the platform's fleet simulator. Until then:
+
+- a start on a real asset is refused (`FAILED_PRECONDITION`) with a message naming the version and
+  what to do;
+- a schedule's firing is recorded as `SKIPPED` with that reason, and an event trigger does not start
+  the run;
+- simulations, and runs on the fleet simulator's assets, start as usual.
+
+Versions people saved are not affected.
+
 ## Managing Applications
 
 Applications themselves — creating, versioning, and promoting them between environments (`DEVELOPMENT` / `STAGING` / `PRODUCTION`) — are managed from the Admin Console, and are also available programmatically for CI/CD-style deployment pipelines:
@@ -204,6 +292,8 @@ Most integrations only need the read/execute side (running Skills, checking thei
 - [Go Client SDK Quickstart](../client-sdk/QUICKSTART_GO.md)
 - [Client SDK — Mission Autonomy Reference (Java)](../api-reference/client-sdk-mission-autonomy.md)
 - [Client SDK — Mission Autonomy Reference (Python)](../api-reference/client-sdk-mission-autonomy-python.md)
+- [Simulating an Application](../client-sdk/SIMULATION-3.0.md) — simulations and traces from the
+  Java, Python and Go Client SDKs (3.0 preview)
 - [Edge SDK — Connector Reference (Java)](../api-reference/edge-sdk-connector-reference.md) — the
   Skill Registry self-reporting API (`observeSkillContract` and friends) an edge adapter uses to push its
   own command contracts, beyond what it already reports live via `getCapabilities`
