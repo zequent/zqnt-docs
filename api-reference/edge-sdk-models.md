@@ -311,7 +311,7 @@ Top-level wrapper for pushing telemetry data to the Live Data Service.
 | `tid` | `String` | Transaction identifier |
 | `sn` | `String` | Device serial number |
 | `assetId` | `String` | Platform asset identifier |
-| `timestamp` | `LocalDateTime` | When the telemetry was recorded |
+| `timestamp` | `Instant` | When the telemetry was recorded (UTC) |
 | `telemetry` | `TelemetryData` | The actual telemetry payload — see below |
 
 Supports the `@Builder` pattern:
@@ -320,7 +320,7 @@ Supports the `@Builder` pattern:
 TelemetryRequestData data = TelemetryRequestData.builder()
     .sn("DEVICE_SN")
     .tid(UUID.randomUUID().toString())
-    .timestamp(LocalDateTime.now())
+    .timestamp(Instant.now())
     .telemetry(telemetryData)
     .build();
 ```
@@ -338,7 +338,7 @@ Unified asset and sub-asset telemetry. Exactly one of `asset` / `subAsset` must 
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | `String` | Telemetry identifier (required) |
-| `timestamp` | `LocalDateTime` | Measurement time (required) |
+| `timestamp` | `Instant` | Measurement time, UTC (required) |
 | `sn` | `String` | Device serial number (required) |
 | `latitude` | `Double` | GPS latitude |
 | `longitude` | `Double` | GPS longitude |
@@ -354,7 +354,7 @@ Unified asset and sub-asset telemetry. Exactly one of `asset` / `subAsset` must 
 ```java
 TelemetryData telemetry = TelemetryData.builder()
     .id(UUID.randomUUID().toString())
-    .timestamp(LocalDateTime.now())
+    .timestamp(Instant.now())
     .sn("DOCK-1")          // or a standalone drone's own SN, e.g. "SIM-DRONE-001"
     .latitude(47.3769)
     .longitude(8.5417)
@@ -455,7 +455,7 @@ Telemetry specific to a sub-asset (drone, vehicle). Nested under `TelemetryData.
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | `String` | Payload identifier |
-| `timestamp` | `LocalDateTime` | Measurement time |
+| `timestamp` | `Instant` | Measurement time (UTC) |
 | `name` | `String` | Payload name |
 | `cameraData` | `CameraData` | Camera state |
 | `rangeFinderData` | `RangeFinderData` | Rangefinder data |
@@ -468,7 +468,7 @@ Telemetry specific to a sub-asset (drone, vehicle). Nested under `TelemetryData.
 | `componentId` | `String` | Component identifier |
 | `externalId` | `String` | Vendor-assigned identifier |
 | `kind` | `String` | Component kind (e.g. `"camera"`) |
-| `timestamp` | `LocalDateTime` | Measurement time |
+| `timestamp` | `Instant` | Measurement time (UTC) |
 | `cameraData` | `CameraData` | Camera state |
 | `rangeFinderData` | `RangeFinderData` | Rangefinder data |
 | `sensorData` | `SensorData` | Sensor readings |
