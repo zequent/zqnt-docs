@@ -14,10 +14,9 @@ This page describes a preview; details can change until 3.0 is released.
   Integration](integration-hub.md#backend----zequent-platform-integration-optional)). It reads the
   telemetry from the Live Data Service at `ZQNT_LIVE_DATA_HOST` / `ZQNT_LIVE_DATA_PORT` (default
   `live-data-service` / `8003`).
-- Create the connector signed in as a user of the organization whose assets you want to forward. A
-  telemetry connector always belongs to an organization and only ever sends that organization's
-  assets. A connector without an organization (for example one a system admin created) shows an
-  error and sends nothing.
+- A telemetry connector belongs to one organization and only ever sends that organization's assets.
+  Create it signed in as a user of that organization; a system admin picks the organization in the
+  form.
 
 ## Settings
 
@@ -41,30 +40,30 @@ The fields you can pick:
 | `horizontalSpeed` | m/s |
 | `verticalSpeed` | m/s, positive up |
 | `batteryPercent` | Battery level in percent |
-| `details` | Every device-specific value the asset reports, such as wind speed on a dock |
-| `details.<key>` | One device-specific value, for example `details.wind_speed` |
+| `details` | Every device-specific value the asset reports, such as the wind speed |
+| `details.<key>` | One device-specific value, for example `details.wind.speed` |
 
-`assetSn`, `assetId` and `observedAt` are always sent, whatever you pick. A value the asset did not
-report is left out of the message rather than sent as zero.
+`assetSn` and `observedAt` are always sent, whatever you pick. A value the asset did not report is
+left out of the message rather than sent as zero.
 
 ## What a message looks like
 
-Each message is one sample of one asset:
+Each message is one sample of one asset, here with no fields selected:
 
 ```json
 {
   "assetSn": "DRONE-7",
-  "assetId": "6f1c2a0e-3b7d-4c55-9f0e-2d8a1b4c7e90",
-  "observedAt": "2026-10-19T09:41:07.250Z",
-  "position": { "latitude": 52.5201, "longitude": 13.4049, "altitude": 81.3 },
-  "relativeAltitude": 40.0,
-  "headingDegrees": 271.5,
-  "batteryPercent": 76
+  "observedAt": "2026-10-21T19:53:17.574Z",
+  "position": { "latitude": 52.5232, "longitude": 13.4045, "altitude": 74 },
+  "relativeAltitude": 40,
+  "headingDegrees": 57.4,
+  "batteryPercent": 76,
+  "details": { "wind.speed": 3.4 }
 }
 ```
 
-A bridge with a mapping that has no rules passes this through unchanged. A mapping with rules sends
-only the fields it maps, so map `assetSn` too if the sink needs it, for example in an MQTT topic.
+A bridge without a mapping passes this through unchanged. A mapping sends only the fields it maps,
+so map `assetSn` too if the sink needs it, for example in an MQTT topic.
 
 ## Example: selected drones to MQTT, once per second
 
@@ -88,11 +87,9 @@ drone per second, on a topic per drone.
    message's serial number, so `DRONE-7` publishes to `zequent/telemetry/DRONE-7`. Store the broker's
    username and password in a vault and select it in the connector form.
 
-3. **Mapping.** Create a mapping named `pass-through` and add no rules.
-
-4. **Bridge.** Under **Bridges**, create a bridge from `fleet-telemetry` to `control-room-mqtt` with
-   the `pass-through` mapping and start it. A telemetry source pushes its messages, so the bridge
-   has no poll interval.
+3. **Bridge.** Under **Bridges**, create a bridge from `fleet-telemetry` to `control-room-mqtt`,
+   leave **Mapping** at "No mapping — pass the source payload through" and start it. A telemetry
+   source pushes its messages, so the bridge has no poll interval.
 
 Messages arrive on the broker as soon as the drones report telemetry.
 
@@ -102,6 +99,8 @@ Messages arrive on the broker as soon as the drones report telemetry.
   of another organization's asset sends nothing.
 - The minimum interval limits how often a message is sent; it does not create messages. An asset that
   reports nothing (switched off, out of range) sends nothing.
+- On Kafka, set the sink's message key to `{assetSn}`: the messages of one asset then stay on one
+  partition, in order.
 - If the connection to the platform drops, the source reconnects by itself, waiting a little longer
   after each failed attempt (up to 30 seconds). Messages from the time it was disconnected are not
   sent afterwards.
