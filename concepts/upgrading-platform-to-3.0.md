@@ -98,10 +98,12 @@ refuses them instead of placing them in the default organization (default: `warn
 
 ## Secrets and sign-in
 
-3.0 can keep every secret of the platform in OpenBao and sign every person in through Keycloak,
-with single sign-on per organization (for example Microsoft Entra ID). Both are optional in the
-preview. Password users move into Keycloak with their existing passwords; people who signed in
-through their organization's single sign-on on 2.0 keep their accounts. See
+3.0 signs every person in through Keycloak, with single sign-on per organization (for example
+Microsoft Entra ID); the platform's own password login, refresh cookie and password reset are gone.
+Password users move into Keycloak with their existing passwords; people who signed in through their
+organization's single sign-on on 2.0 keep their accounts. The platform's secrets live in OpenBao;
+the Integration Hub keeps its connection credentials only there and moves the ones 2.0 encrypted
+into its database on its first start (set `VAULT_ENCRYPTION_KEY` for that start). See
 [Secrets and sign-in](../admin/secrets-and-sign-in.md).
 
 ## What must be upgraded together
