@@ -54,6 +54,11 @@ all. It plays no role in a console-embedded one.
 
 ## Environment Variables
 
+> **3.0 (preview).** The Hub keeps credentials only in OpenBao (`OPENBAO_ADDR` plus a login is
+> required) and accepts Keycloak sign-ins (`ZQNT_AUTH_KEYCLOAK_ISSUER`); `AUTH_PUBLIC_KEY` only
+> checks the AI assistant's calls. `VAULT_ENCRYPTION_KEY` is needed once, for the first start after
+> the upgrade. See [Secrets and sign-in](../admin/secrets-and-sign-in.md#integration-hub-credentials).
+
 ### Backend -- Required
 
 | Variable | Description |
