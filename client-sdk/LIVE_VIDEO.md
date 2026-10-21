@@ -109,8 +109,8 @@ push URL for you, and hands back a playback URL you can put straight into a play
 | `GET` | `/api/admin-console/streams/{sn}` | Current state: is it live, which camera, playback URL |
 | `POST` | `/api/admin-console/streams/{sn}/start` | Start the stream |
 | `POST` | `/api/admin-console/streams/{sn}/stop` | Stop the stream |
-| `POST` | `/api/admin-console/streams/{sn}/lens` | Switch the active lens |
-| `POST` | `/api/admin-console/streams/{sn}/zoom` | Change zoom |
+
+Lens and zoom are not stream endpoints: they are camera commands, see [Camera control](#camera-control).
 
 Start a stream, letting the platform choose the camera:
 
@@ -142,8 +142,8 @@ The response describes the command, and for a successful start it carries the pl
 `assetType` and `startedAt`. It is the right call to make when a page loads, because a stream may
 already be running — started automatically, or by another operator.
 
-Every endpoint needs a signed-in console user. Reading the state is open to any of them; start,
-stop, lens and zoom need the **operator** role.
+Every endpoint needs a signed-in console user. Reading the state is open to any of them; start and
+stop need the **operator** role.
 
 When the platform knows the media server's API (`LIVE_STREAM_MEDIA_SERVER_API_URL`, set on the
 Live Data service), `live` reflects whether video is really arriving there, not just whether the
@@ -303,15 +303,29 @@ server's WHEP endpoint, query string preserved — or call
 
 ## Camera control
 
-Available alongside the stream, for DJI:
+Lens and zoom are commands the asset publishes, like every other command:
+`camera.change_lens` and `camera.change_zoom`. Run them through the generic asset command
+endpoint, `POST /api/admin-console/assets/{sn}/commands/{commandId}`, or the client SDK's
+`executeCommand` (`execute_command` in Python, `ExecuteCommand` in Go). An asset that has not
+published the command refuses it with `command.not_supported`, and nothing reaches the device.
 
-| Control | Admin Console API | Client SDK |
+| Control | Command | Parameters |
 | --- | --- | --- |
-| Switch lens | `POST /streams/{sn}/lens` with `{"lens": "wide"}` | `liveData().changeCameraLens(...)` |
-| Zoom | `POST /streams/{sn}/zoom` with `{"lens": "zoom", "zoom": 5}` | `liveData().changeCameraZoom(...)` |
-| Split-screen | — | `remoteControl().liveStreamSplitScreen(...)` |
+| Switch lens | `camera.change_lens` | `lens`; `videoId` optional, defaults to the running stream |
+| Zoom | `camera.change_zoom` | `lens`, `zoom` |
+| Split-screen | `stream.split_screen` | `enabled` |
 
-Valid `lens` values are `wide`, `zoom` and `ir`.
+```bash
+curl -X POST http://admin-console:8005/api/admin-console/assets/1581F5BMD227T00A1234/commands/camera.change_lens \
+     -H 'Content-Type: application/json' \
+     -d '{"params": {"lens": "ir"}}'
+```
+
+The allowed values and limits are not fixed by the platform: they are in the command's input
+schema, which the asset publishes (`GET /api/admin-console/assets/{sn}/capabilities`, or
+`listCapabilities` in the client SDK). On DJI, `lens` is one of `wide`, `zoom` and `ir`;
+`camera.change_zoom` takes `zoom` or `ir` and a factor from 2 to 200, and the camera refuses a
+factor beyond its own lens. A lens switch needs a running stream.
 
 **Split-screen needs a running stream on the thermal lens.** The command switches the camera to `ir`
 first and then enables the split view; with no stream running it answers that there is no active
