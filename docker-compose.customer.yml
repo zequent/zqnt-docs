@@ -10,11 +10,15 @@
 #
 # Start it with the env file used for interpolation as well, so the required
 # secrets below (POSTGRES_PASSWORD, REDIS_PASSWORD, SERVICE_AUTH_PRIVATE_KEY,
-# SERVICE_AUTH_PUBLIC_KEY) are checked before anything starts. Each edge
+# SERVICE_AUTH_PUBLIC_KEY, the four peppers) are checked before anything starts. Each edge
 # adapter / the simulator also needs its own edge credential
 # (<NAME>_EDGE_TOKEN in .env.customer), issued once the platform is up:
 #
 #   docker compose --env-file .env.customer -f docker-compose.customer.yml up -d
+#
+# OpenBao (secrets) and Keycloak (sign-in) are optional for now: add
+# --profile openbao --profile keycloak to start them (needs Docker Compose
+# 2.23 or newer for the inline configs at the end of this file).
 #
 # Only the dashboard (3001) and the admin-console API (8005) are published
 # (plus, opt-in, the SAPIENT sensor port -- see edge-sapient). Every other
@@ -35,10 +39,10 @@ name: zqnt-platform-customer
 x-zequent-env: &zequent-env
   env_file:
     - .env.customer
-  environment:
+  environment: &zequent-environment
     QUARKUS_PROFILE: prod,docker
-    # Read by every Quarkus image, including 1.3.x ones that predate the
-    # REDIS_PASSWORD property.
+    # Read by every Quarkus image, including 1.3.x ones (like the tags pinned
+    # below) that predate the REDIS_PASSWORD property.
     QUARKUS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.customer and start with --env-file .env.customer}
     # Service identity: every internal gRPC call carries a service token signed
     # with this Ed25519 pair (one per installation, separate from AUTH_*). A
@@ -64,12 +68,19 @@ x-public-env: &public-env
     POSTGRES_PASSWORD: ""
     LIVE_STREAM_AUTH_HOOK_SECRET: ""
     LIVE_STREAM_KEYS_PEPPER: ""
+    ZQNT_PEPPER_WEBHOOK_TOKENS: ""
+    ZQNT_PEPPER_CLAIM_CODES: ""
+    ZQNT_PEPPER_AGENT_PSEUDONYMS: ""
     ZQNT_PLATFORM_PUBLIC_KEY: ${SERVICE_AUTH_PUBLIC_KEY:?set SERVICE_AUTH_PUBLIC_KEY in .env.customer and start with --env-file .env.customer}
+    # The service-key set admin-console publishes; tokens naming a key id are
+    # checked against it, tokens without one against ZQNT_PLATFORM_PUBLIC_KEY.
+    ZQNT_PLATFORM_KEYS_URL: http://admin-console-service:8005/api/admin-console/auth/service-keys
 
 services:
   # --- Infrastructure --------------------------------------------------
   # Postgres/TimescaleDB and Redis are required by every platform service.
   # Point services at your own managed Postgres/Redis instead for production.
+
 
   postgres:
     image: docker.io/timescale/timescaledb:2.30.2-pg16
@@ -105,6 +116,12 @@ services:
   connector-service:
     <<: *zequent-env
     image: ghcr.io/zequent/connector-service:1.3.2
+    environment:
+      <<: *zequent-environment
+      # Webhook tokens and claim codes are stored as HMAC under these; connector
+      # refuses to start without them.
+      ZQNT_PEPPER_WEBHOOK_TOKENS: ${ZQNT_PEPPER_WEBHOOK_TOKENS:?set ZQNT_PEPPER_WEBHOOK_TOKENS in .env.customer and start with --env-file .env.customer}
+      ZQNT_PEPPER_CLAIM_CODES: ${ZQNT_PEPPER_CLAIM_CODES:?set ZQNT_PEPPER_CLAIM_CODES in .env.customer and start with --env-file .env.customer}
     pull_policy: always
     depends_on:
       - postgres
@@ -144,6 +161,13 @@ services:
   admin-console-service:
     <<: *zequent-env
     image: ghcr.io/zequent/admin-console-service:1.3.2
+    environment:
+      <<: *zequent-environment
+      # Operator stream keys are stored as HMAC under this, and the AI assistant's
+      # placeholders for people are keyed by the other; admin-console refuses to
+      # start without them.
+      LIVE_STREAM_KEYS_PEPPER: ${LIVE_STREAM_KEYS_PEPPER:?set LIVE_STREAM_KEYS_PEPPER in .env.customer and start with --env-file .env.customer}
+      ZQNT_PEPPER_AGENT_PSEUDONYMS: ${ZQNT_PEPPER_AGENT_PSEUDONYMS:?set ZQNT_PEPPER_AGENT_PSEUDONYMS in .env.customer and start with --env-file .env.customer}
     pull_policy: always
     depends_on:
       - connector-service
@@ -181,6 +205,147 @@ services:
       - admin-console-service
     ports:
       - "3001:3000"
+    restart: unless-stopped
+
+  # --- Secrets (OpenBao) and sign-in (Keycloak), optional for now ---------
+  # Enable with --profile openbao and --profile keycloak. The platform services
+  # do not read from them yet; the services come first so an installation can
+  # be prepared before an upgrade switches them over.
+  #
+  # OpenBao unseals itself with a static key generated once into the
+  # openbao_seal volume. openbao-init initialises it on the first start (the
+  # recovery key and the root token stay in the openbao_init volume, nothing
+  # secret is logged) and on every start makes sure the mounts, Transit keys,
+  # policies and one AppRole per workload exist; the role-ids and secret-ids
+  # land in the openbao_credentials volume. Back up openbao_seal and
+  # openbao_init separately from the data and off this host: without the seal
+  # key a snapshot cannot be restored. See the operations guide (unseal,
+  # snapshots, realm export) in the deployment repository's README, section 5e.
+  #
+  # Keycloak keeps its data in its own database "keycloak" on the postgres
+  # service and imports the realm "zequent" on its first start. Put a TLS
+  # reverse proxy in front of 8180 and set KEYCLOAK_URL to that public URL.
+  openbao-seal-key:
+    image: docker.io/openbao/openbao:2.7.1
+    profiles: ["openbao"]
+    user: "0"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - '[ -s /openbao/seal/unseal.key ] || (umask 077 && head -c 32 /dev/urandom > /openbao/seal/unseal.key); chown 100:1000 /openbao/seal/unseal.key; chmod 400 /openbao/seal/unseal.key'
+    volumes:
+      - openbao_seal:/openbao/seal
+    restart: "no"
+
+  openbao:
+    image: docker.io/openbao/openbao:2.7.1
+    profiles: ["openbao"]
+    entrypoint: ["bao", "server", "-config=/openbao/config/openbao.hcl"]
+    depends_on:
+      openbao-seal-key:
+        condition: service_completed_successfully
+    environment:
+      BAO_ADDR: http://127.0.0.1:8200
+    configs:
+      - source: openbao.hcl
+        target: /openbao/config/openbao.hcl
+    volumes:
+      - openbao_data:/openbao/file
+      - openbao_seal:/openbao/seal:ro
+    healthcheck:
+      test: ["CMD-SHELL", "bao status >/dev/null 2>&1; [ $$? -ne 1 ]"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Not published: only the platform services on this network talk to it.
+    restart: unless-stopped
+
+  openbao-init:
+    image: docker.io/openbao/openbao:2.7.1
+    profiles: ["openbao"]
+    user: "0"
+    depends_on:
+      openbao:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/init.sh"]
+    environment:
+      BAO_ADDR: http://openbao:8200
+      # The uid of the platform images, which will read their AppRole login from here.
+      CREDENTIALS_OWNER: "1001:0"
+      # Written to OpenBao once, when the secret does not exist there yet (the
+      # peppers must match the ones the platform already hashed with).
+      SEED_POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-${POSTGRES_PASSWORD:-}}
+      SEED_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      SEED_MEDIAMTX_HOOK_SECRET: ${LIVE_STREAM_AUTH_HOOK_SECRET:-}
+      SEED_PEPPER_WEBHOOK_TOKENS: ${ZQNT_PEPPER_WEBHOOK_TOKENS:-}
+      SEED_PEPPER_CLAIM_CODES: ${ZQNT_PEPPER_CLAIM_CODES:-}
+      SEED_PEPPER_STREAM_KEYS: ${LIVE_STREAM_KEYS_PEPPER:-}
+      SEED_PEPPER_AGENT_PSEUDONYMS: ${ZQNT_PEPPER_AGENT_PSEUDONYMS:-}
+      SEED_DJI_APP_KEY: ${DJI_APP_KEY:-}
+      SEED_DJI_APP_ID: ${DJI_APP_ID:-}
+      SEED_DJI_APP_LICENSE: ${DJI_APP_LICENSE:-}
+      KEYCLOAK_ADMIN_CONSOLE_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CONSOLE_CLIENT_SECRET:-}
+    configs:
+      - source: openbao-init.sh
+        target: /init.sh
+    volumes:
+      - openbao_init:/openbao/init
+      - openbao_credentials:/credentials
+    restart: "no"
+
+  keycloak-db-init:
+    image: docker.io/timescale/timescaledb:2.30.2-pg16
+    profiles: ["keycloak"]
+    depends_on:
+      - postgres
+    entrypoint: ["/bin/sh", "/create-database.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGDATABASE: zequent_db
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.customer and start with --env-file .env.customer}
+      KEYCLOAK_DB_USER: keycloak
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-}
+    configs:
+      - source: keycloak-create-database.sh
+        target: /create-database.sh
+    restart: "no"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.5
+    profiles: ["keycloak"]
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - 'for v in KEYCLOAK_URL KC_DB_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD ZQNT_CONSOLE_URL KEYCLOAK_ADMIN_CONSOLE_CLIENT_SECRET; do [ -n "$${!v}" ] || { echo "keycloak: $$v is not set (.env.customer)" >&2; exit 1; }; done; exec /opt/keycloak/bin/kc.sh start --import-realm'
+    depends_on:
+      keycloak-db-init:
+        condition: service_completed_successfully
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-}
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-}
+      KC_HOSTNAME: ${KEYCLOAK_URL:-}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      # Only used to create the first administrator on the first start; replace
+      # it with a permanent administrator and delete the temporary one.
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
+      ZQNT_CONSOLE_URL: ${ZQNT_CONSOLE_URL:-}
+      KEYCLOAK_ADMIN_CONSOLE_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CONSOLE_CLIENT_SECRET:-}
+    configs:
+      - source: zequent-realm.json
+        target: /opt/keycloak/data/import/zequent-realm.json
+    ports:
+      - "8180:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
     restart: unless-stopped
 
   # --- Optional edge adapters (enable with --profile) --------------------
@@ -268,7 +433,7 @@ services:
       - mission-autonomy-service
       - remote-control-service
     # Not published: remote-control (9190) and admin-console (9191) reach it inside
-    # this network.
+    # this network. EdgeAdapterService on 9190 has no authentication.
     restart: unless-stopped
     # Set in your .env.customer: CONNECTOR_ADDR=connector-service:8010, LIVE_DATA_ADDR=live-data-service:8003,
     # MISSION_AUTONOMY_ADDR=mission-autonomy-service:8004, REDIS_ADDR=redis:6379 (it reads
@@ -283,3 +448,295 @@ services:
 volumes:
   zequent_data:
   redis_data:
+  openbao_data:
+  openbao_seal:
+  openbao_init:
+  openbao_credentials:
+
+configs:
+  openbao.hcl:
+    content: |
+      ui           = true
+      api_addr     = "http://openbao:8200"
+      cluster_addr = "http://openbao:8201"
+
+      storage "raft" {
+        path    = "/openbao/file"
+        node_id = "openbao-0"
+      }
+
+      listener "tcp" {
+        address     = "0.0.0.0:8200"
+        tls_disable = true
+      }
+
+      seal "static" {
+        current_key_id = "seal-1"
+        current_key    = "file:///openbao/seal/unseal.key"
+      }
+
+      audit "file" "stdout" {
+        description = "Audit log on standard output (values HMAC'd)"
+        options {
+          file_path = "stdout"
+        }
+      }
+  openbao-init.sh:
+    content: |
+      #!/bin/sh
+      set -eu
+      umask 077
+
+      export BAO_ADDR="$${BAO_ADDR:-http://openbao:8200}"
+      INIT_FILE="$${INIT_FILE:-/openbao/init/init.json}"
+      CREDENTIALS_DIR="$${CREDENTIALS_DIR:-/credentials}"
+      CREDENTIALS_OWNER="$${CREDENTIALS_OWNER:-$$(stat -c %u:%g "$$CREDENTIALS_DIR")}"
+      WORKLOADS="connector live-data remote-control mission-autonomy admin-console integration-hub edge-adapter-dji"
+
+      until bao status >/dev/null 2>&1 || [ $$? -eq 2 ]; do sleep 1; done
+
+      if bao status -format=json 2>/dev/null | grep -q '"initialized": *false'; then
+        bao operator init -recovery-shares=1 -recovery-threshold=1 -format=json > "$$INIT_FILE.tmp"
+        mv "$$INIT_FILE.tmp" "$$INIT_FILE"
+        echo "openbao-init: initialised, recovery key and root token kept in $$INIT_FILE"
+      fi
+      [ -s "$$INIT_FILE" ] || { echo "openbao-init: OpenBao is initialised but $$INIT_FILE is missing" >&2; exit 1; }
+      BAO_TOKEN=$$(sed -n 's/.*"root_token": *"\([^"]*\)".*/\1/p' "$$INIT_FILE")
+      export BAO_TOKEN
+      until bao status >/dev/null 2>&1; do sleep 1; done
+
+      bao secrets list -format=json | grep -q '"zqnt/"' || bao secrets enable -path=zqnt -version=2 kv >/dev/null
+      bao secrets list -format=json | grep -q '"zqnt-transit/"' || bao secrets enable -path=zqnt-transit transit >/dev/null
+      bao auth list -format=json | grep -q '"approle/"' || bao auth enable approle >/dev/null
+
+      for key in service-token:ed25519:false credential:ed25519:false export-signing:ed25519:false \
+          platform-kek:aes256-gcm96:true; do
+        name=$${key%%:*} spec=$${key#*:}
+        bao read "zqnt-transit/keys/$$name" >/dev/null 2>&1 \
+          || bao write "zqnt-transit/keys/$$name" type="$${spec%%:*}" derived="$${spec#*:}" >/dev/null
+      done
+
+      seed() {
+        path=$$1
+        shift
+        bao kv get -mount=zqnt "$$path" >/dev/null 2>&1 && return 0
+        dir=$$(mktemp -d)
+        fields=""
+        for pair in "$$@"; do
+          field=$${pair%%=*}
+          eval "printf '%s' \"\$${$${pair#*=}:-}\"" > "$$dir/$$field"
+          fields="$$fields $$field=@$$dir/$$field"
+        done
+        # shellcheck disable=SC2086
+        bao kv put -mount=zqnt "$$path" $$fields >/dev/null
+        rm -rf "$$dir"
+        echo "openbao-init: seeded $$path"
+      }
+
+      for pepper in webhook-tokens claim-codes stream-keys agent-pseudonyms; do
+        variable=SEED_PEPPER_$$(echo "$$pepper" | tr 'a-z-' 'A-Z_')
+        eval "[ -n \"\$${$$variable:-}\" ]" || eval "$$variable=\$$(head -c 32 /dev/urandom | base64 | tr -d '\\n')"
+        seed "platform/peppers/$$pepper" "value=$$variable"
+      done
+
+      if [ -n "$${KEYCLOAK_ADMIN_CONSOLE_CLIENT_SECRET:-}" ]; then
+        bao kv get -mount=zqnt platform/admin-console/keycloak >/dev/null 2>&1 \
+          || printf '%s' "$$KEYCLOAK_ADMIN_CONSOLE_CLIENT_SECRET" | bao kv put -mount=zqnt platform/admin-console/keycloak client-secret=- >/dev/null
+      fi
+
+      seed infrastructure/postgres password=SEED_POSTGRES_PASSWORD
+      seed infrastructure/redis password=SEED_REDIS_PASSWORD
+      seed infrastructure/object-storage platform-access-key=SEED_STORAGE_PLATFORM_ACCESS_KEY \
+        platform-secret-key=SEED_STORAGE_PLATFORM_SECRET_KEY dock-access-key=SEED_STORAGE_DOCK_ACCESS_KEY \
+        dock-secret-key=SEED_STORAGE_DOCK_SECRET_KEY adapter-access-key=SEED_STORAGE_ADAPTER_ACCESS_KEY \
+        adapter-secret-key=SEED_STORAGE_ADAPTER_SECRET_KEY
+      seed infrastructure/mqtt username=SEED_MQTT_USERNAME password=SEED_MQTT_PASSWORD \
+        dock-username=SEED_MQTT_DOCK_USERNAME dock-password=SEED_MQTT_DOCK_PASSWORD
+      seed infrastructure/mediamtx hook-secret=SEED_MEDIAMTX_HOOK_SECRET
+      seed infrastructure/terrain bearer-token=SEED_TERRAIN_BEARER_TOKEN
+      seed infrastructure/simulator-control token=SEED_SIMULATOR_CONTROL_TOKEN
+      seed infrastructure/grafana admin-password=SEED_GRAFANA_ADMIN_PASSWORD
+      seed platform/edge-adapter-dji/cloud-api app-key=SEED_DJI_APP_KEY app-id=SEED_DJI_APP_ID \
+        app-license=SEED_DJI_APP_LICENSE
+
+      read_paths() { printf 'path "%s" { capabilities = ["read"] }\n' "$$@"; }
+      update_paths() { printf 'path "%s" { capabilities = ["update"] }\n' "$$@"; }
+      core_service() {
+        read_paths "zqnt/data/platform/$$1/*" zqnt/data/infrastructure/redis "zqnt/data/platform/peppers/*" \
+          zqnt-transit/keys/service-token zqnt-transit/keys/credential
+        update_paths zqnt-transit/sign/service-token zqnt-transit/verify/service-token \
+          zqnt-transit/verify/credential
+      }
+      edge_workload() {
+        read_paths "zqnt/data/platform/$$1/*" zqnt/data/infrastructure/redis zqnt-transit/keys/service-token
+        update_paths zqnt-transit/verify/service-token
+      }
+      policy() {
+        case "$$1" in
+          connector)
+            core_service connector
+            read_paths zqnt/data/infrastructure/postgres zqnt/data/infrastructure/object-storage
+            echo 'path "zqnt/data/platform/connector/seed-admin" { capabilities = ["create", "update", "read"] }' ;;
+          live-data | remote-control)
+            core_service "$$1" ;;
+          mission-autonomy)
+            core_service mission-autonomy
+            read_paths zqnt/data/infrastructure/terrain ;;
+          admin-console)
+            core_service admin-console
+            read_paths zqnt/data/infrastructure/postgres zqnt/data/infrastructure/mediamtx \
+              zqnt/data/infrastructure/simulator-control zqnt/data/infrastructure/grafana \
+              zqnt-transit/keys/export-signing
+            update_paths zqnt-transit/sign/credential zqnt-transit/sign/export-signing \
+              zqnt-transit/verify/export-signing zqnt-transit/encrypt/platform-kek \
+              zqnt-transit/decrypt/platform-kek zqnt-transit/rewrap/platform-kek \
+              "zqnt/delete/organizations/*" "zqnt/destroy/organizations/*"
+            echo 'path "zqnt/data/organizations/*" { capabilities = ["create", "update", "delete"] }'
+            echo 'path "zqnt/metadata/organizations/*" { capabilities = ["read", "list", "delete"] }' ;;
+          integration-hub)
+            edge_workload integration-hub
+            read_paths zqnt/data/infrastructure/postgres
+            echo 'path "zqnt/data/organizations/+/integration/*" { capabilities = ["create", "read", "update", "delete"] }'
+            echo 'path "zqnt/metadata/organizations/+/integration/*" { capabilities = ["create", "read", "update", "list", "delete"] }'
+            echo 'path "zqnt/data/platform/integration-hub/credentials/*" { capabilities = ["create", "read", "update", "delete"] }'
+            echo 'path "zqnt/metadata/platform/integration-hub/credentials/*" { capabilities = ["create", "read", "update", "list", "delete"] }' ;;
+          edge-adapter-dji)
+            edge_workload edge-adapter-dji
+            read_paths zqnt/data/infrastructure/object-storage zqnt/data/infrastructure/mqtt ;;
+        esac
+      }
+
+      for workload in $$WORKLOADS; do
+        policy "$$workload" | bao policy write "zqnt-$$workload" - >/dev/null
+        bao write "auth/approle/role/$$workload" token_policies="zqnt-$$workload" \
+          token_ttl=1h token_max_ttl=24h secret_id_ttl=0 >/dev/null
+
+        dir="$$CREDENTIALS_DIR/$$workload"
+        mkdir -p "$$dir"
+        bao read -field=role_id "auth/approle/role/$$workload/role-id" > "$$dir/role-id"
+        if [ ! -s "$$dir/secret-id" ] || ! bao write -format=json "auth/approle/role/$$workload/secret-id/lookup" \
+            secret_id=@"$$dir/secret-id" 2>/dev/null | grep -q '"secret_id_accessor"'; then
+          bao write -f -field=secret_id "auth/approle/role/$$workload/secret-id" > "$$dir/secret-id"
+        fi
+        chown -R "$$CREDENTIALS_OWNER" "$$dir"
+      done
+
+      if [ -n "$${ROOT_TOKEN_FILE:-}" ]; then
+        printf '%s' "$$BAO_TOKEN" > "$$ROOT_TOKEN_FILE"
+        chown "$$CREDENTIALS_OWNER" "$$ROOT_TOKEN_FILE"
+      fi
+
+      echo "openbao-init: ready"
+  keycloak-create-database.sh:
+    content: |
+      #!/bin/sh
+      # Creates Keycloak's own role and database in the platform's Postgres, once.
+      set -eu
+      : "$${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env.customer}"
+
+      until pg_isready -q; do sleep 1; done
+
+      psql -v ON_ERROR_STOP=1 -v role="$$KEYCLOAK_DB_USER" -v password="$$KEYCLOAK_DB_PASSWORD" <<'SQL'
+      SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'role', :'password')
+      WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'role') \gexec
+      SELECT format('ALTER ROLE %I PASSWORD %L', :'role', :'password') \gexec
+      SELECT format('CREATE DATABASE %I OWNER %I', :'role', :'role')
+      WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'role') \gexec
+      SQL
+
+      echo "keycloak-db-init: database $$KEYCLOAK_DB_USER ready"
+  zequent-realm.json:
+    content: |
+      {
+        "realm": "zequent",
+        "displayName": "Zequent",
+        "enabled": true,
+        "organizationsEnabled": true,
+        "sslRequired": "external",
+        "registrationAllowed": false,
+        "loginWithEmailAllowed": true,
+        "registrationEmailAsUsername": true,
+        "duplicateEmailsAllowed": false,
+        "resetPasswordAllowed": true,
+        "rememberMe": false,
+        "bruteForceProtected": true,
+        "permanentLockout": false,
+        "failureFactor": 10,
+        "passwordPolicy": "length(12) and notUsername and notEmail and passwordHistory(3)",
+        "accessTokenLifespan": 300,
+        "ssoSessionIdleTimeout": 1800,
+        "ssoSessionMaxLifespan": 36000,
+        "revokeRefreshToken": true,
+        "refreshTokenMaxReuse": 0,
+        "clients": [
+          {
+            "clientId": "zqnt-console",
+            "name": "Zequent Console",
+            "enabled": true,
+            "publicClient": true,
+            "protocol": "openid-connect",
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": false,
+            "frontchannelLogout": true,
+            "rootUrl": "$${ZQNT_CONSOLE_URL}",
+            "redirectUris": ["$${ZQNT_CONSOLE_URL}/*"],
+            "webOrigins": ["$${ZQNT_CONSOLE_URL}"],
+            "attributes": {
+              "pkce.code.challenge.method": "S256",
+              "post.logout.redirect.uris": "$${ZQNT_CONSOLE_URL}/*"
+            },
+            "defaultClientScopes": ["basic", "web-origins", "acr", "profile", "email", "organization"],
+            "optionalClientScopes": [],
+            "protocolMappers": [
+              {
+                "name": "platform audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "config": {
+                  "included.custom.audience": "zqnt-platform",
+                  "id.token.claim": "false",
+                  "access.token.claim": "true",
+                  "introspection.token.claim": "true"
+                }
+              }
+            ]
+          },
+          {
+            "clientId": "zqnt-admin-console",
+            "name": "Zequent admin-console",
+            "enabled": true,
+            "publicClient": false,
+            "protocol": "openid-connect",
+            "clientAuthenticatorType": "client-secret",
+            "secret": "$${KEYCLOAK_ADMIN_CONSOLE_CLIENT_SECRET}",
+            "standardFlowEnabled": false,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": true,
+            "defaultClientScopes": ["basic"],
+            "optionalClientScopes": []
+          }
+        ],
+        "users": [
+          {
+            "username": "service-account-zqnt-admin-console",
+            "enabled": true,
+            "serviceAccountClientId": "zqnt-admin-console",
+            "clientRoles": {
+              "realm-management": [
+                "query-users",
+                "view-users",
+                "manage-users",
+                "query-groups",
+                "view-identity-providers",
+                "manage-identity-providers",
+                "query-organizations",
+                "view-organizations",
+                "manage-organizations"
+              ]
+            }
+          }
+        ]
+      }
