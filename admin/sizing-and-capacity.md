@@ -3,18 +3,21 @@
 > **Preview.** Zequent **3.0** is not released yet; this page describes the preview builds and may
 > still change.
 
-> **First measurements only.** The figures on this page come from one load-test run on a single
-> laptop-class machine, with every service in development mode and one instance of each. They show
-> where one instance tips over; they are not a sizing for a production installation. They will be
-> replaced by measurements on a production-like setup (native images, real CPU and memory limits)
-> before 3.0 is released. Where no figure has been measured yet, this page says so.
+> **Measured on a production-like setup.** The figures on this page come from load tests against
+> Zequent's own 3.0 environment: native images with the CPU and memory limits below, Kubernetes
+> (k3s) on one server, Postgres/TimescaleDB, Redis and Keycloak in the same cluster, the load
+> generated from outside over the public ingress. The data set is small (a few dozen assets, a few
+> thousand runs), so list views on an installation with long history will be slower. Where no
+> figure has been measured yet, this page says so.
 
 - [What drives the load](#what-drives-the-load)
 - [Service level objectives](#service-level-objectives)
-- [What one admin-console replica handles](#what-one-admin-console-replica-handles)
+- [What admin-console replicas handle](#what-admin-console-replicas-handle)
+- [Long runs and failover](#long-runs-and-failover)
 - [When to add replicas](#when-to-add-replicas)
 - [CPU and memory per service](#cpu-and-memory-per-service)
 - [Postgres and Redis](#postgres-and-redis)
+- [Sign-in (Keycloak)](#sign-in-keycloak)
 - [Telemetry ingest](#telemetry-ingest)
 - [Limits that are configuration, not capacity](#limits-that-are-configuration-not-capacity)
 - [Not measured yet](#not-measured-yet)
@@ -54,65 +57,73 @@ client and include network and TLS, from inside or next to the cluster.
 Command round trips to devices, live video, execution throughput and model latency are not covered:
 they depend on the device, the network and the model provider.
 
-## What one admin-console replica handles
+## What admin-console replicas handle
 
 admin-console serves the console's API and WebSockets, so it is the service that grows with the
-number of operators.
+number of operators. Load: a mix of console reads (assets, asset relations, executions over a time
+range, alerts, audit log, detections, who-am-I) plus open console WebSockets, ramped from 10 to
+about 320 reads per second and from 10 to 500 WebSockets over 10 minutes. Every other core service
+ran two replicas.
 
-Measured setup: one instance of each core service in development mode (JVM, not the native image
-you run), on one laptop (Intel i7-12700H, 20 threads, 62 GB RAM) shared with Postgres, Redis,
-Keycloak, the load generator and other work. Small data set: 7 assets, 264 executions, 821 audit
-events.
+| admin-console replicas (2 CPU, 384 MiB each) | Reads per second | p50 | p95 | p99 | Errors | CPU per replica |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2 | up to 250 | 22–25 ms | ≤ 83 ms | — | 0 % | up to ~1.6 |
+| 2 | 290–320 | 0.6–0.8 s | 2–5 s | — | ~5 % (HTTP 503) | 1.9 (at the limit) |
+| 3 | up to 320 | 25 ms | 63 ms | 92 ms | 0 % | ~1.3 |
 
-| Console reads per second (target) | Served | p50 | p95 | p99 | Errors |
-| --- | --- | --- | --- | --- | --- |
-| 10 | 10.0/s | 20 ms | 184 ms | 221 ms | 0 % |
-| 25 | 24.9/s | 30 ms | 270 ms | 335 ms | 0 % |
-| 50 | 50.0/s | 29 ms | 249 ms | 331 ms | 0 % |
-| 75 | 63.7/s | 657 ms | 4.3 s | 6.9 s | 3.9 % |
-| 100 | 80.4/s | 2.4 s | 5.5 s | 9.5 s | 7.5 % |
+- Two replicas carry about **250 console reads per second** within the objectives. Beyond that
+  their CPU limit is reached and admin-console answers **503 with Retry-After** instead of queueing
+  without bound; nothing crashes and the other services stay unaffected.
+- A third replica removed every error at the same load: capacity grows with replicas.
+- 500 open consoles (WebSockets) next to 320 reads per second: every socket connected (5,559 of
+  5,559 upgrades), ticket p95 19 ms.
 
-- Up to **50 console reads per second** stay within the objectives (p95 ≤ 270 ms, p99 ≤ 335 ms,
-  no errors). Between 50 and 75 reads per second the instance saturates: latency grows to seconds
-  and some requests fail instead of waiting.
-- 50 open consoles (WebSockets) next to 50 reads per second: every socket connected. Read latency
-  rose to p95 644 ms because the test reconnected all 50 sockets at the same moment every 30 s,
-  which real consoles do not do.
-- Starting straight into 50 reads per second caused a 20–30 s stall with errors right after start;
-  ramping the load up did not.
-- The slowest read is the execution list over a time range (p50 228 ms at 50 reads per second);
-  asset status, detections and alerts answer in 13–33 ms at p50.
+Plan **one admin-console replica (2 CPU) for about 120 console reads per second**, and keep the
+average CPU per replica below about 1 CPU so a load spike has room while a new replica starts.
 
-Plan **one admin-console replica for about 50 console reads per second** until the
-production-like measurement replaces this figure.
+## Long runs and failover
+
+- **8 hours** at 20 console reads per second with 20 open consoles, one replica of each service:
+  p95 143 ms, no failed request, no restart, no latency drift over the night.
+- **Failover:** with two replicas of every core service and 50 reads per second, one replica of
+  each service was deleted at the same moment: no request failed (0 of 15,950); the replacements
+  were ready within a minute.
 
 ## When to add replicas
 
-- **admin-console:** add a replica when console reads approach 50 per second per replica, when
-  console p95 latency stays above 300 ms, or when the AI assistant's tool calls approach what one
-  replica serves. The AI assistant's tool-call rate limit is shared by all replicas, so adding
+- **admin-console:** add a replica when console reads approach 120 per second per replica, when
+  its average CPU stays above about 1 CPU per replica, when console p95 latency stays above 300 ms,
+  or when the AI assistant's tool calls approach what the replicas serve. The AI assistant's tool-call rate limit is shared by all replicas, so adding
   replicas does not raise it.
 - **Other core services:** add a replica when a service's CPU stays near its limit or the
   latencies in its area (telemetry ack, command dispatch, execution steps) leave the objectives.
   Per-replica figures for these services are not measured yet.
 - Before adding replicas, check Postgres: every replica opens its own database connection pool
   (see below).
+- **Automatically:** the Helm chart can add and remove core-service replicas on CPU
+  (`autoscaling.enabled: true`; the configured replica count is the minimum,
+  `autoscaling.maxReplicas` per service the maximum). It needs the Kubernetes metrics API
+  (metrics-server). Defaults: a replica is added when the average CPU per replica stays above
+  1 CPU for a minute, at most one per minute; one is removed after ten quiet minutes, at most one
+  every five minutes.
 
 ## CPU and memory per service
 
-No per-service sizing has been measured yet. As a starting point, these are the requests and
-limits Zequent's own development environment runs the 3.0 native images with:
+Requests and limits of Zequent's own 3.0 environment, with what the services used there:
 
-| Service | CPU request | CPU limit | Memory request | Memory limit |
-| --- | --- | --- | --- | --- |
-| connector | 50m | 2 | 128 MiB | 384 MiB |
-| live-data | 50m | 2 | 96 MiB | 256 MiB |
-| remote-control | 50m | 2 | 96 MiB | 256 MiB |
-| mission-autonomy | 100m | 2 | 384 MiB | 768 MiB |
-| admin-console | 50m | 2 | 128 MiB | 384 MiB |
+| Service | CPU request | CPU limit | Memory request | Memory limit | Idle (per replica) | At ~320 reads/s (per replica) |
+| --- | --- | --- | --- | --- | --- | --- |
+| connector | 50m | 2 | 128 MiB | 384 MiB | ~60m, ~55 MiB | 0.4–1 CPU |
+| live-data | 50m | 2 | 96 MiB | 256 MiB | ~50m, ~30 MiB | ~0.1 CPU |
+| remote-control | 50m | 2 | 96 MiB | 256 MiB | ~5m, ~50 MiB | ~0.1 CPU |
+| mission-autonomy | 100m | 2 | 384 MiB | 768 MiB | ~25m, 190–270 MiB | ~0.1 CPU |
+| admin-console | 50m | 2 | 128 MiB | 384 MiB | ~25m, ~35 MiB | ~1.3 CPU (3 replicas) |
 
-These are not validated for production load. Watch CPU usage and CPU throttling of the containers
-when you size, and raise requests and limits before you add replicas to a service that is throttled.
+At idle a full set of two replicas per core service used about 0.3 CPU and 0.8 GiB memory in total.
+Under console load, admin-console and connector carry the work; live-data's share follows the
+telemetry rate, mission-autonomy's the number of running Applications. Watch CPU usage and CPU
+throttling of the containers when you size, and raise limits before you add replicas to a service
+that is throttled.
 
 ## Postgres and Redis
 
@@ -127,10 +138,22 @@ admin-console's pool holds up to 50 connections per replica (`DB_POOL_MAX_SIZE`,
 (`REDIS_MAX_POOL_SIZE`, default `32`), with a waiting queue of 128 requests (256 in admin-console,
 `REDIS_MAX_POOL_WAITING`).
 
-Not measured yet: Postgres CPU and memory per load, disk per asset-day of telemetry at 1 Hz, the
+Measured: at ~320 console reads per second Postgres used 0.4–0.8 CPU and ~1.9 GiB memory, Redis
+0.2 CPU and ~130 MiB, with all core services at two or three replicas.
+
+Not measured yet: Postgres sizing for larger data sets, disk per asset-day of telemetry at 1 Hz, the
 growth of the audit log (one row per AI assistant tool call), and Redis memory per connected asset
 and per open console. Until then, monitor Postgres disk growth during the first weeks of operation
 and size retention from it.
+
+## Sign-in (Keycloak)
+
+Every password sign-in costs Keycloak a deliberately expensive hash (Argon2: several megabytes of
+memory and real CPU each), so a burst of sign-ins (a shift starting, a load test) loads Keycloak far
+more than steady use. The chart bounds Keycloak's work per replica (16 request threads, at most 1,000
+queued requests, beyond that 503) and gives it 2 GiB; run **two Keycloak replicas** where many
+people sign in at once. Sign-in throughput grows with Keycloak replicas and CPU, not with threads.
+Tokens are refreshed without a hash, so signed-in consoles cost little.
 
 ## Telemetry ingest
 
@@ -155,7 +178,8 @@ These figures follow once the production-like measurement is done; this page wil
 them:
 
 - reference sizes (small, medium, large installation: assets, operators, concurrent runs, chat
-  sessions, replicas, CPU and memory, Postgres and Redis)
+  sessions, replicas, CPU and memory, Postgres and Redis); console reads per replica are measured
+  above
 - telemetry samples per second per live-data replica
 - concurrent executions per mission-autonomy replica
 - chat sessions per admin-console replica, and AI nodes per organization
