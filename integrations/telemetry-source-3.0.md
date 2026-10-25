@@ -101,6 +101,11 @@ Messages arrive on the broker as soon as the drones report telemetry.
   reports nothing (switched off, out of range) sends nothing.
 - On Kafka, set the sink's message key to `{assetSn}`: the messages of one asset then stay on one
   partition, in order.
+- On Kafka, create the topic before you start the bridge: the sink does not create topics. Until the
+  topic exists, Integration Hub keeps the messages and retries them every 30 seconds, so none are lost.
+- On OPC UA, the sink writes each payload field to the node whose alias has the same name, for example
+  alias `batteryPercent` → `ns=2;s=BatteryPercent`. A nested field such as `position.latitude` needs a
+  mapping that lifts it to the top level first.
 - If the connection to the platform drops, the source reconnects by itself, waiting a little longer
   after each failed attempt (up to 30 seconds). Messages from the time it was disconnected are not
   sent afterwards.
