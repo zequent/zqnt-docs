@@ -1,7 +1,8 @@
 # Integration Hub — Deployment Guide
 
 Integration Hub is a general-purpose data bridge: it reads from a **source** (OPC-UA, Kafka, WebSocket,
-OpenAPI/HTTP, Iosys HTTP), applies a configurable field mapping (with optional JavaScript
+OpenAPI/HTTP, Iosys HTTP, or the live telemetry of your assets, see [Forwarding live
+telemetry](telemetry-source-3.0.md)), applies a configurable field mapping (with optional JavaScript
 transforms), and writes to a **sink** (MQTT, Kafka, or — when connected to the Zequent platform, see
 below — a running Skill execution). It's a separate service from the platform's own five core
 services and runs standalone by default. It keeps its connector/mapping/vault configuration in its
@@ -83,6 +84,7 @@ integration described below.
 | `ZQNT_EDGE_TOKEN` | -- | Integration Hub's credential for its calls to the platform: a credential of kind **integration** (integration scope), issued by a `system_admin` in the Admin Console (Credentials) or with `core/scripts/mint-edge-credential.py --integration`. The platform refuses Integration Hub's calls without it. Without an organization it publishes the bridges of every organization; bound to an organization, it publishes only that organization's bridges and starts runs only in that organization |
 | `ZQNT_PLATFORM_PUBLIC_KEY` (alias `SERVICE_AUTH_PUBLIC_KEY`) | -- | The platform's service public key. Integration Hub verifies the platform's calls into it (`SendCustomCommand`, `GetCapabilities`) with it and refuses everything else |
 | `ZQNT_CONNECTOR_HOST` / `ZQNT_CONNECTOR_PORT` | `connector-service` / `8010` | Connector Service gRPC endpoint |
+| `ZQNT_LIVE_DATA_HOST` / `ZQNT_LIVE_DATA_PORT` | `live-data-service` / `8003` | Live Data Service gRPC endpoint, where [Zequent Telemetry sources](telemetry-source-3.0.md) read from |
 | `ZQNT_MISSION_AUTONOMY_HOST` / `ZQNT_MISSION_AUTONOMY_PORT` | `mission-autonomy-service` / `8004` | Mission Autonomy Service gRPC endpoint |
 | `ZQNT_PLATFORM_LISTEN_ADDR` | `:9095` | Address this backend's own inbound gRPC server (for `SendCustomCommand`) binds to |
 | `ZQNT_PLATFORM_ADVERTISED_ENDPOINT` | `integration-hub-backend:9095` | What other platform services should dial to reach the above — matters if you rename the container or run behind a different hostname |
@@ -183,6 +185,12 @@ as `route.plan_path`, human approvals, waits and conditions) runs without an ass
 selects none, holds none and never refuses it because a drone is busy. It does not appear under any
 asset in the execution history. An Application that also has a device step (a takeoff, a photo, an
 `EVENT_WAIT` on an asset's event) is given an asset as before.
+
+### Forwarding live telemetry
+
+A **Zequent Telemetry** source (`zqnt-telemetry`) streams the live telemetry of your organization's
+assets into a bridge, so any sink can forward it: MQTT, Kafka, OPC UA and the others. You pick the
+assets, the fields and how often per asset. See [Forwarding live telemetry](telemetry-source-3.0.md).
 
 ### The reverse direction: a Source triggering a Skill
 
