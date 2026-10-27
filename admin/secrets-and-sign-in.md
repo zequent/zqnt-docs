@@ -3,12 +3,15 @@
 > **Preview.** Zequent **3.0** is not released yet; this page describes the preview builds and may
 > still change. On 2.0, see [Organizations, Users & Single Sign-On](organizations-and-sso.md).
 
-In 3.0 every secret of the platform lives in **OpenBao** (an open-source secrets manager, API
-compatible with HashiCorp Vault), and every person signs in through **Keycloak**. Both are optional
-while 3.0 is in preview: an installation without them keeps its secrets in the environment of the
-services and signs people in through admin-console, as on 2.0.
+In 3.0 the platform's secrets live in **OpenBao** (an open-source secrets manager, API compatible
+with HashiCorp Vault), and every person signs in through **Keycloak**. The platform has no sign-in
+of its own any more: no password login, no refresh cookie, no password reset in the console. The
+Integration Hub keeps its connection credentials only in OpenBao. While 3.0 is in preview, the core
+services can still read their own infrastructure secrets from their environment
+(`ZQNT_SECRETS_PROVIDER=env`).
 
 - [How secrets are kept](#how-secrets-are-kept)
+- [Integration Hub credentials](#integration-hub-credentials)
 - [How people sign in](#how-people-sign-in)
 - [Development keys are refused](#development-keys-are-refused)
 - [Rotating keys and secrets](#rotating-keys-and-secrets)
@@ -69,6 +72,22 @@ per key version, identified by `kid`). Adapters, the simulator and the Integrati
 platform's tokens against it: set `ZQNT_PLATFORM_KEYS_URL` to that address. They fetch the set
 every 5 minutes, and again (at most every 30 seconds) when a token names a key they do not know.
 
+## Integration Hub credentials
+
+The Integration Hub stores the credentials of its connections (API keys, usernames and passwords,
+client certificates) in OpenBao KV, under `organizations/<organization id>/integration/<id>`, or
+`platform/integration-hub/credentials/<id>` for a credential of no organization. Its database holds
+only that path. It needs `OPENBAO_ADDR` and a login (`OPENBAO_KUBERNETES_ROLE` or
+`OPENBAO_APPROLE_ROLE_ID` / `OPENBAO_APPROLE_SECRET_ID`, role `integration-hub`) and does not start
+without them. Every read, change and deletion of a credential appears in the organization's audit
+log.
+
+**Upgrading from 2.0.** The 2.0 Integration Hub encrypted credentials into its own database with
+`VAULT_ENCRYPTION_KEY`. Keep that variable set for the **first** start of 3.0: before its database
+migration runs, the Hub moves every such credential to OpenBao, then drops the encrypted column.
+If credentials are still encrypted and the key is missing, the Hub stops with an error and changes
+nothing. Remove `VAULT_ENCRYPTION_KEY` afterwards.
+
 ### What the console shows
 
 **Manage → Access & Integrations → Secrets** lists the organization's secrets — credentials,
@@ -115,8 +134,8 @@ whose alias is the platform organization's id. The realm has two clients:
 | `zqnt-console` | public, authorization code with PKCE (S256) | The console signs people in. Redirects to the console's URL |
 | `zqnt-admin-console` | confidential, service account | admin-console keeps the realm's organizations, users and identity providers in step. Its secret is the only Keycloak secret the platform holds |
 
-With Keycloak sign-in on (`ZQNT_AUTH_KEYCLOAK_ENABLED=true` on every core service,
-`ZQNT_AUTH_KEYCLOAK_ISSUER=https://<keycloak>/realms/zequent`):
+Every core service is configured with the realm
+(`ZQNT_AUTH_KEYCLOAK_ISSUER=https://<keycloak>/realms/zequent`) and refuses to start without it:
 
 - Every core service accepts the realm's access tokens directly: it checks the signature (keys from
   the realm's JWKS by `kid`), the issuer, the audience `zqnt-platform` and that it is an access token.
@@ -130,7 +149,21 @@ With Keycloak sign-in on (`ZQNT_AUTH_KEYCLOAK_ENABLED=true` on every core servic
   conflict.
 - Disabling a user, changing their roles or revoking their sessions also ends their Keycloak
   sessions.
-- admin-console's own login, refresh and password endpoints answer `410 Gone`.
+- The console sends people to Keycloak to sign in and renews their session there. admin-console has
+  no login, refresh or password endpoints.
+
+### Passwords
+
+Passwords are Keycloak's alone. People change theirs in Keycloak's account console
+(`https://<keycloak>/realms/zequent/account`). An administrator sets a new one in the Keycloak
+admin console (**Users → <user> → Credentials → Reset password**). The *Forgot password?* link on
+the sign-in page works once Keycloak can send email (**Realm settings → Email**).
+
+### The AI assistant in the Integration Hub
+
+When the AI assistant uses the Integration Hub for a person, admin-console signs a short-lived
+token for that person with its own Ed25519 key (`AUTH_PRIVATE_KEY`); the Hub checks it with the
+public half (`AUTH_PUBLIC_KEY`). No core service accepts these tokens.
 
 The realm's defaults: passwords of at least 12 characters, not the username or email, not one of
 the last three; brute-force protection; access tokens valid for 5 minutes; sessions end after
@@ -172,6 +205,7 @@ setting, never the value. Generate your own values for every one of them.
 | `platform/admin-console/keycloak` | Keycloak: **Clients → zqnt-admin-console → Credentials → Regenerate**, then `bao kv patch -mount=zqnt platform/admin-console/keycloak client-secret=…` | admin-console reads it whenever it requests a new admin token; no restart |
 | Keycloak's realm signing keys | Keycloak: **Realm settings → Keys**: add a new key, keep the old one passive until the last tokens signed with it have expired (5 minutes), then remove it | The services fetch the realm's keys every 10 minutes, and again when a token names an unknown key |
 | An organization's Entra ID client secret | [see below](#rotating-the-client-secret) | — |
+| The AI assistant's token key (`AUTH_PRIVATE_KEY` / `AUTH_PUBLIC_KEY`) | generate a new Ed25519 pair, set the private half on admin-console and the public half on the Integration Hub, restart both | Tokens signed with the old key stop working at once; they live for minutes |
 | The peppers | **never** | Changing a pepper invalidates every webhook token, claim code or stream key stored under it |
 
 Edge and client credentials stay valid as long as the key version that signed them exists. Do not
