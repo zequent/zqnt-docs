@@ -5,6 +5,9 @@
 > move of an installation — platform, adapters and integrations — from 2.0 to 3.0. It describes the
 > preview builds; details may still change before the release.
 
+The step-by-step runbook for an operator — backups, Keycloak and OpenBao, configuration changes,
+the upgrade itself, verification and rollback — is
+[Migrating an installation from 2.0 to 3.0](../admin/migrating-2.0-to-3.0.md).
 For what changes inside a **Client SDK** integration, see [Upgrading to 3.0](upgrading-to-3.0.md).
 For adapters, see the 3.0 Edge SDK guides: [Java](../edge-sdk/edge-sdk-adapter-3.0.md) ·
 [Python](../edge-sdk/edge-sdk-python-adapter-3.0.md) · [Go](../edge-sdk/edge-sdk-go-adapter-3.0.md).
@@ -100,8 +103,11 @@ refuses them instead of placing them in the default organization (default: `warn
 
 3.0 signs every person in through Keycloak, with single sign-on per organization (for example
 Microsoft Entra ID); the platform's own password login, refresh cookie and password reset are gone.
-Password users move into Keycloak with their existing passwords; people who signed in through their
-organization's single sign-on on 2.0 keep their accounts. The platform's secrets live in OpenBao;
+Before the platform moves, its password users have to be moved into Keycloak and the license
+activations sealed with `EXPORT_PLATFORM_KEK` into OpenBao; the 3.0 database migration refuses to
+run until they are. The tooling for this move is not available in the preview yet — see
+[Migrating an installation from 2.0 to 3.0](../admin/migrating-2.0-to-3.0.md#5-move-users-and-sealed-secrets).
+The platform's secrets live in OpenBao;
 the Integration Hub keeps its connection credentials only there and moves the ones 2.0 encrypted
 into its database on its first start (set `VAULT_ENCRYPTION_KEY` for that start). See
 [Secrets and sign-in](../admin/secrets-and-sign-in.md).
@@ -126,8 +132,9 @@ working".
    pairing paths that 3.0 removes.
 2. **Move human approvals to signed-in users.** Any integration that approves `HUMAN_APPROVAL` nodes
    with a client credential has to sign in as a user before the platform moves to 3.0.
-3. **Upgrade the platform**: all core services and the console together. 2.0 adapters and 2.0
-   client applications keep working against it.
+3. **Upgrade the platform**: all core services and the console together, following
+   [Migrating an installation from 2.0 to 3.0](../admin/migrating-2.0-to-3.0.md). 2.0 adapters and
+   2.0 client applications keep working against it.
 4. **Upgrade adapters**, one at a time, to the 3.0 Edge SDKs (command registry, v3 telemetry with
    catalog keys). The platform picks each one up within 10 minutes, without a restart.
 5. **Upgrade client applications** to the 3.0 Client SDKs and move from typed calls to commands by id
