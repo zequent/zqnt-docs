@@ -50,6 +50,7 @@ signing key is kept in any service: tokens and credentials are signed inside Ope
 | `infrastructure/grafana` | `admin-password` | admin-console |
 | `platform/peppers/webhook-tokens`, `platform/peppers/claim-codes`, `platform/peppers/stream-keys`, `platform/peppers/agent-pseudonyms` | `value` | the core services |
 | `platform/admin-console/keycloak` | `client-secret` | admin-console (client `zqnt-admin-console`) |
+| `platform/admin-console/seed-admin` | `email`, `password` | written once by admin-console: the first system admin's one-time password (see [The first system admin](#the-first-system-admin)) |
 | `platform/edge-adapter-dji/cloud-api` | `app-key`, `app-id`, `app-license` | the DJI adapter |
 | `organizations/<organization id>/integration/<id>` | the connection's credentials | the Integration Hub |
 
@@ -156,14 +157,32 @@ Every core service is configured with the realm
 
 Passwords are Keycloak's alone. People change theirs in Keycloak's account console
 (`https://<keycloak>/realms/zequent/account`). An administrator sets a new one in the Keycloak
-admin console (**Users → <user> → Credentials → Reset password**). The *Forgot password?* link on
+admin console (**Users → `<user>` → Credentials → Reset password**). The *Forgot password?* link on
 the sign-in page works once Keycloak can send email (**Realm settings → Email**).
+
+### The first system admin
+
+On a new installation the platform creates one system admin, the address in
+`AUTH_SYSTEM_ADMIN_EMAIL` (default `system-admin@zequent.local`). admin-console gives its Keycloak
+account a one-time password and hands it over before setting it:
+
+- with OpenBao, in `zqnt/platform/admin-console/seed-admin` (fields `email`, `password`):
+  `bao kv get -mount=zqnt platform/admin-console/seed-admin`;
+- without OpenBao, in a file only admin-console can read (`AUTH_SYSTEM_ADMIN_PASSWORD_FILE`,
+  default `/tmp/zqnt/seed-admin-password`).
+
+admin-console logs where it put the password, never the password itself. Sign in, change the
+password in Keycloak, then delete it:
+`bao kv metadata delete -mount=zqnt platform/admin-console/seed-admin`. The same happens if that
+system admin is ever left without a Keycloak account.
 
 ### The AI assistant in the Integration Hub
 
-When the AI assistant uses the Integration Hub for a person, admin-console signs a short-lived
-token for that person with its own Ed25519 key (`AUTH_PRIVATE_KEY`); the Hub checks it with the
-public half (`AUTH_PUBLIC_KEY`). No core service accepts these tokens.
+When the AI assistant uses the Integration Hub for a person, admin-console signs a service token
+for that person with the platform's service key (Transit `service-token`), valid for 5 minutes and
+only for the Integration Hub (audience `zqnt-integration-hub`). The Hub checks it with the
+platform's public keys (`ZQNT_PLATFORM_PUBLIC_KEY`, `ZQNT_PLATFORM_KEYS_URL`), like an adapter
+checks the platform's commands. There is no separate key for it.
 
 The realm's defaults: passwords of at least 12 characters, not the username or email, not one of
 the last three; brute-force protection; access tokens valid for 5 minutes; sessions end after
@@ -198,14 +217,13 @@ setting, never the value. Generate your own values for every one of them.
 
 | What | How | Effect |
 | --- | --- | --- |
-| Transit signing keys `service-token`, `credential` | `bao write -f zqnt-transit/keys/<name>/rotate` | The services sign with the new version once it is 15 minutes old (`ZQNT_SECRETS_OPENBAO_NEW_KEY_VERSION_GRACE`), so every service and adapter has learned it first (the services refresh the keys every 5 minutes, `ZQNT_SECRETS_OPENBAO_KEY_REFRESH`). Older versions keep verifying |
+| Transit signing keys `service-token` (also the AI assistant's calls into the Integration Hub), `credential` | `bao write -f zqnt-transit/keys/<name>/rotate` | The services sign with the new version once it is 15 minutes old (`ZQNT_SECRETS_OPENBAO_NEW_KEY_VERSION_GRACE`), so every service and adapter has learned it first (the services refresh the keys every 5 minutes, `ZQNT_SECRETS_OPENBAO_KEY_REFRESH`). Older versions keep verifying |
 | Transit `export-signing` | `bao write -f zqnt-transit/keys/export-signing/rotate` | New exports name the version they were signed with; older exports keep verifying while their version exists |
 | Transit `platform-kek` | `bao write -f zqnt-transit/keys/platform-kek/rotate` | admin-console moves every stored secret to the newest version every hour (`ZQNT_SECRETS_OPENBAO_REWRAP_EVERY`) |
 | A secret in KV | change it where it is used (for example the database role's password), then `bao kv patch -mount=zqnt <path> <field>=…` and restart the workloads that read it | — |
 | `platform/admin-console/keycloak` | Keycloak: **Clients → zqnt-admin-console → Credentials → Regenerate**, then `bao kv patch -mount=zqnt platform/admin-console/keycloak client-secret=…` | admin-console reads it whenever it requests a new admin token; no restart |
 | Keycloak's realm signing keys | Keycloak: **Realm settings → Keys**: add a new key, keep the old one passive until the last tokens signed with it have expired (5 minutes), then remove it | The services fetch the realm's keys every 10 minutes, and again when a token names an unknown key |
 | An organization's Entra ID client secret | [see below](#rotating-the-client-secret) | — |
-| The AI assistant's token key (`AUTH_PRIVATE_KEY` / `AUTH_PUBLIC_KEY`) | generate a new Ed25519 pair, set the private half on admin-console and the public half on the Integration Hub, restart both | Tokens signed with the old key stop working at once; they live for minutes |
 | The peppers | **never** | Changing a pepper invalidates every webhook token, claim code or stream key stored under it |
 
 Edge and client credentials stay valid as long as the key version that signed them exists. Do not
@@ -327,7 +345,7 @@ The platform turns a claim of the ID token into roles. Use the **`roles`** claim
 1. In the app registration, **App roles → Create app role**: *Allowed member types* Users/Groups,
    and a **Value** per platform role you want to hand out, for example `Zequent.OrgAdmin`,
    `Zequent.Operator`, `Zequent.Viewer`.
-2. In **Enterprise applications → <your app> → Users and groups**, assign users or groups to those
+2. In **Enterprise applications → `<your app>` → Users and groups**, assign users or groups to those
    app roles. Entra ID puts the values of the assigned app roles into the `roles` claim.
 
 Do not use the `groups` claim for this unless you have to. Above 200 groups Entra ID no longer
