@@ -80,6 +80,7 @@ object of params — no typed method per command. These pages describe preview b
 | Forward the live telemetry of selected assets to MQTT, Kafka, OPC UA or another Integration Hub sink (3.0) | [Forwarding live telemetry](integrations/telemetry-source-3.0.md) |
 | Decide which commands wait for a person's approval — per risk level and per operator, AI agent and automation, as system default, per organization and per site; hard guards, loosening safeguards (3.0) | [Approval rules](concepts/approval-rules-3.0.md) |
 | Keep the platform's secrets in OpenBao, sign people in through Keycloak, rotate keys, back up, connect an organization's Microsoft Entra ID (3.0) | [Secrets and sign-in](admin/secrets-and-sign-in.md) |
+| Size an installation: what one admin-console replica handles, service level objectives, when to add replicas, CPU and memory per service, Postgres and Redis connections (3.0, first measurements) | [Sizing and capacity](admin/sizing-and-capacity.md) |
 | Build an adapter on the 3.0 Edge SDK: command registry, v3 commands and events, telemetry catalog, conformance kit | [Java](edge-sdk/edge-sdk-adapter-3.0.md) · [Python](edge-sdk/edge-sdk-python-adapter-3.0.md) · [Go](edge-sdk/edge-sdk-go-adapter-3.0.md) |
 
 ## Platform Service Images
