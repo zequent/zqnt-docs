@@ -1,5 +1,8 @@
 # Organizations, Users & Single Sign-On
 
+> On 3.0 (preview) with Keycloak sign-in, single sign-on is set up per organization in the console
+> instead: see [Secrets and sign-in](secrets-and-sign-in.md#microsoft-entra-id-for-an-organization).
+
 This page covers standing up a new deployment's first organization and users, and connecting an
 organization to its own OIDC identity provider (SSO) instead of the platform's built-in
 email+password login.

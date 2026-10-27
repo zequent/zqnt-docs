@@ -83,6 +83,25 @@ The client also carries scheduler methods (`create_scheduler`, `update_scheduler
 credential is refused (`PERMISSION_DENIED`): schedules and event triggers are managed in the Admin
 Console — see [Scheduled triggers](../concepts/applications-and-skills.md#scheduled-triggers).
 
+## Simulating an Application (3.0 preview)
+
+On a 3.0 platform, `client.simulations` (`client_sdk.SimulationsClient`) runs an Application on a
+virtual fleet with mock data, and nothing reaches a device. It uses the same Mission Autonomy
+connection. Types are the generated
+`zqnt_api.generated.zqnt.application_simulation.v3.application_simulation_pb2` messages; every call
+raises `client_sdk.CommandError` carrying the gRPC `status`. Guide and examples:
+[Simulating an Application](../client-sdk/SIMULATION-3.0.md).
+
+| Method | Returns | Purpose |
+| --- | --- | --- |
+| `start_simulation(request)` | `StartSimulationResponse` | Start a simulated run; returns once it is running, with `execution_id` and `status`. A request without `context.idempotency_key` gets a new one |
+| `simulation_trace(execution_id)` | `SimulationTrace` | The path the run took so far, or in full once it has ended |
+| `cancel_simulation(execution_id)` | `int` (a `SimulationStatus` value) | Stop a simulated run; `CANCELLING` while its commands stop |
+| `wait_for_simulation(execution_id, *, interval=1.0, timeout=None)` | `SimulationTrace` | Poll the trace until `SUCCEEDED`, `FAILED`, `CANCELLED` or `TIMED_OUT`. `interval` and `timeout` in seconds or as `timedelta`; `timeout=None` waits without a limit. When it elapses first it raises `CommandError` with category `ERROR_CATEGORY_TIMEOUT` and the run keeps going |
+| `simulate(request, *, interval=1.0, timeout=None)` | `SimulationTrace` | `start_simulation`, then `wait_for_simulation` |
+
+`client_sdk.simulations.FINAL_SIMULATION_STATUSES` holds the final statuses.
+
 ## See also
 
 - [Applications & Skills](../concepts/applications-and-skills.md) — narrative introduction and

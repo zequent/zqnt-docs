@@ -105,11 +105,12 @@ push URL for you, and hands back a playback URL you can put straight into a play
 
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/api/admin-console/streams` | Every stream of your organization that is live right now |
 | `GET` | `/api/admin-console/streams/{sn}` | Current state: is it live, which camera, playback URL |
 | `POST` | `/api/admin-console/streams/{sn}/start` | Start the stream |
 | `POST` | `/api/admin-console/streams/{sn}/stop` | Stop the stream |
-| `POST` | `/api/admin-console/streams/{sn}/lens` | Switch the active lens |
-| `POST` | `/api/admin-console/streams/{sn}/zoom` | Change zoom |
+
+Lens and zoom are not stream endpoints: they are camera commands, see [Camera control](#camera-control).
 
 Start a stream, letting the platform choose the camera:
 
@@ -141,12 +142,35 @@ The response describes the command, and for a successful start it carries the pl
 `assetType` and `startedAt`. It is the right call to make when a page loads, because a stream may
 already be running — started automatically, or by another operator.
 
-Every endpoint needs a signed-in console user. Reading the state is open to any of them; start,
-stop, lens and zoom need the **operator** role.
+Every endpoint needs a signed-in console user. Reading the state is open to any of them; start and
+stop need the **operator** role.
 
-When the Admin Console API knows the media server's API (`LIVE_STREAM_MEDIA_SERVER_API_URL`),
-`live` reflects whether video is really arriving there, not just whether the device accepted the
-start command.
+When the platform knows the media server's API (`LIVE_STREAM_MEDIA_SERVER_API_URL`, set on the
+Live Data service), `live` reflects whether video is really arriving there, not just whether the
+device accepted the start command.
+
+### Which streams are live
+
+`GET /api/admin-console/streams` lists every stream the media server is receiving for your
+organization right now, whatever started it — the console, a Skill, your application or the device
+on its own. You only see assets on sites you may read.
+
+```json
+[
+  {
+    "assetSn": "1581F5BMD227T00A1234",
+    "assetName": "Dock North — aircraft",
+    "path": "live/1581F5BMD227T00A1234/drone",
+    "since": "2026-10-16T18:55:00Z",
+    "viewers": 2
+  }
+]
+```
+
+For a docked aircraft the asset is the aircraft itself. `viewers` counts every session reading the
+stream (browsers, recorders, the AI adapter). The answer is `503` when the platform has no current
+answer from the media server — no `LIVE_STREAM_MEDIA_SERVER_API_URL`, or the media server is not
+reachable; retry later.
 
 ## Option B — the Client SDK
 
@@ -244,6 +268,29 @@ resp, err := liveDataClient.StartLiveStream(ctx, &devicecontrol.LiveStreamStartC
 })
 ```
 
+### Which streams are live
+
+The same list as `GET /api/admin-console/streams`, for the organization your client credential
+belongs to: the publishing asset, the media server `path`, `since` and `viewers`. When the platform
+has no current answer from the media server the call fails with `UNAVAILABLE`, which is safe to
+retry.
+
+```java
+List<LiveStream> live = zequent.liveStreams().listLiveStreams().get();
+```
+
+```python
+for stream in await client.live_streams.list_live_streams():
+    print(stream.asset.sn, stream.path, stream.since.ToDatetime(), stream.viewers)
+```
+
+```go
+live, err := streams.New(conn).ListLiveStreams(ctx)
+if status.Code(err) == codes.Unavailable {
+    // no current answer from the media server; retry later
+}
+```
+
 ### The start response does not contain a playback URL
 
 Over the SDK, a successful start returns success, `tid`, `sn` and a message — **not** a playback
@@ -256,15 +303,29 @@ server's WHEP endpoint, query string preserved — or call
 
 ## Camera control
 
-Available alongside the stream, for DJI:
+Lens and zoom are commands the asset publishes, like every other command:
+`camera.change_lens` and `camera.change_zoom`. Run them through the generic asset command
+endpoint, `POST /api/admin-console/assets/{sn}/commands/{commandId}`, or the client SDK's
+`executeCommand` (`execute_command` in Python, `ExecuteCommand` in Go). An asset that has not
+published the command refuses it with `command.not_supported`, and nothing reaches the device.
 
-| Control | Admin Console API | Client SDK |
+| Control | Command | Parameters |
 | --- | --- | --- |
-| Switch lens | `POST /streams/{sn}/lens` with `{"lens": "wide"}` | `liveData().changeCameraLens(...)` |
-| Zoom | `POST /streams/{sn}/zoom` with `{"lens": "zoom", "zoom": 5}` | `liveData().changeCameraZoom(...)` |
-| Split-screen | — | `remoteControl().liveStreamSplitScreen(...)` |
+| Switch lens | `camera.change_lens` | `lens`; `videoId` optional, defaults to the running stream |
+| Zoom | `camera.change_zoom` | `lens`, `zoom` |
+| Split-screen | `stream.split_screen` | `enabled` |
 
-Valid `lens` values are `wide`, `zoom` and `ir`.
+```bash
+curl -X POST http://admin-console:8005/api/admin-console/assets/1581F5BMD227T00A1234/commands/camera.change_lens \
+     -H 'Content-Type: application/json' \
+     -d '{"params": {"lens": "ir"}}'
+```
+
+The allowed values and limits are not fixed by the platform: they are in the command's input
+schema, which the asset publishes (`GET /api/admin-console/assets/{sn}/capabilities`, or
+`listCapabilities` in the client SDK). On DJI, `lens` is one of `wide`, `zoom` and `ir`;
+`camera.change_zoom` takes `zoom` or `ir` and a factor from 2 to 200, and the camera refuses a
+factor beyond its own lens. A lens switch needs a running stream.
 
 **Split-screen needs a running stream on the thermal lens.** The command switches the camera to `ir`
 first and then enables the split view; with no stream running it answers that there is no active
@@ -294,7 +355,7 @@ string.
 | --- | --- | --- |
 | `LIVE_STREAM_SERVER_URL` | Admin Console API | RTMP base the device publishes to, e.g. `rtmp://media.example.com/live` |
 | `LIVE_WHEP_BASE_URL` | Admin Console API | HTTP base your player pulls from, e.g. `https://media.example.com` |
-| `LIVE_STREAM_MEDIA_SERVER_API_URL` | Admin Console API | Optional. The media server's API, used to check that a stream is really live |
+| `LIVE_STREAM_MEDIA_SERVER_API_URL` | Live Data service | Optional. The media server's API, used to check that a stream is really live and to list live streams |
 | `LIVE_STREAM_AUTO_START_ENABLED` | Admin Console API | `true` for platform auto-start mode (default `false`) |
 | `LIVE_STREAM_AUTH_ENABLED` | Admin Console API | `true` when the media server authenticates (default `false`) — see below |
 | `LIVE_STREAM_AUTH_HOOK_SECRET` | Admin Console API | Secret the media server must send to the authentication hook |

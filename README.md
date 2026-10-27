@@ -16,6 +16,10 @@ This public documentation is for external developers and integration teams. It f
 > [1.3 Java Client SDK Quickstart](client-sdk/QUICKSTART-1.3.md)). To upgrade, see
 > [Upgrading from 1.3](concepts/migration-guide.md).
 
+> **3.0 preview.** The 3.0 Client and Edge SDKs are available as preview builds for trying against a 3.0
+> platform; 3.0 is not released yet. Their pages end in `-3.0.md` and are listed under
+> [3.0 (preview)](#30-preview); everything else on this page is 2.0.
+
 ## Start Here
 
 | Goal | Documentation |
@@ -56,6 +60,28 @@ Customer applications normally use the Client SDK and connect to the platform se
 | Java Client SDK | [Quickstart](client-sdk/QUICKSTART.md), [Configuration](client-sdk/CONFIGURATION.md), [Customer Example](client-sdk/CUSTOMER_EXAMPLE.md) |
 | Python Client SDK | [Quickstart](client-sdk/QUICKSTART_PYTHON.md), [Configuration](client-sdk/CONFIGURATION_PYTHON.md), [Customer Example](client-sdk/CUSTOMER_EXAMPLE_PYTHON.md) |
 | Go Client SDK | [Quickstart](client-sdk/QUICKSTART_GO.md), [Connector](client-sdk/CONNECTOR_GO.md) — no built-in retry/circuit-breaker/Stork layer, see the quickstart's "What this SDK deliberately does not do" |
+
+## 3.0 (preview)
+
+On a 3.0 platform every asset is commanded the same way: list the asset's capabilities, then run a
+command by its dotted id (`flight.takeoff`, `navigation.go_to`, `dock.open_cover`, …) with a JSON
+object of params — no typed method per command. These pages describe preview builds and change until
+3.0 is released; the 2.0 pages above stay authoritative for 2.0 platforms.
+
+| Goal | Documentation |
+| --- | --- |
+| What changes for an integration, running against 2.x platforms, typed call → command id | [Upgrading to 3.0](concepts/upgrading-to-3.0.md) |
+| Discover capabilities, execute, wait, watch and cancel commands from Java | [Commands (Java)](client-sdk/COMMANDS-3.0.md) |
+| … from Python | [Commands (Python)](client-sdk/COMMANDS_PYTHON-3.0.md) |
+| … from Go | [Commands (Go)](client-sdk/COMMANDS_GO-3.0.md) |
+| Fly an asset by hand (stick input) and watch live telemetry on 3.0 | the "Manual control" and "Live telemetry" sections of the Commands pages |
+| Simulate an Application before it flies — scenarios per node, a virtual fleet, fast-forward — and read which way it went through its graph, from Java, Python or Go; "Simulator first" for the AI assistant's versions | [Simulating an Application](client-sdk/SIMULATION-3.0.md) · [concept](concepts/applications-and-skills.md#simulating-an-application-30-preview) |
+| Plan the move of an installation (platform, adapters, clients) to 3.0: breaking changes, what keeps working, upgrade order | [Upgrading the platform to 3.0](concepts/upgrading-platform-to-3.0.md) |
+| Forward the live telemetry of selected assets to MQTT, Kafka, OPC UA or another Integration Hub sink (3.0) | [Forwarding live telemetry](integrations/telemetry-source-3.0.md) |
+| Decide which commands wait for a person's approval — per risk level and per operator, AI agent and automation, as system default, per organization and per site; hard guards, loosening safeguards (3.0) | [Approval rules](concepts/approval-rules-3.0.md) |
+| Keep the platform's secrets in OpenBao, sign people in through Keycloak, rotate keys, back up, connect an organization's Microsoft Entra ID (3.0) | [Secrets and sign-in](admin/secrets-and-sign-in.md) |
+| Size an installation: what one admin-console replica handles, service level objectives, when to add replicas, CPU and memory per service, Postgres and Redis connections (3.0, first measurements) | [Sizing and capacity](admin/sizing-and-capacity.md) |
+| Build an adapter on the 3.0 Edge SDK: command registry, v3 commands and events, telemetry catalog, conformance kit | [Java](edge-sdk/edge-sdk-adapter-3.0.md) · [Python](edge-sdk/edge-sdk-python-adapter-3.0.md) · [Go](edge-sdk/edge-sdk-go-adapter-3.0.md) |
 
 ## Platform Service Images
 
@@ -135,6 +161,7 @@ See [Client SDK Configuration](client-sdk/CONFIGURATION.md) for the full `.env` 
 4. **Edge credentials** — one per adapter and for the simulator (`<NAME>_EDGE_TOKEN` in `.env.customer`), issued after the platform is up in the Admin Console (Edge credentials) or offline with `core/scripts/mint-edge-credential.py`. The compose file passes the service public key to every adapter as `ZQNT_PLATFORM_PUBLIC_KEY` and keeps the platform's private keys and passwords away from them.
 5. **Stream-auth hook secret** — `LIVE_STREAM_AUTH_HOOK_SECRET`, the same value in your media server's `authHTTPAddress` (only with a media server that authenticates).
 6. **Stream-key pepper** — `LIVE_STREAM_KEYS_PEPPER`, optional, set once and never changed.
+7. **AI assistant pepper** — `ZQNT_PEPPER_AGENT_PSEUDONYMS` (`openssl rand -hex 32`), required by the admin console; set once.
 
 `LICENSING_PUBLIC_KEY` (needed on 1.3) is no longer needed: the services trust the Zequent license hub's key compiled into them.
 
