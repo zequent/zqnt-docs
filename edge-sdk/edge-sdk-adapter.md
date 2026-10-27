@@ -138,14 +138,14 @@ private void report(String sn, String executionId, String commandId, CommandExec
     liveData.produceNotificationData(NotificationRequestData.builder()
             .sn(sn)
             .tid(UUID.randomUUID().toString())
-            .timestamp(LocalDateTime.now())
+            .timestamp(Instant.now())
             .eventType(NotificationEventType.NOTIFICATION_EVENT_COMMAND_EXECUTION)
             .commandExecutionEvent(NotificationRequestData.CommandExecutionEventData.builder()
                     .externalExecutionId(executionId)
                     .commandId(commandId)
                     .assetSn(sn)
                     .status(status)
-                    .occurredAt(LocalDateTime.now())
+                    .occurredAt(Instant.now())
                     .build())
             .build());
 }

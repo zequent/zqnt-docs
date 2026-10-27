@@ -291,7 +291,7 @@ import com.zqnt.sdk.edge.adapter.domains.TelemetryRequestData;
 import com.zqnt.utils.edge.sdk.domains.TelemetryData;
 import jakarta.enterprise.context.ApplicationScoped;
 import lombok.extern.slf4j.Slf4j;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Slf4j
@@ -312,7 +312,7 @@ public class TelemetryProducer {
 
         TelemetryData telemetry = TelemetryData.builder()
             .id(UUID.randomUUID().toString())
-            .timestamp(LocalDateTime.now())
+            .timestamp(Instant.now())
             .sn(sn)
             .latitude(47.3769)
             .longitude(8.5417)
@@ -323,7 +323,7 @@ public class TelemetryProducer {
         TelemetryRequestData data = TelemetryRequestData.builder()
             .sn(sn)
             .tid(UUID.randomUUID().toString())
-            .timestamp(LocalDateTime.now())
+            .timestamp(Instant.now())
             .telemetry(telemetry)
             .build();
 

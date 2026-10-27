@@ -67,7 +67,7 @@ This is a source/context distinction, not a device-category one. An Asset can be
 ```java
 import com.zqnt.utils.edge.sdk.domains.TelemetryData;
 import com.zqnt.sdk.edge.adapter.domains.TelemetryRequestData;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 TelemetryData.AssetDetails assetDetails = TelemetryData.AssetDetails.builder()
@@ -77,7 +77,7 @@ TelemetryData.AssetDetails assetDetails = TelemetryData.AssetDetails.builder()
 
 TelemetryData telemetry = TelemetryData.builder()
     .id(UUID.randomUUID().toString())
-    .timestamp(LocalDateTime.now())
+    .timestamp(Instant.now())
     .sn("YOUR_DEVICE_SN")
     .latitude(47.3769)
     .longitude(8.5417)
@@ -88,7 +88,7 @@ TelemetryData telemetry = TelemetryData.builder()
 TelemetryRequestData data = TelemetryRequestData.builder()
     .sn("YOUR_DEVICE_SN")
     .tid(UUID.randomUUID().toString())
-    .timestamp(LocalDateTime.now())
+    .timestamp(Instant.now())
     .telemetry(telemetry)
     .build();
 ```
@@ -124,7 +124,7 @@ TelemetryData.SubAssetDetails subAssetDetails = TelemetryData.SubAssetDetails.bu
 
 TelemetryData telemetry = TelemetryData.builder()
     .id(UUID.randomUUID().toString())
-    .timestamp(LocalDateTime.now())
+    .timestamp(Instant.now())
     .sn("YOUR_DRONE_SN")
     .latitude(47.3769)
     .longitude(8.5417)
@@ -175,7 +175,7 @@ import com.zqnt.sdk.edge.adapter.domains.DetectionRequestData.BoundingBoxData;
 DetectionRequestData batch = DetectionRequestData.builder()
     .sn("YOUR_DEVICE_SN")
     .tid(UUID.randomUUID().toString())
-    .timestamp(LocalDateTime.now())
+    .timestamp(Instant.now())
     .streamUrl("rtmp://...")
     .detections(List.of(
         DetectionResultData.builder()
@@ -212,7 +212,7 @@ import com.zqnt.utils.events.proto.NotificationEventType;
 // Report progress for a command your adapter accepted
 NotificationRequestData progress = NotificationRequestData.builder()
     .sn("YOUR_DEVICE_SN")
-    .timestamp(LocalDateTime.now())
+    .timestamp(Instant.now())
     .eventType(NotificationEventType.NOTIFICATION_EVENT_COMMAND_EXECUTION)
     .commandExecutionEvent(CommandExecutionEventData.builder()
         .externalExecutionId(executionId)   // the id you returned in CommandResult.accepted(...)
@@ -220,7 +220,7 @@ NotificationRequestData progress = NotificationRequestData.builder()
         .assetSn("YOUR_DEVICE_SN")
         .status(CommandExecutionStatus.COMMAND_EXECUTION_STATUS_RUNNING)
         .progress(0.42f)
-        .occurredAt(LocalDateTime.now())
+        .occurredAt(Instant.now())
         .build())
     .build();
 
@@ -241,7 +241,7 @@ import com.zqnt.sdk.edge.adapter.domains.NotificationRequestData.AssetStatusEven
 
 NotificationRequestData assetOffline = NotificationRequestData.builder()
     .sn("YOUR_DEVICE_SN")
-    .timestamp(LocalDateTime.now())
+    .timestamp(Instant.now())
     .assetStatusEvent(AssetStatusEventData.builder()
         .sn("YOUR_DEVICE_SN")
         .online(false)
@@ -328,7 +328,7 @@ The Live Data address is `grpc.client.live-data.host` / `.port` (`LIVE_DATA_SERV
 
 1. **Send telemetry at a reasonable frequency.** Sending too fast can overwhelm the gRPC stream and the platform. For most assets, 1-5 Hz is appropriate. For OSD (on-screen display) data from drones, the typical rate is 2 Hz.
 
-2. **Use the POJO API unless you have a specific reason not to.** The mapper handles all Proto conversions for you, including timestamp mapping between `LocalDateTime` and Protobuf `Timestamp`.
+2. **Use the POJO API unless you have a specific reason not to.** The mapper handles all Proto conversions for you, including timestamp mapping between `Instant` and Protobuf `Timestamp`.
 
 3. **Set exactly one of `asset`/`subAsset`** on `TelemetryData` -- `getSourceType()` (and platform-side routing) depends on it.
 
