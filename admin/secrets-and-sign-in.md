@@ -156,7 +156,7 @@ Every core service is configured with the realm
 
 Passwords are Keycloak's alone. People change theirs in Keycloak's account console
 (`https://<keycloak>/realms/zequent/account`). An administrator sets a new one in the Keycloak
-admin console (**Users → <user> → Credentials → Reset password**). The *Forgot password?* link on
+admin console (**Users → `<user>` → Credentials → Reset password**). The *Forgot password?* link on
 the sign-in page works once Keycloak can send email (**Realm settings → Email**).
 
 ### The AI assistant in the Integration Hub
@@ -327,7 +327,7 @@ The platform turns a claim of the ID token into roles. Use the **`roles`** claim
 1. In the app registration, **App roles → Create app role**: *Allowed member types* Users/Groups,
    and a **Value** per platform role you want to hand out, for example `Zequent.OrgAdmin`,
    `Zequent.Operator`, `Zequent.Viewer`.
-2. In **Enterprise applications → <your app> → Users and groups**, assign users or groups to those
+2. In **Enterprise applications → `<your app>` → Users and groups**, assign users or groups to those
    app roles. Entra ID puts the values of the assigned app roles into the `roles` claim.
 
 Do not use the `groups` claim for this unless you have to. Above 200 groups Entra ID no longer
