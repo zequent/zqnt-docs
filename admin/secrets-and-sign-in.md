@@ -142,8 +142,10 @@ Every core service is configured with the realm
   the realm's JWKS by `kid`), the issuer, the audience `zqnt-platform` and that it is an access token.
   The person is the platform user linked to the token's subject.
 - **Roles, permissions and site scope stay in the platform.** Nothing in the token grants a role.
-- admin-console keeps Keycloak in step: organizations, memberships, and local password users,
-  which move **with their existing password hashes** (nobody has to set a new password). It does so
+- admin-console keeps Keycloak in step: organizations, memberships, and the Keycloak accounts of
+  password users (a new user's first password is set in Keycloak; moving a 2.0 installation's
+  existing passwords is not available yet, see
+  [Migrating an installation from 2.0 to 3.0](migrating-2.0-to-3.0.md#5-move-users-and-sealed-secrets)). It does so
   immediately on every change in the console, completely every 15 minutes
   (`ZQNT_AUTH_KEYCLOAK_SYNC_INTERVAL`), and on `POST /api/admin-console/keycloak/sync` (system
   admin). A Keycloak account the platform did not create is never taken over; it is reported as a
