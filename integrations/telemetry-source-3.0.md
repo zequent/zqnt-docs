@@ -85,7 +85,8 @@ drone per second, on a topic per drone.
 2. **Sink.** Create a connector named `control-room-mqtt`, role **Sink**, type **MQTT**, with the
    broker address and the topic `zequent/telemetry/{assetSn}`. `{assetSn}` is replaced with each
    message's serial number, so `DRONE-7` publishes to `zequent/telemetry/DRONE-7`. Store the broker's
-   username and password in a vault and select it in the connector form.
+   username and password as a secret under **Manage → Access & Integrations → Secrets → Integration
+   Hub** and select it in the connector form's **Secret** field.
 
 3. **Bridge.** Under **Bridges**, create a bridge from `fleet-telemetry` to `control-room-mqtt`,
    leave **Mapping** at "No mapping — pass the source payload through" and start it. A telemetry
