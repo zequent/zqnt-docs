@@ -99,6 +99,20 @@ never shows a stored value; a value is shown once, when it is created. Reading n
 keys** tab: each signing and encryption key with its current version, when it was last rotated
 and which versions are in use.
 
+The **Integration Hub** tab is where the Hub's credentials are managed; the Hub has no Vaults tab
+any more. It lists each credential with its type, the connectors that use it and when it last
+changed:
+
+- **Create** a credential: a name, its type and the value. The value is stored in OpenBao and never
+  shown again.
+- **Change** one: enter the new value, and a new name if you want one. A value is never read back,
+  so changing always takes a new value. A client certificate is replaced by creating a new one.
+- **Delete** one: refused while a connector still uses it; the message names those connectors.
+
+Connector forms in the Integration Hub pick a credential from the same list (field **Secret**), and
+link to this tab to create a new one. Existing credentials and connectors keep working unchanged.
+Whether a person may change a credential is decided by their Integration Hub role.
+
 ### Docker Compose
 
 `docker-compose.customer.yml` starts OpenBao with `--profile openbao`:

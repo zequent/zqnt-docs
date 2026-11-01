@@ -198,6 +198,8 @@ The 3.0 core services additionally need these settings (every core service unles
 | Added | `services.connector.peppers.*`, `console.backend.peppers.*` | the new peppers; generated once into `<release>-credentials` unless you name an `existingSecret`. `console.backend.liveStream.keysPepper` stays as it is |
 | Added | `services.connector.startupSeconds` (default `1800`) | time the connector may take for its migrations before liveness applies; raise it for a very large database |
 | Added (optional) | `availability.*`, `autoscaling.*`, `services.<name>.autoscaling`, `console.backend.replicas`, `agentService.*`, `observability.grafana.keycloak.*`, `networkPolicy.kubeApiServer` | replicas and autoscaling, see [Sizing and capacity](sizing-and-capacity.md); the AI assistant; Grafana sign-in. Narrow `networkPolicy.kubeApiServer.cidr` to your API server when OpenBao is on |
+| Added (optional) | `fileScanner.enabled`, `objectStorage.filesBucket`, `objectStorage.quarantineBucket` | files in the AI assistant's chat: the virus scanner and its buckets, see [AI assistant: files and profiles](ai-assistant-3.0.md#for-operators-helm-chart). Off by default; uploads are refused without the scanner |
+| Automatic | admin-console reaches the Integration Hub (`INTEGRATION_HUB_URL`, network rules) | set by the chart when `integrationHub.enabled`; nothing to configure |
 | Image tags | `services.*.tag`, `console.*.image.tag`, `integrationHub.image.tag` | the 3.0 tags from the release notes |
 
 ### Default passwords are refused
@@ -311,7 +313,7 @@ The connector migrates the database from the last 2.0 version to 3.0 in one go. 
 
 | Migration | What it does | Reversible |
 | --- | --- | --- |
-| Audit log, node runs, custom roles, AI assistant, approval rules, simulated runs, agent profiles | new tables and columns | — |
+| Audit log, node runs, custom roles, AI assistant, approval rules, simulated runs, agent profiles, chat files | new tables and columns | — |
 | Webhook tokens | hashes every event trigger's webhook token with the webhook-token pepper and **drops the stored token** | no |
 | Claim codes | hashes every asset claim code again with the claim-code pepper | no |
 | Single sign-on role mappings | turns each provider's claim-to-role mapping into group mappings and **drops the old column** | no |
@@ -340,7 +342,7 @@ and are revoked (logged as `Revoked N stream keys …`): cut new keys for the de
 | License | **License** / **Organizations** in the console: every organization `VALID`. admin-console logs no `sealed secret(s) could not be moved` |
 | Assets and telemetry | existing assets are online and send telemetry; a command reaches a device |
 | Pairing | create a claim code and pair a test device ([Pairing after the upgrade](../concepts/upgrading-platform-to-3.0.md#pairing-after-the-upgrade)) |
-| Integration Hub | its connections work; the credentials appear under **Manage → Access & Integrations → Secrets** |
+| Integration Hub | its connections work; the credentials appear under **Manage → Access & Integrations → Secrets → Integration Hub** (the Hub has no Vaults tab in 3.0). Bridges without a poll interval on a source that answers at once now run on demand: give the ones that start Applications a poll interval, see [Bridges, triggers and steps](../integrations/integration-hub-bridges-3.0.md#when-a-bridge-reads-its-source) |
 | Live video | a stream plays; devices whose stream key was revoked have new keys |
 | Backups | take the first OpenBao snapshot and Keycloak database dump ([Backup and restore](secrets-and-sign-in.md#backup-and-restore)) |
 

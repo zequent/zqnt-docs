@@ -59,6 +59,9 @@ all. It plays no role in a console-embedded one.
 > required) and accepts Keycloak sign-ins (`ZQNT_AUTH_KEYCLOAK_ISSUER`); `AUTH_PUBLIC_KEY` only
 > checks the AI assistant's calls. `VAULT_ENCRYPTION_KEY` is needed once, for the first start after
 > the upgrade. See [Secrets and sign-in](../admin/secrets-and-sign-in.md#integration-hub-credentials).
+> In 3.0 the Hub has no **Vaults** tab any more: its credentials are managed in the console under
+> **Manage → Access & Integrations → Secrets → Integration Hub**. How bridges start Applications, run
+> as steps and react to OPC UA changes: [Bridges, triggers and steps](integration-hub-bridges-3.0.md).
 
 ### Backend -- Required
 
