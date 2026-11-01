@@ -70,6 +70,8 @@ An **Event Trigger** starts an Application's Skill when something happens, witho
 
 Leave the asset blank on a trigger to watch any registered asset. A trigger does not need an asset to fire: with none, the execution follows [Which asset an execution runs on](#which-asset-an-execution-runs-on), so an alarm can start a Skill without naming a drone in advance.
 
+**Late alarms.** A trigger can have a **maximum event age** (in the console: "Ignore events older than"). An event that happened longer ago than that starts nothing, for example an alarm that was held back while a connection was down and arrives all at once afterwards. The platform notes the skip with its reason. The age is measured from when the event happened: for a detection or a telemetry reading the time the asset reported, for a webhook call or a bridge message an `occurredAt` field in ISO 8601 (for example `"occurredAt": "2026-11-01T14:05:00Z"`). A call or message without `occurredAt` counts as happening when it arrives. Without a maximum event age, every event starts a run as before.
+
 ## Running a Skill from your application
 
 Once an Application is deployed, trigger one of its Skills against an asset from your own code using the Client SDK's Mission Autonomy client (Java, Python or Go). The 1.3 Mission/Task methods are gone: in Java they remain only as `@Deprecated` stubs that fail immediately (`createMission`, `createTask`, `startTask`, ...), Python raises `LegacyOperationRemovedError` for them, and the Go SDK no longer has them.
