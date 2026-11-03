@@ -40,7 +40,7 @@ This public documentation is for external developers and integration teams. It f
 | Build a custom Python edge adapter | [Python Edge SDK Quickstart](edge-sdk/edge-sdk-python-quickstart.md) |
 | Build a custom Go edge adapter | [Go Edge SDK Quickstart](edge-sdk/edge-sdk-go-quickstart.md) — older API surface, see the doc's status note |
 | Configure an edge adapter | [Edge SDK Configuration](edge-sdk/edge-sdk-configuration.md) |
-| Deploy a ready-made adapter | [DJI](edge-sdk/edge-sdk-dji-adapter-deployment.md) · [MAVLink](edge-sdk/edge-sdk-mavlink-adapter-deployment.md) · [Sapient](edge-sdk/edge-sdk-sapient-adapter-deployment.md) · [RNS](edge-sdk/edge-sdk-rns-adapter-deployment.md) · [Betaflight](edge-sdk/edge-sdk-betaflight-adapter-deployment.md) · [AI Adapter](edge-sdk/edge-sdk-ai-adapter-deployment.md) |
+| Deploy a ready-made adapter | [DJI](edge-sdk/edge-sdk-dji-adapter-deployment.md) · [MAVLink](edge-sdk/edge-sdk-mavlink-adapter-deployment.md) · [Sapient](edge-sdk/edge-sdk-sapient-adapter-deployment.md) · [RNS](edge-sdk/edge-sdk-rns-adapter-deployment.md) · [Betaflight](edge-sdk/edge-sdk-betaflight-adapter-deployment.md) · [AI Adapter](edge-sdk/edge-sdk-ai-adapter-deployment.md) · [ONVIF cameras (3.0)](edge-sdk/edge-sdk-onvif-adapter-deployment.md) |
 
 
 ## What You Can Build
