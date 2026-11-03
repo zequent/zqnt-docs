@@ -54,7 +54,8 @@ The bridge needs to read its source by itself for this: a poll interval, or a so
 (see the table above).
 
 LoRaWAN sensors behind your own network server work the same way, with alarms already named by
-their decoders: see [Connecting an on-prem LoRaWAN network server](lorawan-3.0.md).
+their decoders: see [Connecting an on-prem LoRaWAN network server](lorawan-3.0.md). For TAK users, see
+[Connecting a TAK Server](tak-3.0.md).
 
 ## Asking the outside world from a run (bridges as steps)
 
