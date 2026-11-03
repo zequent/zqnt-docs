@@ -165,8 +165,9 @@ The serials under `assets` are bound to the node at enrollment:
 - A serial the platform does not know yet is **created as a new asset** of the code's organization.
 - An **existing asset of the same organization** is bound as it is, as long as no other active node
   serves it (an asset of a revoked node is taken over). The code's vendor and type limits apply.
-- Any other existing serial (another organization's asset, or one another active node serves) stops
-  the enrollment with an error that names the serial. Nothing is created and the code is not used
+- Any other existing serial stops the enrollment with an error that names the serial: an asset of
+  another organization (the error says only that the serial is already registered) or one that
+  another active node of your organization serves (the error names that node). Nothing is created and the code is not used
   up: fix `node.yaml`, or unbind the asset from the other node, and enroll again.
 
 A personal node lists exactly one asset.
@@ -322,8 +323,8 @@ on the node's page goes up by one.
 | --- | --- |
 | Connection and Last seen show **Unknown**; no platform anchor at the top of the page; codes come without a provisioning file | admin-console cannot reach Edge Link: `EDGE_LINK_SERVICE_HOST` is unset, or Edge Link does not answer admin-console within 5 seconds. The nodes themselves may be online. Check the variable and the network between admin-console and Edge Link. |
 | `enroll` fails with `enrollment refused` | Edge Link does not say why, by design. Usual causes: the code is wrong, expired or used up; the key protection is below the platform's minimum (for example `software-dev` on a production platform); TLS does not terminate in Edge Link (see below). Create a new code if needed and try again. |
-| `Asset … exists already and does not belong to this code's organization` | A serial under `assets` is an asset of another organization. Remove it from `node.yaml`, or enroll with a code of that organization. The code was not used up. |
-| `Asset … is served by Edge Node "…"; unbind it there first` | Another active node serves this asset. Unbind it on that node's page (or revoke that node), then run `enroll` again with the same code. |
+| `Serial … is already registered and cannot be enrolled with this code` | A serial under `assets` belongs to another organization. For its owner's privacy the message says nothing more. Remove it from `node.yaml`, or enroll with a code of the organization it belongs to. The code was not used up. |
+| `Asset … is served by Edge Node "…"; unbind it there first` | Another active node of your organization serves this asset. Unbind it on that node's page (or revoke that node), then run `enroll` again with the same code. |
 | `This code allows only … assets; asset … is not one` | The code was created for one vendor or type and the asset is another. Use a code without that limit. |
 | `too many failed attempts, back off` | 10 failed attempts within 15 minutes from one address or for one code. Wait and fix the cause first. |
 | `This code enrolls a … Edge Node; this node is configured as … node (node_class)` | `identity.node_class` in `node.yaml` differs from the code's class. Nothing was created and the code was not used up: set the class in `node.yaml` (or create a code of the other class) and run `enroll` again. |
