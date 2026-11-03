@@ -1,7 +1,7 @@
 # Bridges, triggers and steps (3.0 preview)
 
 A **bridge** in the Integration Hub connects a source (an OPC UA server, an HTTP API, a WebSocket,
-Kafka, the platform's live telemetry) to a sink, with a mapping in between that turns the source's
+Kafka, an MQTT broker, the platform's live telemetry) to a sink, with a mapping in between that turns the source's
 data into named values. In 3.0 a bridge works with the platform in two directions:
 
 - **The outside world starts a run.** A fire alarm, a machine fault or a gate sensor: the bridge
@@ -28,7 +28,7 @@ interval** (`pollIntervalMs`):
 | --- | --- | --- |
 | Answers each request at once: HTTP / OpenAPI, OPC UA (read), iosys | reads at that interval | **on demand only**: no background reading; it runs when a step calls it |
 | Takes inputs (for example the Open-Meteo template's latitude and longitude) | on demand only | on demand only |
-| Pushes messages: WebSocket, Kafka, Zequent Telemetry, OPC UA with **Push on change** | not used | reads each message as it arrives |
+| Pushes messages: WebSocket, Kafka, MQTT, Zequent Telemetry, OPC UA with **Push on change** | not used | reads each message as it arrives |
 
 A bridge that runs on demand shows the status **on demand**. It cannot start Applications by itself:
 it never reads anything until something calls it. Give it a poll interval, or use a source that
@@ -52,6 +52,9 @@ pushes, when it should start runs.
 
 The bridge needs to read its source by itself for this: a poll interval, or a source that pushes
 (see the table above).
+
+LoRaWAN sensors behind your own network server work the same way, with alarms already named by
+their decoders: see [Connecting an on-prem LoRaWAN network server](lorawan-3.0.md).
 
 ## Asking the outside world from a run (bridges as steps)
 
