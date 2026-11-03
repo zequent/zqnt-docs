@@ -59,6 +59,7 @@ Your platform operator sets up Edge Link once:
   | `EDGE_LINK_SERVICE_HOST`, `EDGE_LINK_SERVICE_PORT` (default `8006`) | Where admin-console asks Edge Link for connection status and the anchor fingerprints. Unset means the console cannot show connection status and creates codes without a provisioning file. |
   | `EDGE_LINK_PUBLIC_ENDPOINT` | `host:port` that nodes reach Edge Link at, written into provisioning files and QR codes |
   | `EDGE_LINK_PUBLIC_SERVER_NAME` | Optional: the TLS server name, when it differs from the endpoint's host |
+  | `EDGE_LINK_PUBLIC_CA_FILE` | Optional: path to a PEM file with the CA certificate(s) of Edge Link's TLS certificate, when that certificate is not publicly trusted. Written into provisioning files and QR codes, so devices need no `ca_file`. admin-console does not start if the file holds no certificate. |
 
 - **The weakest key protection accepted**, `EDGE_NODES_MINIMUM_KEY_PROTECTION`, set to the same value
   on connector and Edge Link. The default is `SOFTWARE_SEALED`. See
@@ -123,8 +124,8 @@ For `tpm` and `software-tpm-sealed`, open the TPM lines in the systemd unit
    - **Organization** (system admins only).
    - **Node class**: Infrastructure or Personal.
    - **Label**, optional, for example "rooftop gateway".
-   - **Devices**: how many devices may enroll with this code. The platform allows at most 10 per
-     code. The dialog then says what the code is good for.
+   - **Devices**: how many devices may enroll with this code, at most 10 per code. The dialog then
+     says what the code is good for.
    - **Valid for**: 15 minutes, 1 hour (default), 8 hours or 24 hours.
 3. **Create code.** The dialog shows:
    - the **enrollment code** (`ZQ-XXXXX-XXXXX`),
@@ -134,10 +135,12 @@ For `tpm` and `software-tpm-sealed`, open the TPM lines in the systemd unit
 The code, the QR code and the provisioning file are **shown once**. The platform keeps only a hash
 of the code. If you lose them, create a new code.
 
-The provisioning file and the QR code carry the code, the installation id, the anchor keys and the
-Edge Link endpoint. A device that enrolls with them enrolls only with this installation. If the
-dialog says **No provisioning file**, admin-console could not reach Edge Link (see
-[Troubleshooting](#troubleshooting)). The code alone still works.
+The provisioning file and the QR code carry the code, the installation id, the anchor keys, the
+Edge Link endpoint and, when the installation sets `EDGE_LINK_PUBLIC_CA_FILE`, the CA certificate
+of Edge Link's TLS certificate. A device that enrolls with them enrolls only with this installation
+and trusts that CA for it. When the content is too large for a QR code (a long CA chain), the dialog
+offers only the provisioning file. If the dialog says **No provisioning file**, admin-console could
+not reach Edge Link (see [Troubleshooting](#troubleshooting)). The code alone still works.
 
 ### 2. Configure the device
 
@@ -154,12 +157,19 @@ links:
     driver: ip-session
     endpoint: edge-link.example.com:443
     # ca_file: /etc/zqnt-edge-node/ca.pem   # when the Edge Link certificate is not publicly trusted
+                                            # and you enroll without a provisioning file that carries it
 ```
 
-The serials under `assets` are **created as new assets** of the organization at enrollment and bound
-to the node. A serial that already exists in the platform makes the enrollment fail, so list only
-new assets here and [bind existing ones](#bind-assets) in the console afterwards. A personal node
-lists exactly one asset.
+The serials under `assets` are bound to the node at enrollment:
+
+- A serial the platform does not know yet is **created as a new asset** of the code's organization.
+- An **existing asset of the same organization** is bound as it is, as long as no other active node
+  serves it (an asset of a revoked node is taken over). The code's vendor and type limits apply.
+- Any other existing serial (another organization's asset, or one another active node serves) stops
+  the enrollment with an error that names the serial. Nothing is created and the code is not used
+  up: fix `node.yaml`, or unbind the asset from the other node, and enroll again.
+
+A personal node lists exactly one asset.
 
 Check the file:
 
@@ -311,13 +321,17 @@ on the node's page goes up by one.
 | Symptom | Cause and fix |
 | --- | --- |
 | Connection and Last seen show **Unknown**; no platform anchor at the top of the page; codes come without a provisioning file | admin-console cannot reach Edge Link: `EDGE_LINK_SERVICE_HOST` is unset, or Edge Link does not answer admin-console within 5 seconds. The nodes themselves may be online. Check the variable and the network between admin-console and Edge Link. |
-| `enroll` fails with `enrollment refused` | Edge Link does not say why, by design. Usual causes: the code expired or was used up; a serial under `assets` already exists in the platform; the key protection is below the platform's minimum (for example `software-dev` on a production platform); TLS does not terminate in Edge Link (see below). Create a new code if needed and try again. |
+| `enroll` fails with `enrollment refused` | Edge Link does not say why, by design. Usual causes: the code is wrong, expired or used up; the key protection is below the platform's minimum (for example `software-dev` on a production platform); TLS does not terminate in Edge Link (see below). Create a new code if needed and try again. |
+| `Asset … exists already and does not belong to this code's organization` | A serial under `assets` is an asset of another organization. Remove it from `node.yaml`, or enroll with a code of that organization. The code was not used up. |
+| `Asset … is served by Edge Node "…"; unbind it there first` | Another active node serves this asset. Unbind it on that node's page (or revoke that node), then run `enroll` again with the same code. |
+| `This code allows only … assets; asset … is not one` | The code was created for one vendor or type and the asset is another. Use a code without that limit. |
 | `too many failed attempts, back off` | 10 failed attempts within 15 minutes from one address or for one code. Wait and fix the cause first. |
-| `node class …, configured …` | `identity.node_class` in `node.yaml` differs from the code's class. The platform had already accepted the enrollment, so the node appears in the console: revoke it, set the class in `node.yaml`, and enroll with a new code. |
+| `This code enrolls a … Edge Node; this node is configured as … node (node_class)` | `identity.node_class` in `node.yaml` differs from the code's class. Nothing was created and the code was not used up: set the class in `node.yaml` (or create a code of the other class) and run `enroll` again. |
+| `node class …, configured …` | The same mismatch, reported by an older node runtime after the platform had accepted the enrollment: the node appears in the console. Revoke it, set the class in `node.yaml`, and enroll with a new code. |
 | `platform does not match the provisioning file` | The provisioning file comes from another installation, or the installation's anchor changed. Use a file from this installation's console. |
 | `node is already enrolled` | The device holds an enrollment. Use a re-enrollment code with `--reenroll`. |
 | Every enrollment and connection fails although the endpoint is right | A proxy or ingress terminates TLS in front of Edge Link, or the connection is not TLS 1.3. Configure TLS passthrough so the node's TLS connection ends in Edge Link. |
-| TLS certificate errors on the device | The Edge Link certificate is not trusted by the device: set `ca_file` on the link (or `--ca-file`), and `server_name` (or `--server-name`) when the name in the certificate differs from the endpoint host. |
+| TLS certificate errors on the device | The Edge Link certificate is not trusted by the device: enroll with a provisioning file from an installation that sets `EDGE_LINK_PUBLIC_CA_FILE`, or set `ca_file` on the link (or `--ca-file`); and `server_name` (or `--server-name`) when the name in the certificate differs from the endpoint host. |
 | The node stays **Offline** although the service runs | Read `journalctl -u zqnt-edge-node`. Check the status (a Suspended or Revoked node is refused), the link `endpoint`, and TLS passthrough. |
 | Every connection takes an extra round trip | The device's clock is more than 2 minutes off (`EDGE_LINK_HANDSHAKE_FRESHNESS`, default `120s`). Edge Link then answers with its own time and a nonce, and the node still connects. Synchronise the clock (NTP). |
 | Last seen looks old | The list refreshes every 30 seconds. Last seen is when the node's last session ended. Suspending, revoking and reporting lost take effect within seconds. Edge Link otherwise re-checks a node's status at the latest every 60 seconds (10 seconds for a personal node). |
