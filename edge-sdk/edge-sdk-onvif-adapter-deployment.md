@@ -57,6 +57,7 @@ tilt_min = -90
 tilt_max = 20
 range = 800                          # metres within which the camera can identify a target
 # transcode = true                   # H.265 cameras: re-encode to H.264 for the browser
+# auto_stream = true                 # on air as soon as the camera connects, see Live video
 ```
 
 Passwords are never written into the file; a `password` key is refused. Cameras found by
@@ -106,9 +107,40 @@ the next.
 ## Live video
 
 When an operator opens the live view (or an Application runs `stream.start`), the platform sends the
-media server's publish URL and the adapter relays the camera's RTSP stream to it with ffmpeg,
-without re-encoding unless `transcode` is set. Browsers play H.264; set `transcode = true` (or
-`ONVIF_TRANSCODE=true` for every camera) for H.265 cameras.
+media server's publish URL — `live/<sn>` on the media server, with a freshly minted publish key —
+and the adapter relays the camera's RTSP stream (ONVIF `GetStreamUri`, with the camera's login) to
+exactly that URL with ffmpeg, without re-encoding unless `transcode` is set. Browsers play H.264;
+set `transcode = true` (or `ONVIF_TRANSCODE=true` for every camera) for H.265 cameras. The console
+then plays the stream over WHEP as for any other asset, in the asset's live view and in the
+execution live view.
+
+The relay is supervised: a stream that drops is restarted with growing delays (1 s doubling to
+30 s), one that cannot get going gives up after a few tries. Its state is published as telemetry
+(`camera.stream`: `running`, `reconnecting`, `failed`, `stopped`) and on the `stream.start` /
+`stream.stop` capabilities (`streamState`, `streamReason`), so a refused credential or an
+unreachable RTSP port is visible on the asset instead of in the log alone.
+
+### Streaming without a start from the console
+
+A camera with `auto_stream = true` (per camera or in `[defaults]`) streams as soon as it connects
+and stops reporting when it drops. Who starts it is the same choice as for the DJI adapter (see
+[Live Video](../client-sdk/LIVE_VIDEO.md#automatically-when-the-camera-becomes-available)):
+
+- **The platform.** The adapter reports that the camera can stream. With
+  `LIVE_STREAM_AUTO_START_ENABLED=true` on the Admin Console API the platform answers with the
+  ordinary `stream.start`, fresh publish key included, and stops the stream when the camera goes
+  away. Nothing else to configure.
+- **The adapter itself.** With `ONVIF_STREAM_PUBLISH_URL` (the media server, e.g.
+  `rtmp://mediamtx:1936`) and `ONVIF_STREAM_PUBLISH_KEY` (a publish key an organization admin
+  mints once under **Assets → Stream keys**, permission *publish*, path `live/*`) the camera
+  publishes to `live/<sn>` on its own, with the key as `?user=zqnt-pub&pass=<key>` — the same path
+  and form the platform uses, so the console plays it without knowing who started it. A
+  `stream.start` from the platform replaces that publisher. Per camera, `publish_url` names a
+  different URL and `publish_key_env` / `publish_key_file` that camera's own key (a plain
+  `publish_key` in the file is refused, like `password`).
+
+Without a key the camera publishes with a bare URL, which a media server that authenticates refuses;
+the relay then reports `failed`. Without a publish URL the camera only reports that it can stream.
 
 ---
 
@@ -136,6 +168,8 @@ say) starts an Application. One alert per camera and type is sent per `alert_int
 | --- | --- | --- |
 | `ONVIF_CAMERAS_FILE` | `/etc/zqnt/onvif-cameras.toml` | The camera file |
 | `ONVIF_TRANSCODE` | `false` | Re-encode every stream to H.264 |
+| `ONVIF_STREAM_PUBLISH_URL` | _unset_ | The media server cameras with `auto_stream` publish to by themselves (`live/<sn>` is appended) |
+| `ONVIF_STREAM_PUBLISH_KEY` | _unset_ | Their publish key (Assets → Stream keys, permission *publish*, path `live/*`) |
 | `FFMPEG_BINARY` | `ffmpeg` | The relay's ffmpeg |
 | `ASSET_TYPE` | _unset_ | `ASSET_TYPE_CAMERA` |
 | `ASSET_VENDOR` | _unset_ | `ASSET_VENDOR_RTMP_RTSP` |
