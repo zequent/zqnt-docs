@@ -86,6 +86,7 @@ object of params — no typed method per command. These pages describe preview b
 | Start an Application from an OPC UA, HTTP or Kafka signal, ask the outside world from a run (weather before takeoff), react to OPC UA value changes (3.0) | [Bridges, triggers and steps](integrations/integration-hub-bridges-3.0.md) |
 | Let people attach files to the AI assistant's chat, and set up assistant profiles with your own instructions (3.0) | [AI assistant: files and profiles](admin/ai-assistant-3.0.md) |
 | Size an installation: what one admin-console replica handles, service level objectives, when to add replicas, CPU and memory per service, Postgres and Redis connections (3.0, first measurements) | [Sizing and capacity](admin/sizing-and-capacity.md) |
+| Encrypt the traffic inside an installation: mutual TLS between the core services, TLS from the ingresses, the internal CA, switching it on with Helm or Compose, your own CA (3.0) | [Securing an installation](admin/securing-an-installation.md) |
 | Connect a site's devices as Edge Nodes: enroll with a one-time code, QR code or provisioning file, check they are online, bind assets, suspend, revoke, report a lost device (preview) | [Enrolling and managing Edge Nodes](admin/edge-nodes.md) |
 | Build an adapter on the 3.0 Edge SDK: command registry, v3 commands and events, telemetry catalog, conformance kit | [Java](edge-sdk/edge-sdk-adapter-3.0.md) · [Python](edge-sdk/edge-sdk-python-adapter-3.0.md) · [Go](edge-sdk/edge-sdk-go-adapter-3.0.md) |
 
