@@ -14,6 +14,7 @@ neither read nor tamper with telemetry, commands or service tokens.
 - [PostgreSQL and Redis](#postgresql-and-redis)
 - [Switching it on with Helm](#switching-it-on-with-helm)
 - [Switching it on with Docker Compose](#switching-it-on-with-docker-compose)
+- [Workloads outside core](#workloads-outside-core)
 - [The final step: refusing plaintext](#the-final-step-refusing-plaintext)
 - [Bringing your own CA](#bringing-your-own-ca)
 - [Checking that it works](#checking-that-it-works)
@@ -29,6 +30,11 @@ neither read nor tamper with telemetry, commands or service tokens.
 | Edge Nodes → edge-link | TLS (edge-link's own certificate) | unchanged; the same listener also serves the core |
 | Core services → PostgreSQL | password, plaintext | TLS to PostgreSQL's certificate (`sslmode=verify-full`), then the password |
 | Core services → Redis | password, plaintext | TLS to Redis's certificate (`rediss://`), then the password |
+| Edge adapters, simulator, Integration Hub → core services (gRPC) | edge credential per call, plaintext | TLS to each service's certificate, then the edge credential |
+| Edge adapters, simulator, Integration Hub → Redis / PostgreSQL | password, plaintext | TLS to the store's certificate, then the password |
+| Edge workloads → admin-console's key set (HTTP) | plaintext | HTTPS to admin-console's certificate |
+| Console (server side) → admin-console API, media server auth hook → admin-console | plaintext inside the cluster | HTTPS to admin-console's certificate |
+| Core services → edge adapters (commands) | signed service token per call, plaintext | unchanged (not covered yet) |
 
 Every core service keeps its plaintext port for the health probes and, until the
 [final step](#the-final-step-refusing-plaintext), for callers that have not moved to TLS yet.
@@ -64,10 +70,10 @@ inside the network can pose as the database or the cache. The password still aut
 service afterwards; neither store asks the services for a client certificate.
 
 Redis keeps serving its plaintext port next to the TLS one, and PostgreSQL keeps accepting
-plaintext sessions, until the [final step](#the-final-step-refusing-plaintext): the edge adapters,
-the Integration Hub and the simulator still connect without TLS. A service whose Redis URL still
-says `redis://` while internal TLS is on connects with `rediss://` rather than silently falling
-back to plaintext.
+plaintext sessions, until the [final step](#the-final-step-refusing-plaintext), for a workload
+that has not moved yet (an edge adapter of your own on an older SDK). A core service whose Redis
+URL still says `redis://` while internal TLS is on connects with `rediss://` rather than silently
+falling back to plaintext.
 
 For a managed PostgreSQL or Redis outside the installation, which the internal CA cannot vouch
 for, set `ZQNT_INTERNAL_TLS_POSTGRES=false` or `ZQNT_INTERNAL_TLS_REDIS=false` (Helm:
@@ -92,6 +98,13 @@ ingress to the services' TLS listeners. The chart's own PostgreSQL (`postgres-v2
 Redis on `internalTls.redis.port` (6380) next to its plaintext port; the core services connect
 that way, and the stores restart once for it. Nothing else changes: the plaintext ports stay for
 the probes and for callers outside core.
+
+The workloads outside core — the edge adapters (DJI, AI, SAPIENT, ONVIF), the simulator, the
+Integration Hub, the console and the media server — get the CA certificate alone, the `ca.crt`
+item of the CA Secret (`internalTls.ca`), mounted at `/etc/zqnt/internal-tls/ca.crt`, and are
+pointed at the TLS listeners: see [Workloads outside core](#workloads-outside-core). Their images
+must carry the change (the 3.1 line of the adapters, simulator, Integration Hub and console);
+switch `internalTls.enabled` on together with them, not before.
 
 A renewed store certificate is read at the next restart of `postgres-v2` / `redis-v2`
 (`kubectl rollout restart deployment/postgres-v2 -n <namespace>`); the core services reload theirs
@@ -122,7 +135,33 @@ operator can reach it. The certificates are good for 90 days: run the script aga
 restart the services; the CA is kept.
 
 The admin-console API stays published in plaintext on 8005 for the reverse proxy in front of it;
-8443 serves the same API over TLS with the internal CA.
+8443 serves the same API over TLS with the internal CA. The overlay also moves the simulator
+(`--profile simulator`) to the core services' TLS ports, Redis's TLS port and admin-console's key
+set over HTTPS, and the console's server-side proxy to `https://admin-console-service:8443`, each
+with `internal-tls/ca.crt` mounted alone: the plaintext addresses in `.env.customer` stay as they
+are and are overridden by the overlay.
+
+## Workloads outside core
+
+Everything that calls the core from inside the installation without being a core service — the
+edge adapters, the simulator, the Integration Hub, the console's server side and the media
+server's auth hook — reads the same two settings:
+
+| Variable | Meaning |
+| --- | --- |
+| `ZQNT_INTERNAL_TLS=true` | call the core services, Redis, PostgreSQL and admin-console's key set over TLS, each connection verified against the CA **and** the dialled host name; off (the default) is plaintext |
+| `ZQNT_INTERNAL_TLS_CA` | the CA certificate, default `/etc/zqnt/internal-tls/ca.crt`; a missing file stops the workload at start instead of falling back to plaintext |
+
+They present **no client certificate**: their edge credential (`ZQNT_EDGE_TOKEN`), the console
+session or the hook secret authenticates them as before, now over TLS. The Helm chart and the
+Compose overlay set both variables and the TLS addresses (`…:8443`, `rediss://…:6380`,
+`sslmode=verify-full` on the Integration Hub's database URL, the key set on
+`https://…:8443/api/admin-console/auth/service-keys`); an adapter you run elsewhere, built on
+the Java, Python or Go Edge SDK (3.1 or later), takes the same two variables plus the CA file,
+and the client SDKs read them too for a client inside the installation.
+
+The Edge SDKs keep plaintext as the default, so an adapter on an older SDK keeps working until the
+[final step](#the-final-step-refusing-plaintext); from then on it is refused.
 
 ## The final step: refusing plaintext
 
@@ -131,10 +170,31 @@ closes the door: a gRPC call that arrives over plaintext is refused before its c
 and a platform service token is accepted only together with the caller's client certificate. On
 Helm the same switch closes Redis's plaintext port and makes PostgreSQL reject a session without
 TLS; on Compose set `ZQNT_REDIS_PLAINTEXT_PORT=0` and `ZQNT_POSTGRES_PLAINTEXT=reject` in
-`.env.customer` alongside it. Switch it on once nothing calls the core, the database or the cache
-over plaintext any more; until then an installation with internal TLS on still encrypts every call
-between the core services, the ingresses, the console API, the database and the cache, and only
-tolerates callers that have not moved yet.
+`.env.customer` alongside it.
+
+The order that keeps the installation working at every step:
+
+1. **Roll out the images** of every workload with its internal TLS change — the core services
+   (3.0.1 or later), then the edge adapters, the simulator, the Integration Hub and the console
+   (their 3.1 images) — while internal TLS is still off; nothing changes yet.
+2. **Switch internal TLS on** (`internalTls.enabled: true`; Compose: issue the certificates and
+   add the overlay). The core services serve TLS next to their plaintext ports and call each other
+   over mutual TLS; the workloads outside core move to the TLS listeners; the plaintext ports
+   stay open. Check the log lines and `pg_stat_ssl` / `CLIENT LIST` below: nothing of yours should
+   still appear on a plaintext port, apart from the health probes, the metrics scrape and the agent
+   service (see [What is not covered yet](#what-is-not-covered-yet)).
+3. **Move what is still on plaintext**: an edge adapter of your own gets the two variables and
+   the CA file; a client of your own inside the installation the same, or stays on the public
+   gRPC ingress, which is TLS already.
+4. **Refuse plaintext**: `internalTls.require: true` (Compose: the three `.env.customer`
+   settings). From now on a plaintext gRPC call is answered with `UNAUTHENTICATED`, Redis's
+   plaintext port is closed and PostgreSQL rejects a plaintext session; the health probes keep
+   their plaintext HTTP port, which serves no API.
+
+Until step 4 an installation with internal TLS on already encrypts every call between the core
+services, the ingresses, the console API, the database and the cache, and from the edge
+workloads, and only tolerates callers that have not moved yet. To go back one step, switch
+`require` off again; the certificates stay.
 
 ## Bringing your own CA
 
@@ -165,20 +225,26 @@ lists every workload certificate with `READY True`.
 
 For the stores: in PostgreSQL, `select usename, ssl, version from pg_stat_ssl join
 pg_stat_activity using (pid) where client_addr is not null` lists every session with `ssl = t` and
-`TLSv1.3` for the core services (a plaintext one shows `f`); `redis-cli -p 6380 --tls --cacert
-ca.crt ping` answers `PONG`, and `CLIENT LIST` on the TLS port shows the services' connections
-while the plaintext port only has those of the workloads that have not moved yet.
+`TLSv1.3` for the core services and the Integration Hub (a plaintext one shows `f`);
+`redis-cli -p 6380 --tls --cacert ca.crt ping` answers `PONG`, and `CLIENT LIST` on the TLS port
+shows the services', adapters' and simulator's connections while the plaintext port only has those
+of the workloads that have not moved yet.
+
+For a workload outside core: it starts without a certificate error and its telemetry keeps
+arriving; an adapter with `ZQNT_INTERNAL_TLS=true` but no CA file refuses to start and names
+`ZQNT_INTERNAL_TLS_CA`. From its pod, `openssl s_client -connect connector-service:8443 -CAfile
+/etc/zqnt/internal-tls/ca.crt </dev/null` shows `Verify return code: 0 (ok)`.
 
 ## What is not covered yet
 
-- **Workloads outside core.** The Integration Hub, the agent service, the adapters and the
-  simulator still call the core over plaintext, and the platform still dials adapters over
-  plaintext; the adapters, the Integration Hub and the simulator also still reach Redis and
-  PostgreSQL over plaintext. They move to the TLS ports with the CA mounted, and the final step
-  above is switched on afterwards.
+- **The agent service.** It still calls admin-console over plaintext gRPC and is the one
+  workload the final step would cut off; it moves in its own change.
+- **Commands to the adapters.** The platform dials an adapter's own gRPC port (its
+  `EdgeAdapterService`) over plaintext; every command carries a signed, short-lived service token
+  the adapter verifies, but the connection is not encrypted yet. The Integration Hub's bridge port
+  is the same case.
 - **Keycloak's own database on Kubernetes.** The chart's Keycloak keeps its separate PostgreSQL
   (`keycloak-postgres`) in plaintext; on Compose, where Keycloak shares the platform's PostgreSQL,
   its connection is already verified against the CA.
-- **In-cluster HTTP.** The media server's auth hook and the service-key set the edge workloads
-  fetch (`/api/admin-console/auth/service-keys`) still reach admin-console over plaintext HTTP, and
-  the metrics endpoint stays plaintext for Prometheus.
+- **Metrics.** The metrics endpoint stays plaintext for Prometheus, on the management port that
+  serves nothing else.
