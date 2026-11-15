@@ -25,6 +25,29 @@ The adapter is built on the standard `EdgeAdapterRuntime`/`EdgeAdapterConfig` pa
 4. Results are published via `DetectionPublisher` / `ProduceDetection`, visible the same way any other adapter's detections are.
 5. If enabled, the adapter calls `RemoteControlService.LookAt` to re-aim the target's gimbal at the tracked object.
 
+## Which video detection reads (3.0)
+
+When a detection is started without its own `stream_url`, and the asset has no pull URL of its own,
+the adapter reads the asset's stream from the platform's media server (`AI_STREAM_READ_URL`, with
+the read key `AI_STREAM_READ_KEY`). It prefers the camera's low-resolution **analysis stream**:
+
+- It first checks whether `live/<sn>/analysis` is published (a quick probe of up to 5 seconds). The
+  ONVIF adapter publishes one for cameras that have a sub-stream, see
+  [Analysis stream for detection](edge-sdk-onvif-adapter-deployment.md#analysis-stream-for-detection).
+- If it is, the run reads it. The live view and recordings keep the full-quality main stream.
+- If it is not, the run reads the main stream (`live/<sn>`, `live/<sn>/drone` for an aircraft,
+  `live/<sn>/dji_dock` for a dock) as before.
+
+`detection.start`, `detection.stop` and `detection.status` (per run) report which one is read:
+`stream: analysis` or `stream: main`, and the adapter log says so when the run starts. A read key for
+`live/*` covers the analysis stream too.
+
+Reading the analysis stream is on by default. Switch it off with the Technical Config setting
+`ai.stream.prefer_analysis = false` or `AI_STREAM_PREFER_ANALYSIS=false`. An explicit `stream_url`,
+an asset's pull URL and the simulation video for simulated assets are always used as they are.
+`detection.snapshot` keeps the main stream when no detection is running on the asset, because that
+picture is for a person to decide on.
+
 ## Detection control (custom command)
 
 Starting, stopping, and toggling tracking is done through `SendCustomCommand` with `command_type = "detection.control"` — the same generic custom-command pattern other adapters use (e.g. MAVLink's `mission.waypoint.execute`). `params` mirrors this shape:
@@ -61,6 +84,7 @@ Starting, stopping, and toggling tracking is done through `SendCustomCommand` wi
 | `AI_CAMERA_HFOV_DEG` | `82.0` | Camera horizontal field of view (degrees) — tune to your actual camera |
 | `AI_CAMERA_VFOV_DEG` | `52.0` | Camera vertical field of view (degrees) |
 | `AI_MIN_CONFIDENCE` | `0.6` | Minimum detection confidence to report |
+| `AI_STREAM_PREFER_ANALYSIS` | `true` | 3.0: read a camera's low-resolution analysis stream (`live/<sn>/analysis`) when it is published; see [Which video detection reads](#which-video-detection-reads-30) |
 | `ZQNT_CLAIM_CODE` | _unset_ | A one-time pairing code from the console's **Pair device** dialog. Used only when the platform does not already know this service's serial number: the code decides which organization the resulting asset belongs to, and that cannot be changed afterwards. Leave it unset once the asset exists — the code is single-use. Without it, an unknown serial simply has no asset, and this service creates nothing. |
 | `ZQNT_EDGE_TOKEN` | _unset_ | The adapter's **edge credential**, sent on every call to the platform. Issued in the Admin Console under **Manage → Access & Integrations → Credentials** (kind *Edge adapter*); without it the platform refuses the calls |
 | `ZQNT_PLATFORM_PUBLIC_KEY` | _unset_ | The platform's public key (alias `SERVICE_AUTH_PUBLIC_KEY`). The adapter refuses every command the platform did not sign with it; without it, every command is refused |
