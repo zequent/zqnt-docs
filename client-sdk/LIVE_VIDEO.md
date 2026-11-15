@@ -372,11 +372,18 @@ stream is refused.
 
 ### Keys the platform mints itself
 
-Every start through the Admin Console API mints a short-lived credential for that one stream path:
+Every start through the Admin Console API mints a short-lived credential for that camera's stream
+path:
 
 - a **publish** key, good for 10 minutes, put into the push URL the device receives;
 - a **read** key, good for 2 minutes, put into the playback URL a viewer receives — a fresh one on
   every state call while the stream is live.
+
+Each key also covers the camera's **analysis stream**, the same path with `/analysis` added
+(`live/<sn>/analysis` next to `live/<sn>`), with the same permission. That is the low-resolution
+copy of the video a camera can publish for AI detection while the live view keeps full quality (see
+[Analysis stream for detection](../edge-sdk/edge-sdk-onvif-adapter-deployment.md#analysis-stream-for-detection)).
+Nothing else is covered: not other paths below the stream, and not another asset's streams.
 
 For RTMP, RTSP and SRT the key travels in the query (`?user=zqnt-pub&pass=<key>`); for an HTTP
 playback URL it travels as `zqnt-read:<key>@host`. The publish key never comes back to whoever
