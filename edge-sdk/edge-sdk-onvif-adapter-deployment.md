@@ -148,12 +148,16 @@ next to the main stream:
 - **When.** It starts, restarts and stops together with the main stream, whether an operator opens
   the live view, an Application runs `stream.start` or the camera streams on its own. A failing
   analysis stream never fails `stream.start`.
-- **Publish key.** The analysis stream is published with a publish key you mint once in the Admin
-  Console under **Assets → Stream keys** (permission *publish*, path `live/*`, or `live/<sn>*` for
-  one camera). Give it to the adapter as `ONVIF_STREAM_PUBLISH_KEY` for every camera, or per camera
-  with `publish_key_env` (the name of an environment variable) or `publish_key_file` in the camera
-  file; a plain `publish_key` in the file is refused. Without a key the camera publishes only its
-  main stream, and the adapter log says why.
+- **Credential.** The analysis stream is published with the same credential as the main stream.
+  The key the platform hands out with `stream.start` for `live/<sn>` also covers
+  `live/<sn>/analysis`, so no extra key is needed. An operator publish key is optional: when the
+  camera streams on its own with one (`auto_stream`), the analysis stream uses that key too, and when the
+  publish URL the camera receives carries no credential, the adapter adds the operator key if one is
+  configured. Mint it once in the Admin Console under **Assets → Stream keys** (permission
+  *publish*, path `live/*`, or `live/<sn>*` for one camera) and give it to the adapter as
+  `ONVIF_STREAM_PUBLISH_KEY` for every camera, or per camera with `publish_key_env` (the name of an
+  environment variable) or `publish_key_file` in the camera file; a plain `publish_key` in the file
+  is refused.
 
 Per camera, or for all cameras in `[defaults]`:
 
