@@ -20,7 +20,8 @@ default model, as before.
 - **Installation-wide.** A system admin sets the value for every organization in **Manage →
   Configuration** (scope `GLOBAL`).
 - **Per organization.** An organization may set its own value under **Manage → Follow & Relief
-  Settings**, which overrides the installation's choice. It cannot be set per site.
+  Settings**, in the group **AI models**, which overrides the installation's choice. It cannot be
+  set per site.
 
 For AI assessments, a model chosen on the step itself always wins, and an AI step with tools keeps
 the organization's default model.
@@ -87,6 +88,21 @@ AGENT_MODEL_PROFILES='{"my-review-model": {"prompt": "compact", "output": "nativ
 | `thinking` | `off`, `low`, `medium`, `high`, `xhigh`, `max` | what the task asks for; reviews ask for none |
 | `timeout_seconds` | one call's timeout | the catalog's **Timeout per call** |
 | `max_output_tokens` | one call's longest answer | the catalog's **Longest answer** |
+
+With the Helm chart, set the value `agentService.modelProfiles` instead of the variable; the
+chart writes it as JSON into `AGENT_MODEL_PROFILES`:
+
+```yaml
+agentService:
+  modelProfiles:
+    zqnt-reaction-review: {prompt: compact, output: native, temperature: 0}
+    my-review-model: {prompt: compact, output: native, temperature: 0}
+```
+
+Left at `null` (the chart's default), the variable is not set and the agent service's default
+below applies; `{}` sets no profiles. A JSON string is passed through as is. A value you set
+replaces the default, so keep `zqnt-reaction-review` in it as long as that model does the reaction
+review.
 
 A model without a profile is called like any other model, so most models need no entry. When the
 variable is not set, only the model id `zqnt-reaction-review` has a profile (`compact`, `native`,
