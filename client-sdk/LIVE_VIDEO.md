@@ -74,6 +74,11 @@ If either is missing the adapter skips the auto-start silently; it is a normal c
 error. There is a short delay (about 5 seconds) between the camera becoming available and the start
 command being sent, so the aircraft has settled before it is asked to publish.
 
+An ONVIF camera with `auto_stream = true` does the same: it reports that it can stream whenever it
+connects (platform mode needs only `LIVE_STREAM_AUTO_START_ENABLED=true`), and with a publish key of
+its own (`ONVIF_STREAM_PUBLISH_URL` / `ONVIF_STREAM_PUBLISH_KEY`) it publishes to `live/<sn>` by
+itself as well. See the [ONVIF adapter guide](../edge-sdk/edge-sdk-onvif-adapter-deployment.md#live-video).
+
 ### On demand, from the console or your application
 
 The rest of this page is about this path: an explicit start for a named camera.
