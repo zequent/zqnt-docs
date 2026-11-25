@@ -88,6 +88,8 @@ object of params — no typed method per command. These pages describe preview b
 | Size an installation: what one admin-console replica handles, service level objectives, when to add replicas, CPU and memory per service, Postgres and Redis connections (3.0, first measurements) | [Sizing and capacity](admin/sizing-and-capacity.md) |
 | Connect a site's devices as Edge Nodes: enroll with a one-time code, QR code or provisioning file, check they are online, bind assets, suspend, revoke, report a lost device (preview) | [Enrolling and managing Edge Nodes](admin/edge-nodes.md) |
 | Build an adapter on the 3.0 Edge SDK: command registry, v3 commands and events, telemetry catalog, conformance kit | [Java](edge-sdk/edge-sdk-adapter-3.0.md) · [Python](edge-sdk/edge-sdk-python-adapter-3.0.md) · [Go](edge-sdk/edge-sdk-go-adapter-3.0.md) |
+| Run versioned vision models on the AI adapter: a model catalog distributed from object storage, one command per task (licence plates, drones), a second model that reads what the first found, a GPU budget that refuses or queues, many cameras on one GPU (3.0) | [Vision models](edge-sdk/edge-sdk-ai-adapter-deployment.md#vision-models-30) |
+| Report what a model read about a detection (plate text, drone type) from your own adapter | [Detection attributes](edge-sdk/edge-sdk-python-adapter-3.0.md#detection-attributes) |
 
 ## Platform Service Images
 

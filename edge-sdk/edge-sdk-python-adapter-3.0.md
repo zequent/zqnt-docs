@@ -249,6 +249,47 @@ values are not sent; `observed_at` defaults to now. `TelemetryIngestPublisher` k
 stream per kind (telemetry, detections, alerts), buffers while it is down and reconnects with
 backoff (1 s doubling to 60 s). `publish_detections(DetectionBatch(...))` publishes detections.
 
+### Detection attributes
+
+A detection can carry what a model read or recognised about the object beyond its class: the text
+of a licence plate, its country, the type of a drone. Add them as `DetectionAttribute`s, and name
+the model that produced the detection as `name@version`:
+
+```python
+from edge_sdk import BoundingBox, DetectionAttribute, DetectionBatch, DetectionResult
+
+await rt.ingest.publish_detections(
+    DetectionBatch(
+        sn="CAM-GATE-NORTH",
+        detections=[
+            DetectionResult(
+                object_id="track-17",
+                object_type="licence_plate",
+                confidence=0.91,
+                bounding_box=BoundingBox(x=0.42, y=0.61, width=0.08, height=0.03),
+                model="plates@1.2.0",
+                attributes=[
+                    DetectionAttribute(key="plate", value="M AB 123", confidence=0.93, model="plate-text@2.0.0"),
+                    DetectionAttribute(key="plate_country", value="DE"),
+                ],
+            )
+        ],
+    )
+)
+```
+
+| Field | Meaning |
+| --- | --- |
+| `key` | Lower snake case: `plate`, `plate_country`, `uav_type` |
+| `value` | Always text; a number goes as its decimal text |
+| `confidence` | 0..1, the attribute's own confidence (default 0: none given) |
+| `model` | The model that produced the attribute when it is not the detection's own, e.g. a second-stage text reader |
+
+The platform stores attributes and the model with every detection. The Admin Console shows the
+newest report's attributes in a track's details on the **Detections** page (`Plate: M AB 123 (93%)`,
+`Plate country: DE`) together with the model. Attributes and the model are sent on a 3.0 platform
+only; on a 2.x platform the detection is published without them.
+
 **Standard keys.** The platform's telemetry catalog (`zqnt_api.telemetry`) has 64 detail keys —
 listed in [The telemetry catalog](edge-sdk-adapter-3.0.md#the-telemetry-catalog) — with constants
 (`zqnt_api.telemetry.DOCK_COVER_STATE`, …), `telemetry_fields()` and `telemetry_field(key)`.
