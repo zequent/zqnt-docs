@@ -130,6 +130,54 @@ say) starts an Application. One alert per camera and type is sent per `alert_int
 
 ---
 
+## Analysis stream for detection
+
+Most cameras offer a full-quality main stream and a smaller sub-stream (640x360, for example). AI
+detection scales every frame down before it looks at it, so decoding a 1080p or 4K stream for it
+mostly costs processing power. The adapter therefore publishes the camera's low-resolution profile
+next to the main stream:
+
+| Stream | Path on the media server | Used by |
+| --- | --- | --- |
+| Main stream | `live/<sn>` | Live view and recording, unchanged |
+| Analysis stream | `live/<sn>/analysis` | AI detection |
+
+- **Which profile.** Of the camera's media profiles, the one with the fewest pixels that is smaller
+  than the main profile. A camera with only one profile, or none smaller, publishes no analysis
+  stream, and detection reads its main stream.
+- **When.** It starts, restarts and stops together with the main stream, whether an operator opens
+  the live view, an Application runs `stream.start` or the camera streams on its own. A failing
+  analysis stream never fails `stream.start`.
+- **Credential.** The analysis stream is published with the same credential as the main stream.
+  The key the platform hands out with `stream.start` for `live/<sn>` also covers
+  `live/<sn>/analysis`, so no extra key is needed. An operator publish key is optional: when the
+  camera streams on its own with one (`auto_stream`), the analysis stream uses that key too, and when the
+  publish URL the camera receives carries no credential, the adapter adds the operator key if one is
+  configured. Mint it once in the Admin Console under **Assets → Stream keys** (permission
+  *publish*, path `live/*`, or `live/<sn>*` for one camera) and give it to the adapter as
+  `ONVIF_STREAM_PUBLISH_KEY` for every camera, or per camera with `publish_key_env` (the name of an
+  environment variable) or `publish_key_file` in the camera file; a plain `publish_key` in the file
+  is refused.
+
+Per camera, or for all cameras in `[defaults]`:
+
+```toml
+[[camera]]
+sn = "CAM-GATE-NORTH"
+# analysis_profile = "Profile_2"     # pin a profile (token or name) instead of the smallest one
+# analysis_stream = false            # publish no analysis stream for this camera
+```
+
+The adapter reports the analysis stream on the camera's `stream.start` / `stream.stop`
+capabilities (`analysisStreamState`, `analysisStreamPath`, `analysisResolution` and, when it
+failed, `analysisStreamReason`) and as the telemetry field `camera.analysis_stream` (`running`,
+`reconnecting`, `failed`, `stopped`).
+
+The AI adapter looks for the analysis stream by itself and falls back to the main stream; see
+[Which video detection reads](edge-sdk-ai-adapter-deployment.md#which-video-detection-reads-30).
+
+---
+
 ## Environment variables
 
 | Variable | Default | Purpose |
