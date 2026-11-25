@@ -40,7 +40,7 @@ This public documentation is for external developers and integration teams. It f
 | Build a custom Python edge adapter | [Python Edge SDK Quickstart](edge-sdk/edge-sdk-python-quickstart.md) |
 | Build a custom Go edge adapter | [Go Edge SDK Quickstart](edge-sdk/edge-sdk-go-quickstart.md) — older API surface, see the doc's status note |
 | Configure an edge adapter | [Edge SDK Configuration](edge-sdk/edge-sdk-configuration.md) |
-| Deploy a ready-made adapter | [DJI](edge-sdk/edge-sdk-dji-adapter-deployment.md) · [MAVLink](edge-sdk/edge-sdk-mavlink-adapter-deployment.md) · [Sapient](edge-sdk/edge-sdk-sapient-adapter-deployment.md) · [RNS](edge-sdk/edge-sdk-rns-adapter-deployment.md) · [Betaflight](edge-sdk/edge-sdk-betaflight-adapter-deployment.md) · [AI Adapter](edge-sdk/edge-sdk-ai-adapter-deployment.md) |
+| Deploy a ready-made adapter | [DJI](edge-sdk/edge-sdk-dji-adapter-deployment.md) · [MAVLink](edge-sdk/edge-sdk-mavlink-adapter-deployment.md) · [Sapient](edge-sdk/edge-sdk-sapient-adapter-deployment.md) · [RNS](edge-sdk/edge-sdk-rns-adapter-deployment.md) · [Betaflight](edge-sdk/edge-sdk-betaflight-adapter-deployment.md) · [AI Adapter](edge-sdk/edge-sdk-ai-adapter-deployment.md) · [ONVIF cameras (3.0)](edge-sdk/edge-sdk-onvif-adapter-deployment.md) |
 
 
 ## What You Can Build
@@ -79,11 +79,14 @@ object of params — no typed method per command. These pages describe preview b
 | Plan the move of an installation (platform, adapters, clients) to 3.0: breaking changes, what keeps working, upgrade order | [Upgrading the platform to 3.0](concepts/upgrading-platform-to-3.0.md) |
 | Migrate a 2.0 installation (Docker Compose or Helm) to 3.0 step by step: backups, Keycloak and OpenBao, configuration changes, database migrations, verification, rollback | [Migrating an installation from 2.0 to 3.0](admin/migrating-2.0-to-3.0.md) |
 | Forward the live telemetry of selected assets to MQTT, Kafka, OPC UA or another Integration Hub sink (3.0) | [Forwarding live telemetry](integrations/telemetry-source-3.0.md) |
+| Bring LoRaWAN sensors from your own network server (ChirpStack) in as assets — door, motion, fence, temperature, level, GPS trackers — and let their alarms start Applications (3.0) | [Connecting an on-prem LoRaWAN network server](integrations/lorawan-3.0.md) |
+| Share one picture with TAK users (ATAK, WinTAK, iTAK): their positions, marks, emergencies and GeoChat in Zequent, your drones, detections and alerts in TAK (3.0) | [Connecting a TAK Server](integrations/tak-3.0.md) |
 | Decide which commands wait for a person's approval — per risk level and per operator, AI agent and automation, as system default, per organization and per site; hard guards, loosening safeguards (3.0) | [Approval rules](concepts/approval-rules-3.0.md) |
 | Keep the platform's secrets in OpenBao, sign people in through Keycloak, rotate keys, back up, connect an organization's Microsoft Entra ID (3.0) | [Secrets and sign-in](admin/secrets-and-sign-in.md) |
 | Start an Application from an OPC UA, HTTP or Kafka signal, ask the outside world from a run (weather before takeoff), react to OPC UA value changes (3.0) | [Bridges, triggers and steps](integrations/integration-hub-bridges-3.0.md) |
 | Let people attach files to the AI assistant's chat, and set up assistant profiles with your own instructions (3.0) | [AI assistant: files and profiles](admin/ai-assistant-3.0.md) |
 | Size an installation: what one admin-console replica handles, service level objectives, when to add replicas, CPU and memory per service, Postgres and Redis connections (3.0, first measurements) | [Sizing and capacity](admin/sizing-and-capacity.md) |
+| Connect a site's devices as Edge Nodes: enroll with a one-time code, QR code or provisioning file, check they are online, bind assets, suspend, revoke, report a lost device (preview) | [Enrolling and managing Edge Nodes](admin/edge-nodes.md) |
 | Build an adapter on the 3.0 Edge SDK: command registry, v3 commands and events, telemetry catalog, conformance kit | [Java](edge-sdk/edge-sdk-adapter-3.0.md) · [Python](edge-sdk/edge-sdk-python-adapter-3.0.md) · [Go](edge-sdk/edge-sdk-go-adapter-3.0.md) |
 
 ## Platform Service Images
