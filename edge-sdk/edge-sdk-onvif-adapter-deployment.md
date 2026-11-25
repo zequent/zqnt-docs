@@ -3,7 +3,7 @@
 The ONVIF adapter turns the fixed and PTZ cameras you already have at fences, masts and gates into
 Zequent assets: live video in the Admin Console, PTZ commands in Applications, camera events as
 alerts and event-trigger sources, and **slew-to-cue**: a radar or sensor detection points the
-nearest PTZ camera that covers the target.
+nearest free PTZ camera that covers the target and keeps it on the track.
 
 It speaks ONVIF Profile S/T (device, media, PTZ and events services) to each camera and relays the
 camera's RTSP stream to the platform's media server. Most video management systems (VMS) expose
@@ -83,23 +83,54 @@ PTZ commands are reported as unsupported.
 
 ---
 
-## Slew-to-cue: point a camera at a detection
+## Slew-to-cue: point a camera at a detection and follow it
 
-1. Create an Application with one node, `camera.ptz.look_at`, and map its parameters to the
+The platform offers two camera steps for an Application. Both pick the camera themselves: the
+**nearest online PTZ camera whose coverage contains the target** (within its range and its pan
+sector, as published by the adapter or corrected by an operator on the asset's Coverage tab). A
+nearer camera that cannot turn far enough, or is out of range, is skipped; if no camera covers the
+target, the step fails and says which camera came closest.
+
+| Step | What it does |
+|------|--------------|
+| `camera.ptz.look_at` | Points the chosen camera at `latitude`/`longitude` once. Each new detection starts a new run, so a moving target is followed from one run to the next. |
+| `camera.ptz.follow` | Points the nearest **free** camera at the target and keeps it on the track: the camera is re-aimed whenever the object moved more than `minMoveM` (default 5 m) or every `refreshSeconds` (default 10 s). The step keeps running until the track ends, the alarm is resolved, or someone else sends the camera a PTZ command. |
+
+### Set it up as a site reaction
+
+1. Create an Application with one node, `camera.ptz.follow`, and map its parameters to the
    detection: `latitude` → `$.input.latitude`, `longitude` → `$.input.longitude`,
-   `altitude` → `$.input.altitude`. Add further nodes as needed (for example `stream.start`, or a
-   human approval).
-2. Create an event trigger of type **DETECTION** for the radar or sensor (optionally an object type
-   and minimum confidence) that starts this Application, with the default target (the detecting
-   asset).
-3. When the radar reports a target, the run starts on the radar, and the `camera.ptz.look_at` node
-   is sent to the **nearest online camera whose coverage contains the target**: within its range
-   and its pan sector. A nearer camera that cannot turn far enough, or is out of range, is skipped;
-   if no camera covers the target, the node fails and says which camera came closest. Later camera
-   nodes of the same run go to the same camera.
+   `trackId` → `$.input.trackId` (optional: `altitude` → `$.input.altitude`, `minMoveM`,
+   `refreshSeconds`, `zoom`, `targetSize`). Release it for the site. Add further nodes as needed
+   (for example `stream.start` on the camera, or a human approval).
+2. Either create an event trigger of type **DETECTION** for the radar or sensor (optionally an object
+   type and minimum confidence) that starts this Application, or start it from the alarm card in
+   Operate: both pass the detection's position and track.
+3. When the sensor reports a target, the run starts and the step points the camera. The run's
+   step shows which camera was chosen and why (`CAM-01 points at track …`), every re-aim is a
+   progress update, and the alarm's timeline gets a note when the camera is taken and released.
 
-Each new detection starts a new run, so the camera follows a moving target from one detection to
-the next.
+### Follow and release rules
+
+- **Free camera.** A camera that already follows another track is not free; the next free camera
+  in coverage is chosen, first come, first served. If the only cameras in coverage are busy, the
+  step fails with "held by another run".
+- **One follow per track.** A second run for the same track (an event trigger fires again at its
+  cooldown) completes at once with "already follows track …" instead of taking a second camera.
+- **The operator always wins.** A PTZ command sent to the camera by an operator (remote control,
+  the command drawer) or by another run releases the follow at its next step; the step completes
+  with `released = "an operator took the camera"`.
+- **End of the track.** No report for 60 s (`zqnt.camera-follow.track-timeout`) ends the follow
+  with `released = "track ended"`; resolving the alarm ends it with `"alarm resolved"`; cancelling
+  the run releases the camera.
+- **A refusal.** If the camera refuses to point (`camera.out_of_coverage`, the target left its
+  range or pan/tilt limits), the step fails and the camera is released.
+- Without a `trackId` the camera is pointed once and the step completes.
+
+The step's output is `cameraSn`, `trackId`, `updates` (how often the camera was aimed), the last
+`latitude`/`longitude` and `released` (why it let go). Platform defaults:
+`zqnt.camera-follow.min-move-m` (5), `zqnt.camera-follow.refresh` (10s),
+`zqnt.camera-follow.tick` (2s), `zqnt.camera-follow.track-timeout` (60s).
 
 ---
 
